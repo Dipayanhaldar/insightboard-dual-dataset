@@ -35,7 +35,32 @@ function App(){
  const [filters,setFilters]=useState({}); const [search,setSearch]=useState(''); const [page,setPage]=useState(1); const [pageSize,setPageSize]=useState(10); const [sort,setSort]=useState({key:'end_year',dir:'desc'}); const [sidebarOpen,setSidebarOpen]=useState(true); const [notice,setNotice]=useState('');
  async function switchDataset(mode){setDataMode(mode);setFilters({});setSearch('');setPage(1);setDataLoading(true);try{if(mode==='hyderabad'){const clean=normalizeRows(hyderabadDataset,'hyderabad');setRows(clean);setDatasetName('Hyderabad Metro public-reference dataset');setNotice(`Loaded ${clean.length} Hyderabad Metro station records. This is a station reference list, not live service data.`);}else{const response=await fetch('https://raw.githubusercontent.com/rockyhans/blackcoffer_submission/main/backend/jsondata.json');if(!response.ok)throw new Error(`Public dataset request failed (${response.status}).`);const raw=await response.json();const clean=normalizeRows(raw,'blackcoffer');setRows(clean);setDatasetName('Blackcoffer public dataset');setNotice(`Loaded ${clean.length.toLocaleString()} Blackcoffer records from the public repository.`);}}catch(err){if(mode==='blackcoffer'){setRows(normalizeRows(demoRows));setDatasetName('Blackcoffer-style demo data (fallback)');setNotice(`Could not load the public Blackcoffer dataset. Showing demo data instead. ${err.message}`);}else{setNotice(`Could not load Hyderabad data: ${err.message}`);}}finally{setDataLoading(false);}}
  useEffect(()=>{switchDataset('blackcoffer');},[]);
- const options=useMemo(()=>Object.fromEntries(FILTERS.map(([key])=>[key,[...new Set(rows.map(r=>key==='end_year'?getYear(r):key==='published'?String(r.published||'').slice(0,4)||'Unknown':String(r[key]??'Unknown')).filter(v=>v&&v!=='Unknown')].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}))])),[rows]);
+ const options = useMemo(
+  () =>
+    Object.fromEntries(
+      FILTERS.map(([key]) => {
+        const values = rows
+          .map((r) =>
+            key === 'end_year'
+              ? getYear(r)
+              : key === 'published'
+                ? String(r.published || '').slice(0, 4) || 'Unknown'
+                : String(r[key] ?? 'Unknown')
+          )
+          .filter((v) => v && v !== 'Unknown');
+
+        return [
+          key,
+          [...new Set(values)].sort((a, b) =>
+            String(a).localeCompare(String(b), undefined, {
+              numeric: true,
+            })
+          ),
+        ];
+      })
+    ),
+  [rows]
+);
  const filtered=useMemo(()=>rows.filter(r=>{
    const matchFilters=FILTERS.every(([key])=>!filters[key]||(key==='end_year'?getYear(r):key==='published'?String(r.published||'').slice(0,4):String(r[key]??''))===filters[key]);
    const q=search.trim().toLowerCase(); const matchSearch=!q||['title','topic','insight','country','sector','region','source','pestle','city'].some(k=>String(r[k]??'').toLowerCase().includes(q)); return matchFilters&&matchSearch;
