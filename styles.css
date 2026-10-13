@@ -7,3 +7,39 @@
 /* Dual-dataset selector */
 .dataset-switch{display:flex;align-items:center;gap:7px;padding:5px 8px;border:1px solid #dce4ef;border-radius:10px;background:#fff;color:#64748b;font-size:12px;white-space:nowrap}.dataset-switch select{max-width:150px;border:0;background:transparent;color:#1f2937;font:inherit;font-weight:650;outline:none;cursor:pointer}.dataset-switch select:disabled{opacity:.6;cursor:wait}
 @media(max-width:900px){.dataset-switch{width:100%;justify-content:space-between}.dataset-switch select{max-width:unset}}
+/* Responsive import controls: keep upload visible on phones and tablets. */
+.upload-btn{position:relative;cursor:pointer;display:inline-flex!important;}
+.upload-btn input[type="file"]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;display:block!important;}
+@media(max-width:600px){
+  .topbar{align-items:center;gap:7px;padding:10px 10px;}
+  .top-actions{flex:1 1 100%;width:100%;display:flex;flex-wrap:wrap;justify-content:flex-start;margin-left:0;gap:7px;}
+  .top-actions .dataset-switch{flex:1 1 100%;min-width:0;}
+  .top-actions .btn{font-size:11px;gap:6px;padding:9px 10px;flex:1 1 auto;}
+  .top-actions .btn svg{width:15px;height:15px;}
+  .top-actions .upload-btn{display:inline-flex!important;}
+  .top-search{order:0;flex:1 1 calc(100% - 45px);max-width:none;}
+  .topbar>.icon-btn{flex:0 0 auto;}
+}
+@media(min-width:601px) and (max-width:900px){
+  .top-actions{flex-wrap:wrap;justify-content:flex-start;}
+  .upload-btn{display:inline-flex!important;}
+}
+
+/* Export controls for Excel and six-chart PDF; wrap cleanly on smaller screens. */
+.excel-btn{border-color:#dce8e0;color:#217346;background:#f8fcf9}
+.top-actions{flex-wrap:wrap}
+@media(max-width:600px){.top-actions .btn{flex:1 1 calc(50% - 8px);min-width:0}.top-actions .btn span{white-space:normal}.top-actions .dataset-switch{flex-basis:100%}.charts-grid{grid-template-columns:1fr}}
+
+/* Dataset identity and user-provided logo controls */
+.dataset-brand{display:flex;align-items:center;gap:12px;margin-top:15px;padding:10px 12px;background:#fff;border:1px solid #e5ebf3;border-radius:13px;width:max-content;max-width:100%;box-shadow:0 3px 12px #203b5a0a}
+.dataset-brand>img,.dataset-logo{width:52px;height:52px;object-fit:contain;border-radius:12px;flex:0 0 52px}
+.dataset-logo{display:grid;place-items:center;font-family:Manrope,sans-serif;font-size:15px;font-weight:900;letter-spacing:-.5px;box-shadow:inset 0 0 0 1px #ffffff70}
+.blackcoffer-logo{color:#fff;background:linear-gradient(145deg,#1b2d4a,#426b9e);}
+.metro-logo{color:#fff;background:linear-gradient(145deg,#e65d2f,#a72825);}
+.custom-logo{color:#fff;background:linear-gradient(145deg,#3988ff,#2466d8);}
+.dataset-brand strong{display:block;color:#24344c;font-size:12px;font-weight:800}
+.dataset-brand small{display:block;color:#8793a5;font-size:10px;margin-top:3px}
+.logo-upload{display:inline-flex;margin-top:6px;color:#2e70df;font-size:10px;font-weight:700;cursor:pointer}
+.logo-upload input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+.logo-upload:focus-within{outline:2px solid #77a9ff;outline-offset:2px}
+@media(max-width:600px){.dataset-brand{width:100%;margin-top:12px}.dataset-brand>img,.dataset-logo{width:44px;height:44px;flex-basis:44px}.logo-upload{font-size:11px}}

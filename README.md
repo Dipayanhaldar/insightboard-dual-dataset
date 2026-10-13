@@ -1,20 +1,34 @@
-# InsightBoard — Dual Dataset Dashboard
+# InsightBoard — Dynamic Dataset & Export Update
 
-A responsive React + Vite dashboard that can switch between two datasets: the public Blackcoffer business-insights JSON and a Hyderabad Metro station reference dataset. Includes six charts, combined filters, search, KPI cards, a sortable/paginated table, local JSON/CSV import, CSV export, and PDF report export.
+This is a Vite + React project. It is intended to be deployed as a static website (for example, Vercel) or built and embedded/hosted through a WordPress workflow that supports custom front-end assets.
 
-## Dataset switcher
-- **Blackcoffer:** loads the publicly accessible `jsondata.json` from the original public repository at runtime. If the network request fails, the app falls back to clearly labeled synthetic Blackcoffer-style demo data. For offline use, download the dataset and use Import data.
-- **Hyderabad Metro:** uses the bundled `src/hyderabad_metro_stations.json` file. It contains station reference records, not live arrival, ridership, or service status. The station list and line assignments should be verified against current official transit information before operational use.
-- You can import a JSON array or an object containing a `records` array, or a CSV file. Imported files stay in the browser and are not uploaded to a server.
+## Features in this update
+- Import JSON arrays or objects containing `records` / `data`, plus CSV files.
+- On import, replace the active dataset; fields, categorical filters, numeric summaries, chart groupings, and table columns are inferred from the imported records.
+- Export filtered records as CSV or Excel (`.xlsx`).
+- Export the visible chart panels as images inside a PDF, followed by a filtered-data table (up to 1,000 rows and the first 12 fields for readable PDF layout).
+- Dataset logo panel: built-in initials for Blackcoffer and Hyderabad Metro presets, plus a **Choose logo** control for a user-provided PNG/JPG/WebP/SVG image. The chosen image is browser-session state; it is not uploaded to a server.
+- Import controls remain visible at mobile widths.
 
-## Run on Windows / VS Code
-1. Install Node.js LTS from https://nodejs.org/.
-2. Extract this ZIP.
-3. Open the `frontend` folder in VS Code.
-4. Open Terminal → New Terminal. If PowerShell blocks npm scripts, select Command Prompt.
-5. Run `npm install`, then `npm run dev`.
-6. Open the local URL printed by Vite.
-7. Run `npm run build` to check production compilation.
+## Run locally
+1. Install Node.js 20 LTS or newer.
+2. Open this folder in a terminal.
+3. Run `npm install`.
+4. Run `npm run dev`.
+5. For a production build, run `npm run build`; deploy the generated `dist` folder.
 
-## Important architecture note
-This is a frontend-only build. It does not currently use Express or MongoDB. If the assessment requires a database-backed REST API, add and deploy that backend as a separate step.
+## Vercel settings
+- Framework: Vite
+- Root directory: repository root (`.`)
+- Install: `npm install`
+- Build: `npm run build`
+- Output: `dist`
+
+## Important deployment note
+Uploading this ZIP to GitHub does not update a separately hosted WordPress site automatically. If WordPress is the live site, you must deploy the built assets to the WordPress setup or update the embed/iframe/source that WordPress uses. If Vercel is the source embedded in WordPress, first deploy to Vercel and verify the embedded URL points to that deployment.
+
+## Logo note
+The current Blackcoffer/Metro badges are text-based placeholders, not official logos. Replace them with the approved high-resolution logo images when provided. The in-app **Choose logo** control lets a user apply a logo for the current browser session.
+
+## Data note
+The included Hyderabad Metro JSON is the project reference dataset. Synthetic or user-imported demo files should be clearly labelled and not represented as verified company sales.
