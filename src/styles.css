@@ -43,3 +43,51 @@
 .logo-upload input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
 .logo-upload:focus-within{outline:2px solid #77a9ff;outline-offset:2px}
 @media(max-width:600px){.dataset-brand{width:100%;margin-top:12px}.dataset-brand>img,.dataset-logo{width:44px;height:44px;flex-basis:44px}.logo-upload{font-size:11px}}
+
+
+/* Table cell wrapping fix: long values (especially addresses) must stay inside their own columns. */
+.table-scroll{
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+}
+.table-scroll table{
+  width:max-content;
+  min-width:100%;
+  table-layout:auto;
+  white-space:normal;
+}
+.table-scroll th,
+.table-scroll td{
+  min-width:120px;
+  max-width:260px;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:normal;
+  vertical-align:top;
+  line-height:1.45;
+}
+.table-scroll th .sort-btn{
+  display:inline-block;
+  max-width:100%;
+  text-align:left;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  line-height:1.4;
+}
+.table-scroll td.title-cell{
+  white-space:normal;
+  overflow-wrap:anywhere;
+  text-overflow:clip;
+}
+@media(max-width:600px){
+  .table-scroll th,
+  .table-scroll td{
+    min-width:110px;
+    max-width:220px;
+    padding:10px 11px;
+  }
+}
+
