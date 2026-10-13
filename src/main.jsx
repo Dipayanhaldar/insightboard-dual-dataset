@@ -70,4 +70,4 @@ function App(){
 }
 function Kpi({icon,label,value,sub,color}){return <div className="kpi-card"><div className={`kpi-icon ${color}`}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div><div className="kpi-sub">{sub}</div></div>}
 function ChartCard({title,subtitle,children}){return <div className="chart-card"><div className="chart-card-head"><div><h3>{title}</h3><p>{subtitle}</p></div><button className="chart-menu" title="Chart visualization"><BarChart3 size={17}/></button></div><div className="chart-body">{children}</div></div>}
-createRoot(docu
+createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>);
