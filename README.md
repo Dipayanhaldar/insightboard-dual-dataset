@@ -1,21 +1,25 @@
-# InsightBoard — Dynamic Dataset & Export Update
+# InsightBoard — Dynamic Dataset Dashboard
 
-This is a Vite + React project. It is intended to be deployed as a static website (for example, Vercel) or built and embedded/hosted through a WordPress workflow that supports custom front-end assets.
+InsightBoard is a React + Vite data exploration dashboard designed for Vercel deployment.
 
-## Features in this update
-- Import JSON arrays or objects containing `records` / `data`, plus CSV files.
-- On import, replace the active dataset; fields, categorical filters, numeric summaries, chart groupings, and table columns are inferred from the imported records.
+## Current features
+- Built-in datasets: Blackcoffer Corporate Data and Hyderabad Metro Rail station-reference data.
+- Import JSON arrays or objects containing `records` / `data`, plus CSV files. An **Imported Data** selection appears only after a file has been loaded.
+- Imported records replace the currently active dataset; they are not merged with built-in presets.
+- URL, link, href and hyperlink fields are hidden from the dashboard fields, filters, charts, table and exports.
+- Dynamic categorical filters, KPI cards, six chart panels, and searchable, sortable, paginated records table.
+- Light mode by default, with a dark-mode toggle. The selected appearance is remembered in the current browser.
 - Export filtered records as CSV or Excel (`.xlsx`).
 - Export the visible chart panels as images inside a PDF, followed by a filtered-data table (up to 1,000 rows and the first 12 fields for readable PDF layout).
-- Dataset logo panel: built-in initials for Blackcoffer and Hyderabad Metro presets, plus a **Choose logo** control for a user-provided PNG/JPG/WebP/SVG image. The chosen image is browser-session state; it is not uploaded to a server.
-- Import controls remain visible at mobile widths.
+- Responsive import and chart controls for smaller screens.
+- Preset logo assets and an optional user-provided dataset logo for the current browser session.
 
 ## Run locally
 1. Install Node.js 20 LTS or newer.
 2. Open this folder in a terminal.
 3. Run `npm install`.
 4. Run `npm run dev`.
-5. For a production build, run `npm run build`; deploy the generated `dist` folder.
+5. Run `npm run build` to verify a production build.
 
 ## Vercel settings
 - Framework: Vite
@@ -24,11 +28,5 @@ This is a Vite + React project. It is intended to be deployed as a static websit
 - Build: `npm run build`
 - Output: `dist`
 
-## Important deployment note
-Uploading this ZIP to GitHub does not update a separately hosted WordPress site automatically. If WordPress is the live site, you must deploy the built assets to the WordPress setup or update the embed/iframe/source that WordPress uses. If Vercel is the source embedded in WordPress, first deploy to Vercel and verify the embedded URL points to that deployment.
-
-## Logo note
-The current Blackcoffer/Metro badges are text-based placeholders, not official logos. Replace them with the approved high-resolution logo images when provided. The in-app **Choose logo** control lets a user apply a logo for the current browser session.
-
 ## Data note
-The included Hyderabad Metro JSON is the project reference dataset. Synthetic or user-imported demo files should be clearly labelled and not represented as verified company sales.
+The built-in Hyderabad Metro data is station-reference data, not live train-position or service-status information. Imported files are processed in the browser and are not uploaded to a server by this version.
