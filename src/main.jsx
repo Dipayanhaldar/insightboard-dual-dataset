@@ -7,6 +7,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
+import { Analytics } from '@vercel/analytics/react';
 import './styles.css';
 
 const COLORS = ['#377dff','#26b5a8','#f5a623','#8b7cf6','#f06d9b','#65a5e8','#7e9b62','#ed8064'];
@@ -104,6 +105,7 @@ function App(){
     <div className="table-scroll"><table><thead><tr>{fields.slice(0,12).map(key=><th key={key}><button className="sort-btn" onClick={()=>setSort(p=>({key,dir:p.key===key&&p.dir==='asc'?'desc':'asc'}))}>{nice(key)}{sort.key===key?(sort.dir==='asc'?' ↑':' ↓'):''}</button></th>)}</tr></thead><tbody>{pageRows.map((r,i)=><tr key={r._insightboard_id??i}>{fields.slice(0,12).map(key=><td key={key} className={key===fields[0]?'title-cell':''} title={String(r[key]??'')}>{r[key]===null||r[key]===undefined?'—':typeof r[key]==='object'?JSON.stringify(r[key]):String(r[key])}</td>)}</tr>)}</tbody></table></div>
     <div className="table-foot"><span>Showing {filtered.length?((page-1)*pageSize+1):0}–{Math.min(page*pageSize,filtered.length)} of {filtered.length.toLocaleString()} records</span><div className="pagination"><button disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Previous</button><span>Page {page} of {pageCount}</span><button disabled={page>=pageCount} onClick={()=>setPage(p=>p+1)}>Next</button></div></div>
    </section><footer>InsightBoard <span>·</span> Schema-aware data visualization <span>·</span> {new Date().getFullYear()}</footer></div></main>
+  <Analytics />
   {aiOpen&&<div className="ai-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setAiOpen(false);}}>
    <section className="ai-panel" role="dialog" aria-modal="true" aria-label="InsightBoard Gemini AI Analyst">
     <header className="ai-panel-head"><div className="ai-avatar"><Sparkles size={20}/></div><div className="ai-head-copy"><strong>InsightBoard AI Analyst</strong><small>Gemini-powered data summary and reporting assistant</small></div><button type="button" className="icon-btn" onClick={()=>setAiOpen(false)} aria-label="Close AI assistant"><X/></button></header>
