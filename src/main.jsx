@@ -7,6 +7,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
+import { Analytics } from '@vercel/analytics/react';
 import './styles.css';
 
 const COLORS = ['#377dff','#26b5a8','#f5a623','#8b7cf6','#f06d9b','#65a5e8','#7e9b62','#ed8064'];
@@ -95,4 +96,4 @@ function App(){
 }
 function Kpi({icon,label,value,sub,color}){return <div className="kpi-card"><div className={`kpi-icon ${color}`}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div><div className="kpi-sub">{sub}</div></div>}
 function ChartCard({title,subtitle,children}){return <div className="chart-card"><div className="chart-card-head"><div><h3>{title}</h3><p>{subtitle}</p></div><button className="chart-menu" title="Chart visualization"><BarChart3 size={17}/></button></div><div className="chart-body">{children}</div></div>}
-createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>);
+createRoot(document.getElementById('root')).render(<React.StrictMode><App/><Analytics /></React.StrictMode>);
