@@ -91,3 +91,98 @@
   }
 }
 
+
+
+/* Light/dark theme toggle and dark palette. Light remains the default. */
+.theme-toggle{flex:0 0 auto}
+.theme-toggle span{display:inline}
+.dataset-switch select{max-width:210px}
+@media(max-width:600px){
+  .top-actions .theme-toggle{flex:0 1 auto}
+  .top-actions .theme-toggle span{display:inline}
+}
+
+/* Mobile chart legibility: keep chart cards separate and give labels room. */
+@media(max-width:600px){
+  .charts-grid{grid-template-columns:minmax(0,1fr);gap:14px}
+  .chart-card{min-width:0;overflow:hidden}
+  .chart-body{height:270px;min-width:0;overflow:visible}
+  .chart-card-head h3{line-height:1.45;overflow-wrap:anywhere}
+  .chart-card-head p{line-height:1.5}
+  .recharts-responsive-container{min-width:0}
+}
+
+html[data-theme="dark"]{color-scheme:dark;background:#0b1220}
+html[data-theme="dark"] body{background:#0b1220;color:#e5edf7}
+html[data-theme="dark"] .app-shell{background:#0b1220;color:#e5edf7}
+html[data-theme="dark"] .sidebar,
+html[data-theme="dark"] .topbar,
+html[data-theme="dark"] .chart-card,
+html[data-theme="dark"] .kpi-card,
+html[data-theme="dark"] .table-panel,
+html[data-theme="dark"] .dataset-brand,
+html[data-theme="dark"] .intro-chip,
+html[data-theme="dark"] .data-status{background:#111b2c;border-color:#28364b;color:#e2eaf5}
+html[data-theme="dark"] .topbar{background:#111b2ced}
+html[data-theme="dark"] .brand strong,
+html[data-theme="dark"] .page-intro h1,
+html[data-theme="dark"] .kpi-value,
+html[data-theme="dark"] .chart-card-head h3,
+html[data-theme="dark"] .dataset-brand strong,
+html[data-theme="dark"] .section-heading h2,
+html[data-theme="dark"] .table-head h2,
+html[data-theme="dark"] .data-status b{color:#edf4ff}
+html[data-theme="dark"] .page-intro p,
+html[data-theme="dark"] .side-label,
+html[data-theme="dark"] .nav-item,
+html[data-theme="dark"] .filter-control,
+html[data-theme="dark"] .chart-card-head p,
+html[data-theme="dark"] .kpi-label,
+html[data-theme="dark"] .kpi-sub,
+html[data-theme="dark"] .dataset-line,
+html[data-theme="dark"] .dataset-brand small,
+html[data-theme="dark"] .section-heading p,
+html[data-theme="dark"] .table-head p,
+html[data-theme="dark"] .small-muted,
+html[data-theme="dark"] .table-foot,
+html[data-theme="dark"] .data-status small{color:#aab9ce}
+html[data-theme="dark"] .nav-item.active{background:#1d3453;color:#a9c9ff}
+html[data-theme="dark"] .top-search,
+html[data-theme="dark"] .dataset-switch,
+html[data-theme="dark"] .dataset-switch select,
+html[data-theme="dark"] .select-wrap select,
+html[data-theme="dark"] .table-tools select,
+html[data-theme="dark"] .btn-light,
+html[data-theme="dark"] .reset-btn,
+html[data-theme="dark"] .chart-menu,
+html[data-theme="dark"] .top-search kbd,
+html[data-theme="dark"] .pagination button{background:#172438;border-color:#33445d;color:#dce7f6}
+html[data-theme="dark"] .top-search input{color:#edf4ff}
+html[data-theme="dark"] .top-search input::placeholder{color:#8293ab}
+html[data-theme="dark"] .select-wrap svg{color:#9eafc7}
+html[data-theme="dark"] .pagination button:disabled{opacity:.45}
+html[data-theme="dark"] .kpi-icon.blue{background:#1d3453;color:#8ab8ff}
+html[data-theme="dark"] .kpi-icon.teal{background:#163c3b;color:#6ad9c9}
+html[data-theme="dark"] .kpi-icon.purple{background:#302b51;color:#b9aaff}
+html[data-theme="dark"] .kpi-icon.orange{background:#493820;color:#f5c46b}
+html[data-theme="dark"] .result-pill{background:#1d3453;color:#a9c9ff}
+html[data-theme="dark"] .notice{background:#16352c;border-color:#285a48;color:#9be1c4}
+html[data-theme="dark"] .table-panel table,
+html[data-theme="dark"] .table-scroll table{background:#111b2c}
+html[data-theme="dark"] thead{background:#172438}
+html[data-theme="dark"] th{border-color:#28364b;color:#aebed3}
+html[data-theme="dark"] td{border-color:#26354a;color:#c5d1e1}
+html[data-theme="dark"] tbody tr:hover{background:#19283e}
+html[data-theme="dark"] .title-cell,
+html[data-theme="dark"] .metric{color:#e1ebf9}
+html[data-theme="dark"] .tag{background:#1d3453;color:#a9c9ff}
+html[data-theme="dark"] .table-scroll th,
+html[data-theme="dark"] .table-scroll td{border-color:#28364b}
+html[data-theme="dark"] .recharts-cartesian-axis-tick-value{fill:#aebed3!important}
+html[data-theme="dark"] .recharts-cartesian-grid line{stroke:#2a3a50!important}
+html[data-theme="dark"] .recharts-legend-item-text{color:#c1cee0!important}
+html[data-theme="dark"] .recharts-default-tooltip{background:#111b2c!important;border-color:#34445a!important;color:#edf4ff!important;box-shadow:0 8px 24px #0006}
+html[data-theme="dark"] .recharts-tooltip-label,
+html[data-theme="dark"] .recharts-tooltip-item{color:#e5edf7!important}
+html[data-theme="dark"] footer{color:#8fa0b8}
+html[data-theme="dark"] footer span{color:#51627b}
