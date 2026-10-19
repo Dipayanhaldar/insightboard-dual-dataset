@@ -128,3 +128,7 @@ html[data-theme="dark"] .v2-warning{background:#342b18;border-color:#63522a;colo
 @media(max-width:760px){.v2-account-hero{grid-template-columns:1fr;padding:19px;gap:14px}.v2-ai-highlights{grid-template-columns:1fr}.v2-grid{gap:13px}.v2-card{padding:17px}.v2-heading{align-items:flex-start}.v2-ai-badge{font-size:8px}}
 @media(max-width:480px){.v2-account-intro{gap:10px}.v2-account-mark{width:40px;height:40px}.v2-account-intro h3{font-size:21px}.v2-account-hero .v2-auth-tabs button{padding:9px 6px;font-size:12px}}
 @media(prefers-reduced-motion:reduce){.v2-heading,.v2-card,.v2-account-hero,.v2-spin{animation:none!important;transition:none!important}.v2-card:hover,.v2-button:not(:disabled):hover,.v2-auth-tabs button:hover{transform:none}}
+
+.v2-account-content{min-width:0;display:grid;gap:12px;align-content:center}
+.v2-auth-form{animation:ib-fade-up .28s ease both}
+.v2-summary{animation:ib-fade-up .32s ease both}

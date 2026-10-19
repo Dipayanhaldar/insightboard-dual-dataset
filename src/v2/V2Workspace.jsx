@@ -248,6 +248,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields}) {
           <div className="v2-account-mark"><Sparkles size={19}/></div>
           <div><span className="v2-overline">YOUR PRIVATE WORKSPACE</span><h3>Welcome to InsightBoard</h3><p>Sign in to keep your report history, or create an account to get started. Your imported raw data remains in your browser.</p></div>
         </div>
+        <div className="v2-account-content">
         <div className="v2-account-status"><span className={backendStatus.includes('connected')?'v2-status-online':'v2-status-waiting'}></span><span>{backendStatus}</span></div>
         {account?<>
           <div className="v2-account-signed">
@@ -263,13 +264,14 @@ export default function V2Workspace({analytics,rows,fields,numericFields}) {
             <button type="button" className={authMode==='login'?'active':''} onClick={()=>setAuthMode('login')}><LogIn size={14}/> Sign in</button>
             <button type="button" className={authMode==='register'?'active':''} onClick={()=>setAuthMode('register')}><UserPlus size={14}/> Create account</button>
           </div>
-          <form className="v2-auth-form" onSubmit={submitAuth}>
+          <form key={authMode} className="v2-auth-form" onSubmit={submitAuth}>
             <label className="v2-field"><span>Email</span><input type="email" autoComplete="email" maxLength={254} required value={email} onChange={event=>setEmail(event.target.value)} placeholder="you@example.com"/></label>
             <label className="v2-field"><span>Password (10–128 characters)</span><input type="password" autoComplete={authMode==='register'?'new-password':'current-password'} minLength={10} maxLength={128} required value={password} onChange={event=>setPassword(event.target.value)} placeholder="At least 10 characters"/></label>
             <button className="v2-button primary" type="submit" disabled={authBusy}>{authBusy?<RefreshCw size={14} className="v2-spin"/>:authMode==='register'?<UserPlus size={14}/>:<LogIn size={14}/>} {authBusy?'Please wait…':authMode==='register'?'Create account':'Sign in'}</button>
           </form>
           <p className="v2-note">Use a unique password. Password hashes—not plaintext passwords—are stored. Account session ends when this browser session is cleared.</p>
         </>}
+        </div>
       </div>
     <div className="v2-grid">
       <article className="v2-card v2-quality">
