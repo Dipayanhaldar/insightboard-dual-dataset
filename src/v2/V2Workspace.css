@@ -68,3 +68,63 @@ html[data-theme="dark"] .v2-warning{background:#342b18;border-color:#63522a;colo
 .v2-report-list{margin-top:16px}
 .v2-report-list .v2-reports{margin-top:0}
 @media(max-width:620px){.v2-account-signed{align-items:flex-start;flex-direction:column}.v2-account-signed .v2-button-row{width:100%;flex-wrap:wrap}.v2-auth-tabs button{flex:1;justify-content:center}}
+
+
+/* V2 polish: clear hierarchy, welcoming account panel and restrained motion */
+.v2-heading{align-items:center;margin-bottom:20px}
+.v2-heading h2{font-size:clamp(22px,2.2vw,30px);letter-spacing:-.8px}
+.v2-heading p,.v2-muted{font-size:12px}
+.v2-grid{gap:18px;align-items:stretch}
+.v2-card{border-radius:18px;padding:22px;border-color:#e1e9f4;box-shadow:0 8px 24px rgba(28,55,93,.045);transition:transform .24s ease,box-shadow .24s ease,border-color .24s ease}
+.v2-card:hover{box-shadow:0 16px 34px rgba(28,55,93,.09);border-color:#d5e2f3}
+.v2-card-title h3{font-size:14px}
+.v2-heading,.v2-card,.v2-account-hero{animation:ib-fade-up .56s cubic-bezier(.2,.75,.25,1) both}
+.v2-card:nth-child(2){animation-delay:.09s}
+.v2-history{animation-delay:.16s}
+.v2-account-hero{position:relative;isolation:isolate;overflow:hidden;display:grid;gap:18px;grid-template-columns:minmax(230px,.9fr) minmax(300px,1.1fr);align-items:center;margin:6px 0 20px;padding:24px;border:1px solid #cfdfff;background:linear-gradient(115deg,#f4f8ff 0%,#fff 56%,#f1fbfa 100%);box-shadow:0 14px 34px rgba(39,94,177,.09)}
+.v2-account-hero:before{content:"";position:absolute;z-index:-1;width:240px;height:240px;right:-90px;top:-120px;border-radius:50%;background:radial-gradient(circle,rgba(68,132,255,.16),transparent 70%);pointer-events:none}
+.v2-account-intro{display:flex;gap:14px;align-items:flex-start}
+.v2-account-mark{width:46px;height:46px;flex:0 0 auto;display:grid;place-items:center;border-radius:15px;color:#fff;background:linear-gradient(135deg,#3985ff,#6d68ec);box-shadow:0 8px 18px rgba(54,112,224,.25)}
+.v2-overline{display:block;color:#3676dc;font-size:9px;font-weight:800;letter-spacing:1.5px;margin:1px 0 8px}
+.v2-account-intro h3{font:800 clamp(20px,2vw,26px)/1.2 Manrope,system-ui,sans-serif;letter-spacing:-.7px;color:#172944;margin:0 0 7px}
+.v2-account-intro p{font-size:12px;line-height:1.7;max-width:410px;color:#6c7b91;margin:0}
+.v2-account-hero .v2-account-panel{display:grid}
+.v2-account-hero .v2-account-status{font-size:12px}
+.v2-account-hero .v2-auth-form{max-width:none;gap:12px}
+.v2-account-hero .v2-auth-form .v2-button{width:100%;min-height:43px}
+.v2-account-hero .v2-auth-tabs{margin:4px 0 12px}
+.v2-account-hero .v2-field{font-size:11px}
+.v2-account-hero .v2-field input{padding:11px 12px;border-radius:10px;font-size:13px;transition:border-color .18s ease,box-shadow .18s ease}
+.v2-account-hero .v2-field input:focus,.v2-account-hero .v2-field select:focus{outline:none;border-color:#78a7f7;box-shadow:0 0 0 4px rgba(55,125,255,.12)}
+.v2-account-hero .v2-auth-tabs button{padding:10px 13px;border-radius:10px;transition:background .18s ease,border-color .18s ease,transform .18s ease}
+.v2-account-hero .v2-auth-tabs button:hover{transform:translateY(-1px)}
+.v2-account-hero .v2-auth-tabs button.active{background:#e7efff;border-color:#8fb5ff;color:#235fbd}
+.v2-button{font-size:12px;padding:11px 15px;border-radius:10px;transition:transform .18s ease,box-shadow .18s ease,background .18s ease,border-color .18s ease}
+.v2-button:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 7px 16px rgba(36,94,188,.14)}
+.v2-button.primary{background:linear-gradient(110deg,#3278eb,#4f69e8);box-shadow:0 7px 16px rgba(47,111,220,.17)}
+.v2-button.primary:not(:disabled):hover{background:linear-gradient(110deg,#2868d7,#465ad4)}
+.v2-button:focus-visible,.v2-text-button:focus-visible,.v2-auth-tabs button:focus-visible{outline:3px solid rgba(55,125,255,.35);outline-offset:3px}
+.v2-ai-badge{flex:0 0 auto;border-radius:999px;padding:5px 8px;font-size:9px;letter-spacing:.5px;font-weight:800;background:#eef2f7;color:#617187}
+.v2-ai-badge.ready{background:#e4f8ef;color:#16794f}
+.v2-ai-badge.setup,.v2-ai-badge.offline{background:#fff4df;color:#8a5a0a}
+.v2-ai-highlights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:17px 0 12px}
+.v2-ai-highlights>div{display:flex;align-items:flex-start;gap:9px;padding:12px;border:1px solid #e3ebf7;background:linear-gradient(140deg,#f8faff,#fff);border-radius:12px;color:#3873cf}
+.v2-ai-highlights span{display:grid;gap:4px;min-width:0}
+.v2-ai-highlights strong{font-size:11px;color:#283d5a}
+.v2-ai-highlights small{font-size:10px;line-height:1.5;color:#7c8ba1}
+.v2-generate-button{width:100%;min-height:44px;margin-top:1px}
+.v2-ai .v2-field select{padding:10px 12px;font-size:12px;border-radius:10px}
+.v2-ai .v2-consent{font-size:11px;line-height:1.65;color:#60728a}
+.v2-ai .v2-warning{border-radius:11px;font-size:11px}
+.v2-ai .v2-note{font-size:11px}
+.v2-history{margin-top:18px}
+.v2-report-row{padding:13px 0;transition:background .18s ease,padding .18s ease}
+.v2-report-row:hover{background:rgba(57,126,228,.035);padding-left:8px;padding-right:8px}
+.v2-account-signed .v2-button-row{margin:4px 0 0}
+.v2-account-signed .v2-button{font-size:11px}
+.v2-config-note code{font-size:11px;background:rgba(255,255,255,.62);padding:2px 5px;border-radius:5px;overflow-wrap:anywhere}
+@keyframes ib-fade-up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ib-soft-pulse{0%,100%{box-shadow:0 0 0 0 rgba(39,112,222,.05)}50%{box-shadow:0 0 0 5px rgba(39,112,222,.035)}}
+@media(max-width:760px){.v2-account-hero{grid-template-columns:1fr;padding:19px;gap:14px}.v2-ai-highlights{grid-template-columns:1fr}.v2-grid{gap:13px}.v2-card{padding:17px}.v2-heading{align-items:flex-start}.v2-ai-badge{font-size:8px}}
+@media(max-width:480px){.v2-account-intro{gap:10px}.v2-account-mark{width:40px;height:40px}.v2-account-intro h3{font-size:21px}.v2-account-hero .v2-auth-tabs button{padding:9px 6px;font-size:12px}}
+@media(prefers-reduced-motion:reduce){.v2-heading,.v2-card,.v2-account-hero,.v2-spin{animation:none!important;transition:none!important}.v2-card:hover,.v2-button:not(:disabled):hover,.v2-auth-tabs button:hover{transform:none}}

@@ -186,3 +186,17 @@ html[data-theme="dark"] .recharts-tooltip-label,
 html[data-theme="dark"] .recharts-tooltip-item{color:#e5edf7!important}
 html[data-theme="dark"] footer{color:#8fa0b8}
 html[data-theme="dark"] footer span{color:#51627b}
+
+
+/* Final-year project polish: gentle dashboard motion and accessible interaction states */
+.page-intro{animation:ib-dashboard-enter .55s cubic-bezier(.2,.75,.25,1) both}
+.kpi-card,.chart-card,.table-panel{animation:ib-dashboard-enter .55s cubic-bezier(.2,.75,.25,1) both;transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease}
+.kpi-card:nth-child(2){animation-delay:.05s}.kpi-card:nth-child(3){animation-delay:.1s}.kpi-card:nth-child(4){animation-delay:.15s}
+.chart-card:nth-child(2){animation-delay:.08s}.chart-card:nth-child(3){animation-delay:.12s}.chart-card:nth-child(4){animation-delay:.16s}
+.kpi-card:hover,.chart-card:hover,.table-panel:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(28,55,93,.08);border-color:#d9e5f4}
+.nav-item,.icon-btn,.btn,.reset-btn,.select-wrap select,.top-search,.table-tools select,.pagination button{transition:background .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease,transform .18s ease}
+.nav-item:hover{transform:translateX(2px);background:#f4f7fd}
+.btn:focus-visible,.icon-btn:focus-visible,.nav-item:focus-visible,.reset-btn:focus-visible{outline:3px solid rgba(55,125,255,.35);outline-offset:3px}
+tbody tr{transition:background .16s ease}
+@keyframes ib-dashboard-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.page-intro,.kpi-card,.chart-card,.table-panel{animation:none!important;transition:none!important}.kpi-card:hover,.chart-card:hover,.table-panel:hover,.nav-item:hover{transform:none}}

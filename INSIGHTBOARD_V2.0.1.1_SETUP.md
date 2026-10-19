@@ -10,7 +10,7 @@ This feature branch contains a React/Vite + Node.js/Express + MongoDB applicatio
 - Saved reports store a whitelisted aggregate snapshot: field names, filters, numeric summaries, category/time aggregates, completeness and optional Gemini summary. Raw imported rows are not sent to the InsightBoard backend or stored in MongoDB.
 - Account tokens are kept in browser session storage and expire after 8 hours by default. Closing the tab/session may require signing in again.
 - API rate limiting, password length validation, JWT verification, request size limits, a health endpoint and per-account report limits are included.
-- The Gemini panel remains Bring Your Own Key (BYOK): the browser calls Google directly. The Gemini key is not stored on the InsightBoard backend. Use your own key, keep it private, and do not upload confidential data to Google.
+- Gemini AI summaries use a server-side proxy. The application key is stored only in Render environment variables and never shipped to browser JavaScript. The browser submits a sanitized aggregate snapshot to the backend; a separate hourly request limit helps control quota abuse. Raw imported rows are not accepted by the summary endpoint.
 - render.yaml describes one free Render web service that builds the frontend and runs the API from the same origin. It does not contain MongoDB credentials.
 
 ## Proposed free-hosted architecture
@@ -71,12 +71,17 @@ Never paste the live URI, password, or JWT secret into ChatGPT or commit them to
 5. Review the plan and billing screen. Keep the service on Free; do not approve a paid plan or add billing details just to make this demo run.
 6. Automatic deployments are off initially. Manual deploys let you decide when updates from this feature branch are published.
 
-### 3. Optional .TECH domain
+### 3. Gemini server key (needed for AI summaries)
 
-1. Claim an eligible domain through https://education.github.com/pack/; partner availability and eligibility can change.
-2. Register a name that is available, such as insightboard.tech.
-3. After the Render service exists, add the domain in service settings and follow Render's DNS instructions. Render manages TLS certificates and HTTPS for connected custom domains.
-4. Do not change the current production Vercel domain or DNS records. Attach only the newly registered domain to the V2 Render service.
+1. Open https://aistudio.google.com/app/apikey and create a Gemini API key for your project.
+2. In Render, open the V2 web service you intend to keep, then Environment.
+3. Add `GEMINI_API_KEY` and paste the value directly into Render. Do not put the key in source code, GitHub, the browser, or this chat. Leave `GEMINI_MODEL` set to `gemini-3.5-flash-lite` unless you intentionally select another supported model.
+4. Save the environment change and deploy/restart that V2 service. Visit `/api/ai/status` on its public URL; it should return `available: true`. A successful status means the key exists, not necessarily that quota/billing is ready; test by generating one summary.
+5. Watch Google AI Studio's usage/quota and configure billing controls if your use case requires them. Keep the key restricted to the Gemini API when the key type supports that restriction.
+
+### 4. .TECH domain: claim and connect
+
+For a click-by-click guide, see [INSIGHTBOARD_TECH_DOMAIN_SETUP.md](INSIGHTBOARD_TECH_DOMAIN_SETUP.md). The short process is: claim the one-year student offer at https://get.tech/github-student-developer-pack, add the registered domain under Settings → Custom Domains on the selected V2 Render service, copy the DNS records shown by Render to your .TECH registrar, then verify the domain in Render. Render provisions HTTPS after DNS verification. Do not change the current production Vercel domain or GitHub `main` branch.
 
 ## Local development
 
@@ -101,5 +106,5 @@ Never paste the live URI, password, or JWT secret into ChatGPT or commit them to
 - Do not paste database passwords, JWT secrets or Gemini keys into ChatGPT or commit them to GitHub.
 - Password hashes, not plaintext passwords, are stored in MongoDB. Tokens expire after eight hours.
 - Saved reports are scoped by user ID and contain aggregate values rather than raw rows. The backend sanitizes snapshots against a whitelist of fields.
-- The Gemini feature sends the active dashboard's limited aggregate snapshot directly from the browser to Google's API only after the user requests a summary and confirms consent.
+- The Gemini feature sends the active dashboard's sanitized aggregate snapshot to the InsightBoard API only after the user requests a summary and confirms consent. The Express backend sends it to Google with a server-side environment key; raw imported rows are not accepted by that endpoint.
 - main has not been edited or merged. Review this feature branch and a green CI build before deciding whether to provision, deploy or merge anything.
