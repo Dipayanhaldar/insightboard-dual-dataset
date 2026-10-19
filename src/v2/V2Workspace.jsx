@@ -33,7 +33,7 @@ function checkData(rows, fields, numericFields) {
     if (seen.has(key)) duplicates++; else seen.add(key);
   }
   const invalid = (numericFields || []).slice(0,20).reduce((total, field) =>
-    total + subset.filter(row => !blank(row?.[field]) && !Number.isFinite(Number(row[field])).length).length, 0);
+    total + subset.filter(row => !blank(row?.[field]) && Number.isNaN(Number(row[field]))).length, 0);
   return { scanned:subset.length, total:list.length, limited:list.length>subset.length, missing, duplicates, invalid };
 }
 function loadKey() {
