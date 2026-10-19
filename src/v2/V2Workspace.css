@@ -132,3 +132,12 @@ html[data-theme="dark"] .v2-warning{background:#342b18;border-color:#63522a;colo
 .v2-account-content{min-width:0;display:grid;gap:12px;align-content:center}
 .v2-auth-form{animation:ib-fade-up .28s ease both}
 .v2-summary{animation:ib-fade-up .32s ease both}
+
+html[data-theme="dark"] .v2-account-hero{background:linear-gradient(115deg,#17263d 0%,#111b2c 56%,#152d32 100%);border-color:#2e4463}
+html[data-theme="dark"] .v2-account-intro h3{color:#eef4ff}
+html[data-theme="dark"] .v2-account-intro p,html[data-theme="dark"] .v2-account-signed small{color:#a9bad1}
+html[data-theme="dark"] .v2-ai-highlights>div{background:linear-gradient(140deg,#172438,#111b2c);border-color:#31435b}
+html[data-theme="dark"] .v2-ai-highlights strong{color:#e5edf8}
+html[data-theme="dark"] .v2-ai-highlights small{color:#a2b3ca}
+html[data-theme="dark"] .v2-account-hero .v2-auth-tabs button.active{background:#213b63;border-color:#4d82d9;color:#dbe9ff}
+html[data-theme="dark"] .v2-config-note code{background:#3a321e;color:#ffdf99}
