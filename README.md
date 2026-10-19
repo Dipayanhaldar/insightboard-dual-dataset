@@ -1,32 +1,32 @@
 # InsightBoard — Dynamic Dataset Dashboard
 
-InsightBoard is a React + Vite data exploration dashboard designed for Vercel deployment.
+InsightBoard is a React + Vite data exploration dashboard with an optional V2 backend prototype.
 
-## Current features
+## Current dashboard features
 - Built-in datasets: Blackcoffer Corporate Data and Hyderabad Metro Rail station-reference data.
-- Import JSON arrays or objects containing `records` / `data`, plus CSV files. An **Imported Data** selection appears only after a file has been loaded.
-- Imported records replace the currently active dataset; they are not merged with built-in presets.
-- URL, link, href and hyperlink fields are hidden from the dashboard fields, filters, charts, table and exports.
+- Import JSON arrays or objects containing records/data, plus CSV files. Imported records replace the currently active dataset.
 - Dynamic categorical filters, KPI cards, six chart panels, and searchable, sortable, paginated records table.
-- Light mode by default, with a dark-mode toggle. The selected appearance is remembered in the current browser.
-- Export filtered records as CSV or Excel (`.xlsx`).
-- Export the visible chart panels as images inside a PDF, followed by a filtered-data table (up to 1,000 rows and the first 12 fields for readable PDF layout).
-- Responsive import and chart controls for smaller screens.
-- Preset logo assets and an optional user-provided dataset logo for the current browser session.
+- Light/dark themes; CSV, Excel and PDF exports; preset logo assets and Metro announcement audio.
 
-## Run locally
-1. Install Node.js 20 LTS or newer.
-2. Open this folder in a terminal.
-3. Run `npm install`.
-4. Run `npm run dev`.
-5. Run `npm run build` to verify a production build.
+## V2 backend (feature branch only)
+The feature/insightboard-v2.0.1.1 branch adds Node.js + Express, MongoDB account/report storage, and a Render deployment blueprint. It does not modify main.
+- User account and report APIs are served by the same Express service as the built React website.
+- MongoDB stores account credentials as password hashes and private aggregate report snapshots.
+- Raw imported dataset rows remain in the browser and are not uploaded to InsightBoard.
+- Gemini remains browser-side Bring Your Own Key; never commit your key or share it with other users.
+- Hosting and Atlas resources are not provisioned automatically by this repository.
 
-## Vercel settings
-- Framework: Vite
-- Root directory: repository root (`.`)
-- Install: `npm install`
-- Build: `npm run build`
-- Output: `dist`
+See INSIGHTBOARD_V2.0.1.1_SETUP.md for setup, security notes, verified free-tier limitations and deployment steps.
 
-## Data note
-The built-in Hyderabad Metro data is station-reference data, not live train-position or service-status information. Imported files are processed in the browser and are not uploaded to a server by this version.
+## Run the frontend locally
+1. Install Node.js 22 or newer.
+2. Run npm install.
+3. Run npm run dev.
+4. Run npm run build.
+
+## Run the V2 API locally
+1. Copy server/.env.example to server/.env and supply a MongoDB Atlas URI plus a private JWT secret.
+2. Run npm run dev:api in one terminal and npm run dev in another.
+3. Vite proxies /api calls to Express at port 3001.
+
+The built-in Hyderabad Metro data is station-reference data, not live train-position or service-status information.

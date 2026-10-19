@@ -1,49 +1,94 @@
-# InsightBoard V2.0.1.1 — Browser-only Lab Branch
+# InsightBoard V2.0.2 — backend and MongoDB setup
 
-This branch stays in the existing InsightBoard repository and remains separate from main. It is not merged or deployed. The current production site is unchanged.
+This feature branch contains a React/Vite + Node.js/Express + MongoDB application. It remains separate from main. No Render service, MongoDB cluster, domain, or other account resource has been created by this code change.
 
-## What this branch adds
+## What changed
 
-- Local data-quality checks: missing values, possible exact duplicates and non-numeric values in detected numeric columns. Checks are capped at the first 10,000 rows for responsiveness.
-- Gemini summaries from a limited aggregate snapshot of the active dashboard. Raw rows are not sent by this feature.
-- Summary output languages: English, Telugu, Hindi, Tamil, Bengali, Marathi, Kannada, Malayalam and Urdu. V2 panel controls have basic English, Hindi and Telugu labels. The rest of the dashboard is not fully translated yet.
-- An API key input in the UI. The key is never hardcoded in code or sent to an InsightBoard backend. By default, the saved key is held in this browser tab session; optional Remember saves it in this browser's local storage. Forget removes the browser-stored key.
-- Saved report history stored locally in this browser (up to 20 aggregate snapshots). It is not cloud-synced, not account-protected, and does not include raw imported rows.
-- Existing imports, dynamic filters, KPI cards, six charts, table sorting/pagination and CSV/Excel/PDF exports are retained.
-- Vercel auto-deployment is configured to skip this feature branch. Check Vercel's Git settings before activation.
-- GitHub Actions build check for the V2 branch.
+- React dashboard and its existing dataset imports, filters, KPIs, charts, table, exports and Metro assets remain in place.
+- Added a Node.js + Express API served from the same origin as the built React app.
+- Added MongoDB-backed user accounts and report history. Passwords are hashed; each user can access only their own reports.
+- Saved reports store a whitelisted aggregate snapshot: field names, filters, numeric summaries, category/time aggregates, completeness and optional Gemini summary. Raw imported rows are not sent to the InsightBoard backend or stored in MongoDB.
+- Account tokens are kept in browser session storage and expire after 8 hours by default. Closing the tab/session may require signing in again.
+- API rate limiting, password length validation, JWT verification, request size limits, a health endpoint and per-account report limits are included.
+- The Gemini panel remains Bring Your Own Key (BYOK): the browser calls Google directly. The Gemini key is not stored on the InsightBoard backend. Use your own key, keep it private, and do not upload confidential data to Google.
+- render.yaml describes one free Render web service that builds the frontend and runs the API from the same origin. It does not contain MongoDB credentials.
 
-## No InsightBoard backend or database
+## Proposed free-hosted architecture
 
-Supabase, database migrations, serverless functions, cloud authentication and the Supabase client have been removed from this branch. No database or server is created or connected.
+- GitHub: source code and the isolated feature branch.
+- Render Free Web Service: serves the React website and runs the Express API. Public URL with custom-domain support.
+- MongoDB Atlas Free cluster: persists accounts and saved aggregate reports independently of your laptop.
+- GitHub Student Pack .TECH domain: optional; register separately, then attach it to Render.
 
-Gemini still runs as an external Google API because an AI model must be called somewhere. In this version, the visitor's browser calls Google directly using the API key they enter. There is no private shared key embedded in the repo, and no InsightBoard proxy. This is a bring-your-own-key demo, not a secure shared-key production architecture.
+Neither your laptop being open nor any files stored on your laptop are required after successful online deployment. The website and data depend on Render and MongoDB Atlas being available.
 
-IMPORTANT: never send your API key to ChatGPT, commit it to GitHub, paste it into source code, or set it as a VITE_ variable. The browser-only approach cannot keep an entered key secret from the browser environment. If you want everyone to use your one shared key without entering their own, a server-side proxy is required and that would reintroduce backend/cloud infrastructure.
+## Free-tier limitations to know before creating anything
 
-## Generate a Gemini API key
+- Render free web services sleep after 15 minutes without inbound traffic. They wake on the next request, commonly taking about a minute. They may restart, and local filesystem changes are not durable. This app does not store report data on Render's filesystem; MongoDB stores it.
+- Render provides 750 free instance hours per workspace per calendar month. A single continuously active 24/7 service is roughly 720 hours in a 30-day month, leaving little room for other free services. Sleeping services do not consume instance hours. Bandwidth and build-pipeline limits also apply. If no payment method is on file and a free quota is exceeded, Render disables services instead of charging beyond included usage. Do not add billing details just to start this demo.
+- Atlas Free clusters never expire, but storage is limited to 0.5 GB, 100 read/write operations per second, 500 concurrent connections, and one free cluster per project. Atlas may automatically pause an idle free cluster after 30 days with zero connections. It is a small app/demo tier, not a production SLA or backup plan.
+- Render outbound IP ranges are shared by services in the same region. The instructions use those ranges for Atlas network access instead of exposing the database to all IP addresses.
+- Free hosting means best-effort availability, not guaranteed instant response or production uptime. Plans and limits can change.
 
-1. Open https://aistudio.google.com/apikey and sign in to Google AI Studio.
-2. If prompted, accept Google's terms and choose/create a project as prompted.
-3. Click Create API key. New AI Studio keys are currently created as authorization keys by default.
-4. Keep the key private. If available for that key, restrict use to the Gemini API and restrict website origins to your actual domain. A restriction limits misuse but does not make a browser-shared key equivalent to a server secret.
-5. Open your deployed InsightBoard or local demo, paste the key into the Gemini API key field, and click Use key in this browser. Leave Remember unchecked to store only for this browser tab session. Check Remember only if you want it saved in local storage on this device.
-6. Select a summary language, read the data-sharing acknowledgement, tick the checkbox, and click Generate Gemini summary.
-7. Click Forget key when finished, especially on shared computers.
+Sources checked on 19 October 2026:
+- Render free service limits: https://render.com/docs/free
+- Render Blueprint configuration and generated secrets: https://render.com/docs/blueprint-spec
+- MongoDB Atlas Free cluster limits: https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/
+- MongoDB Atlas Free cluster setup: https://www.mongodb.com/docs/atlas/tutorial/deploy-free-tier-cluster/
+- Render outbound IP ranges: https://render.com/docs/outbound-ip-addresses
+- Render custom domains: https://render.com/docs/custom-domains
 
-Google's security guide explicitly says not to expose API keys client-side in production and recommends a backend proxy for securing a shared application key. The UI therefore uses BYOK and warns users not to use a shared owner key: https://ai.google.dev/gemini-api/docs/api-key
+## Accounts and setup needed before deployment
 
-## Free tier and data-use note (reviewed 19 October 2026)
+Do these only when ready to provision. No credentials are needed in this chat.
 
-Google lists Gemini 3.5 Flash-Lite (model ID gemini-3.5-flash-lite) as stable and available with free-tier options, subject to account/model availability and quota limits. Free-tier prompts may be used to improve Google products. Don't send confidential, personally identifiable, customer, employee, regulated or commercially sensitive data. Check current pricing and terms before use: https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite and https://ai.google.dev/gemini-api/docs/pricing
+### 1. MongoDB Atlas account and free database
 
-No Supabase/Azure account, database, billing plan or separate hosting service has been configured by this branch. Creating a Gemini API key does involve Google AI Studio and its associated project/key setup, but no InsightBoard database/backend is needed for this BYOK demo.
+1. Open https://www.mongodb.com/cloud/atlas/register and sign in.
+2. Create a project for InsightBoard V2.
+3. Create one Free cluster (M0), choosing a nearby supported region.
+4. Under Database Access, create a dedicated database user with a strong random password. Do not reuse your account login password.
+5. Under Network Access, add Render's outbound IP CIDR ranges for the selected Render region. After the service exists, copy the ranges from Render Dashboard → service → Connect → Outbound. Use all ranges shown for that region. Do not use 0.0.0.0/0 unless you consciously accept allowing connections from any IP.
+6. Choose Connect → Drivers → Node.js and copy the connection string. Replace the database-user placeholders and URL-encode special characters in the database password. Store the final URI only in Render's environment settings or local server/.env; never commit it.
 
-## Local behavior and merge steps
+### 2. Render account and service
 
-- Without an API key, the existing dashboard and local data checks still work; the AI summary button stays unavailable until a key is supplied and consent is checked.
-- Local history and optional remembered key are stored in the browser's storage for this site only. They do not follow the user to another device/browser and are not a secure team history.
-- The key is sent from the browser to Google directly when Generate is clicked. The only data sent is the aggregate snapshot and category/field labels, not raw row objects.
-- To activate later: open https://github.com/Dipayanhaldar/insightboard-dual-dataset/tree/feature/insightboard-v2.0.1.1, click Contribute -> Open pull request, set base to main, review the diff and successful build, then merge when approved. Merging to main can trigger the existing Vercel production deployment.
+1. Open https://dashboard.render.com/register.
+2. Connect your GitHub account and authorize access to Dipayanhaldar/insightboard-dual-dataset.
+3. Create a Blueprint from this repository and choose branch feature/insightboard-v2.0.1.1. Review the plan and confirm the preview contains exactly one free web service from this branch, never main.
+4. Render prompts for MONGODB_URI during setup; enter your Atlas connection string. JWT_SECRET is generated randomly from render.yaml. Do not replace it with a public or committed value.
+5. Review the plan and billing screen. Keep the service on Free; do not approve a paid plan or add billing details just to make this demo run.
+6. Automatic deployments are off initially. Manual deploys let you decide when updates from this feature branch are published.
 
-Google Calendar reminders, secure multi-user accounts, centrally saved reports and using one shared secure API key remain out of scope for this no-backend version.
+### 3. Optional .TECH domain
+
+1. Claim an eligible domain through https://education.github.com/pack/; partner availability and eligibility can change.
+2. Register a name that is available, such as insightboard.tech.
+3. After the Render service exists, add the domain in service settings and follow Render's DNS instructions. Render manages TLS certificates and HTTPS for connected custom domains.
+4. Do not change the current production Vercel domain or DNS records. Attach only the newly registered domain to the V2 Render service.
+
+## Local development
+
+1. Install Node.js 22 or newer within the supported package range.
+2. At the repository root, run npm install.
+3. Copy server/.env.example to server/.env and add your own Atlas URI plus a strong random JWT_SECRET.
+4. Start the API in one terminal: npm run dev:api.
+5. Start the frontend in another terminal: npm run dev. Vite proxies /api requests to Express on port 3001.
+6. Visit the local Vite address. Create an account, sign in, save a report and verify it remains after refreshing or signing in from another browser.
+7. Run npm run check:server and npm run build.
+
+## Test before inviting users
+
+1. Open /api/health on the deployed site and confirm it reports status: ok and database: true.
+2. Create a test account, save an aggregate snapshot, refresh, delete it and sign out.
+3. Create a second account and verify it cannot see the first account's reports.
+4. Confirm a Render restart does not remove saved reports.
+5. Registration is public. This beta has rate limiting but does not yet include email verification, password reset or CAPTCHA. Do not treat this beta as a high-stakes production service until those operational features and backups are added.
+
+## Safety and data behavior
+
+- Do not paste database passwords, JWT secrets or Gemini keys into ChatGPT or commit them to GitHub.
+- Password hashes, not plaintext passwords, are stored in MongoDB. Tokens expire after eight hours.
+- Saved reports are scoped by user ID and contain aggregate values rather than raw rows. The backend sanitizes snapshots against a whitelist of fields.
+- The Gemini feature sends the active dashboard's limited aggregate snapshot directly from the browser to Google's API only after the user requests a summary and confirms consent.
+- main has not been edited or merged. Review this feature branch and a green CI build before deciding whether to provision, deploy or merge anything.

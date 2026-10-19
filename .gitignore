@@ -7,3 +7,12 @@ dist
 .env.*.local
 supabase/.temp/
 .DS_Store
+
+.env
+.env.*
+!.env.example
+server/.env
+server/.env.*
+!.env.example
+node_modules/
+dist/
