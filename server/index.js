@@ -27,7 +27,7 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       baseUri: ["'self'"],
-      connectSrc: ["'self'", "https://raw.githubusercontent.com"],
+      connectSrc: ["'self'", "https://generativelanguage.googleapis.com", "https://raw.githubusercontent.com"],
       fontSrc: ["'self'", "https:", "data:"],
       formAction: ["'self'"],
       frameAncestors: ["'self'"],

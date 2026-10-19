@@ -200,3 +200,10 @@ html[data-theme="dark"] footer span{color:#51627b}
 tbody tr{transition:background .16s ease}
 @keyframes ib-dashboard-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.page-intro,.kpi-card,.chart-card,.table-panel{animation:none!important;transition:none!important}.kpi-card:hover,.chart-card:hover,.table-panel:hover,.nav-item:hover{transform:none}}
+
+/* V2 visual motion: subtle stagger, hover lift, and accessible focus states */
+.page-intro{animation:ib-dashboard-enter .7s cubic-bezier(.16,.75,.25,1) both}
+.kpi-card,.chart-card,.table-panel{animation-duration:.7s;box-shadow:0 7px 24px rgba(27,52,88,.045)}
+.kpi-card{position:relative;overflow:hidden}
+.kpi-card:after{content:"";position:absolute;left:0;right:0;top:0;height:2px;opacity:0;transform:scaleX(.25);transform-origin:left;background:linear-gradient(90deg,#3485f7,#6a65ed,#37b7a8);transition:opacity .22s ease,transform .22s ease}
+.kpi-card:hover:after{opacity:1;transform:scaleX(1)}

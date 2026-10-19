@@ -10,7 +10,7 @@ This feature branch contains a React/Vite + Node.js/Express + MongoDB applicatio
 - Saved reports store a whitelisted aggregate snapshot: field names, filters, numeric summaries, category/time aggregates, completeness and optional Gemini summary. Raw imported rows are not sent to the InsightBoard backend or stored in MongoDB.
 - Account tokens are kept in browser session storage and expire after 8 hours by default. Closing the tab/session may require signing in again.
 - API rate limiting, password length validation, JWT verification, request size limits, a health endpoint and per-account report limits are included.
-- Gemini AI summaries use a server-side proxy. The application key is stored only in Render environment variables and never shipped to browser JavaScript. The browser submits a sanitized aggregate snapshot to the backend; a separate hourly request limit helps control quota abuse. Raw imported rows are not accepted by the summary endpoint.
+- Gemini AI summaries support two modes: a site-managed key stored only in Render (backend proxy with request limits), or optional BYOK where a user enters their personal key and the browser calls Google directly. A personal key is stored only in the user's browser if they choose to save it; it is never sent to the InsightBoard backend. BYOK browser calls expose that key to anyone who can inspect that browser session, so the UI warns users to use a private device and a Gemini-restricted key. In both modes, only a sanitized aggregate snapshot is sent for analysis; raw imported rows are not sent.
 - render.yaml describes one free Render web service that builds the frontend and runs the API from the same origin. It does not contain MongoDB credentials.
 
 ## Proposed free-hosted architecture
@@ -106,5 +106,5 @@ For a click-by-click guide, see [INSIGHTBOARD_TECH_DOMAIN_SETUP.md](INSIGHTBOARD
 - Do not paste database passwords, JWT secrets or Gemini keys into ChatGPT or commit them to GitHub.
 - Password hashes, not plaintext passwords, are stored in MongoDB. Tokens expire after eight hours.
 - Saved reports are scoped by user ID and contain aggregate values rather than raw rows. The backend sanitizes snapshots against a whitelist of fields.
-- The Gemini feature sends the active dashboard's sanitized aggregate snapshot to the InsightBoard API only after the user requests a summary and confirms consent. The Express backend sends it to Google with a server-side environment key; raw imported rows are not accepted by that endpoint.
+- The Gemini feature sends the active dashboard's aggregate snapshot only after the user requests a summary and confirms consent. In site-managed mode, the Express backend sends it to Google with a server-side key; in BYOK mode, the browser sends the aggregate snapshot directly to Google. Raw imported rows are not sent.
 - main has not been edited or merged. Review this feature branch and a green CI build before deciding whether to provision, deploy or merge anything.
