@@ -1,0 +1,4 @@
+project_id = "insightboard-v2"
+
+[functions.gemini-summary]
+verify_jwt = true
