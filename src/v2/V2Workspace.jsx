@@ -260,7 +260,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields}) {
 
   return <section className="v2-workspace" aria-labelledby="v2-title">
     <div className="v2-heading">
-      <div><div className="v2-eyebrow"><Sparkles size={15}/> V2 LAB · VERSION 2.0.1.1</div><h2 id="v2-title">{copy.title}</h2><p>{copy.subtitle}</p></div>
+      <div><div className="v2-eyebrow"><Sparkles size={15}/> V2 LAB · VERSION 2.0.2 BETA</div><h2 id="v2-title">{copy.title}</h2><p>{copy.subtitle}</p></div>
       <label className="v2-language"><span>UI</span><select value={uiLanguage} onChange={event=>setUiLanguage(event.target.value)} aria-label="Workspace language"><option value="en">English</option><option value="hi">हिन्दी</option><option value="te">తెలుగు</option></select></label>
     </div>
     <div className="v2-grid">
