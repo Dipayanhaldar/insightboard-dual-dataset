@@ -1,7 +1,7 @@
 {
   "name": "insightboard-schema-aware",
   "private": true,
-  "version": "2.0.1-beta.1",
+  "version": "2.0.1-beta.2",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -16,12 +16,11 @@
     "react-dom": "^18.3.1",
     "recharts": "^2.15.0",
     "xlsx": "^0.18.5",
-    "html2canvas": "^1.4.1",
-    "@supabase/supabase-js": "^2.57.0"
+    "html2canvas": "^1.4.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^6.0.7"
   },
-  "description": "InsightBoard V2.0.1.1 lab branch with optional Supabase persistence and Gemini insights"
+  "description": "InsightBoard V2.0.1.1 browser-only Gemini assistant, data checks and local report history"
 }
