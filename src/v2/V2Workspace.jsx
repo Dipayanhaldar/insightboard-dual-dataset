@@ -109,18 +109,33 @@ export default function V2Workspace({analytics,rows,fields,numericFields}) {
     const cleanEmail=email.trim().toLowerCase();
     if(!cleanEmail||!password){setMessage('Enter your email and password.');return;}
     setAuthBusy(true);setMessage('');
+    const controller=new AbortController();
+    const requestTimeout=setTimeout(()=>controller.abort(),60000);
     try {
       const response=await fetch('/api/auth/'+(authMode==='register'?'register':'login'),{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email:cleanEmail,password})
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:cleanEmail,password}),
+        signal:controller.signal
       });
       const result=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(result.error||'Account request failed.');
+      if(!result.token||!result.user)throw new Error('The server returned an incomplete account response. Check the Render deployment and logs.');
       try{sessionStorage.setItem('insightboard-api-token',result.token);}catch{}
       setAccount(result.user);setAuthToken(result.token);setPassword('');
       setMessage(authMode==='register'?'Account created. Your saved reports are private to this account.':'Signed in. Loading your saved reports.');
-    } catch(error) {setMessage(error?.message||'Could not connect to the account service.');}
-    finally {setAuthBusy(false);}
+    } catch(error) {
+      if(error?.name==='AbortError') {
+        setMessage('This request timed out after 60 seconds. Render may be waking from sleep, or the database may still be reconnecting. Check /api/health and the Render logs before trying again.');
+      } else if(error instanceof TypeError) {
+        setMessage('Could not reach the account API. Check that the latest V2 deployment is running, then open /api/health.');
+      } else {
+        setMessage(error?.message||'Could not connect to the account service.');
+      }
+    } finally {
+      clearTimeout(requestTimeout);
+      setAuthBusy(false);
+    }
   }
 
   function signOut() {
