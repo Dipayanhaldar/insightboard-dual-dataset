@@ -49,7 +49,7 @@ Do these only when ready to provision. No credentials are needed in this chat.
 3. Create one Free cluster (M0), choosing a nearby supported region.
 4. Under Database Access, create a dedicated database user with a strong random password. Do not reuse your account login password.
 5. Under Network Access, allowlist the outbound CIDR ranges for the Render region selected in render.yaml. Render explains how to obtain the ranges here: https://render.com/docs/outbound-ip-addresses. After the service exists, verify them in Render Dashboard → service → Connect → Outbound. Use every range shown for that region. Do not use 0.0.0.0/0 unless you consciously accept allowing connections from any IP. If you create the service before finishing this step, the web process can deploy in a degraded state; after updating Atlas network access, manually restart/redeploy the service so it reconnects.
-6. Choose Connect → Drivers → Node.js and copy the connection string. Replace only the database-user placeholders and URL-encode any reserved characters in both the username and password if needed. Keep the Atlas-provided slash/database path as generated (normally `/\?` or `/` before the query string); do not change it to `/insightboard_v2`. The app selects `insightboard_v2` via `MONGODB_DATABASE` and explicitly authenticates against Atlas's default `admin` authentication database. Store the final URI only in Render's environment settings or local `server/.env`; never commit it.
+6. Choose Connect → Drivers → Node.js and copy the connection string. Replace only the database-user placeholders and URL-encode any reserved characters in both the username and password if needed. Keep the Atlas-provided slash/database path as generated (normally `/` before the query string); do not change it to `/insightboard_v2`. The app selects `insightboard_v2` via `MONGODB_DATABASE` and explicitly authenticates against Atlas's default `admin` authentication database. Store the final URI only in Render's environment settings or local `server/.env`; never commit it.
 
 ### 2. Render account and service
 
@@ -57,6 +57,17 @@ Do these only when ready to provision. No credentials are needed in this chat.
 2. Connect your GitHub account and authorize access to Dipayanhaldar/insightboard-dual-dataset.
 3. Create a Blueprint from this repository and choose branch feature/insightboard-v2.0.1.1. Review the plan and confirm the preview contains exactly one free web service from this branch, never main.
 4. Render prompts for MONGODB_URI during setup; enter your Atlas connection string. JWT_SECRET is generated randomly from render.yaml. Do not replace it with a public or committed value.
+
+#### If Render reports `bad auth: authentication failed`
+
+1. In Atlas → Database & Network Access → Database Access, check the **database user** used in the URI. This is not your Atlas website login email.
+2. If unsure of the password, edit that database user and reset it, or create a dedicated user for the application. Save the new password securely.
+3. Copy Atlas's Node.js connection string again and replace the username/password placeholders exactly. Make sure no angle brackets or placeholder text remain.
+4. If the username or password contains URI-reserved characters such as `$ : / ? # [ ] @`, percent-encode them in the URI. To avoid encoding mistakes, you can set a long, strong password containing letters and numbers only, then update the URI.
+5. Use the host name for the same Atlas cluster where the database user was created. Do not change Atlas's URI path to `/insightboard_v2`; the app chooses that data database separately and explicitly authenticates using `admin`.
+6. In Render → Environment, replace `MONGODB_URI` with the corrected full URI and save. Restart/redeploy after the code update and environment update.
+
+Never paste the live URI, password, or JWT secret into ChatGPT or commit them to GitHub.
 5. Review the plan and billing screen. Keep the service on Free; do not approve a paid plan or add billing details just to make this demo run.
 6. Automatic deployments are off initially. Manual deploys let you decide when updates from this feature branch are published.
 
