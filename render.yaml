@@ -6,7 +6,7 @@ services:
     region: singapore
     branch: feature/insightboard-v2.0.1.1
     autoDeployTrigger: off
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
