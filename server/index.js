@@ -269,6 +269,7 @@ app.use((error, _req, res, _next) => {
 if (process.env.MONGODB_URI) {
   mongoose.connect(process.env.MONGODB_URI, {
     dbName: process.env.MONGODB_DATABASE || 'insightboard_v2',
+    authSource: process.env.MONGODB_AUTH_SOURCE || 'admin',
     serverSelectionTimeoutMS: 15000
   }).then(() => console.log('MongoDB connected.'))
     .catch(error => console.error('MongoDB connection failed:', error.message));
