@@ -18,7 +18,24 @@ const distDirectory = path.resolve(__dirname, '../dist');
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      connectSrc: ["'self'", "https://generativelanguage.googleapis.com", "https://raw.githubusercontent.com"],
+      fontSrc: ["'self'", "https:", "data:"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      mediaSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'"],
+      scriptSrcAttr: ["'none'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"]
+    }
+  }
+}));
 app.use(express.json({ limit: '64kb' }));
 app.use('/api', rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -26,13 +43,13 @@ app.use('/api', rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false
 }));
-app.use('/api/auth', rateLimit({
+const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Too many sign-in attempts. Wait 15 minutes and try again.' }
-}));
+});
 
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
@@ -145,14 +162,14 @@ function publicReport(report) {
 
 app.get('/api/health', (_req, res) => {
   const ready = databaseReady();
-  res.status(ready ? 200 : 503).json({
-    status: ready ? 'ok' : 'starting',
+  res.status(200).json({
+    status: ready ? 'ok' : 'degraded',
     database: ready,
     service: 'InsightBoard V2 API'
   });
 });
 
-app.post('/api/auth/register', requireDatabase, asyncRoute(async (req, res) => {
+app.post('/api/auth/register', authLimiter, requireDatabase, asyncRoute(async (req, res) => {
   const email = safeText(req.body?.email, 254).toLowerCase();
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -175,7 +192,7 @@ app.post('/api/auth/register', requireDatabase, asyncRoute(async (req, res) => {
   });
 }));
 
-app.post('/api/auth/login', requireDatabase, asyncRoute(async (req, res) => {
+app.post('/api/auth/login', authLimiter, requireDatabase, asyncRoute(async (req, res) => {
   const email = safeText(req.body?.email, 254).toLowerCase();
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   const user = await User.findOne({ email }).select('+passwordHash');

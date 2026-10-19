@@ -48,7 +48,7 @@ Do these only when ready to provision. No credentials are needed in this chat.
 2. Create a project for InsightBoard V2.
 3. Create one Free cluster (M0), choosing a nearby supported region.
 4. Under Database Access, create a dedicated database user with a strong random password. Do not reuse your account login password.
-5. Under Network Access, add Render's outbound IP CIDR ranges for the selected Render region. After the service exists, copy the ranges from Render Dashboard → service → Connect → Outbound. Use all ranges shown for that region. Do not use 0.0.0.0/0 unless you consciously accept allowing connections from any IP.
+5. Under Network Access, allowlist the outbound CIDR ranges for the Render region selected in render.yaml. Render explains how to obtain the ranges here: https://render.com/docs/outbound-ip-addresses. After the service exists, verify them in Render Dashboard → service → Connect → Outbound. Use every range shown for that region. Do not use 0.0.0.0/0 unless you consciously accept allowing connections from any IP. If you create the service before finishing this step, the web process can deploy in a degraded state; after updating Atlas network access, manually restart/redeploy the service so it reconnects.
 6. Choose Connect → Drivers → Node.js and copy the connection string. Replace the database-user placeholders and URL-encode special characters in the database password. Store the final URI only in Render's environment settings or local server/.env; never commit it.
 
 ### 2. Render account and service

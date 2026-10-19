@@ -291,7 +291,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields}) {
         <button className="v2-button primary" onClick={()=>void generateSummary()} disabled={busy||(!apiKey&&!keyDraft.trim())||!consent}>{busy?<RefreshCw size={15} className="v2-spin"/>:<Sparkles size={15}/>} {busy?'Working…':copy.summarize}</button>
         <div className="v2-warning"><AlertTriangle size={15}/><span>{copy.warning} <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" rel="noreferrer">Google key security guidance</a>.</span></div>
         {summary?<div className="v2-summary" aria-live="polite"><h4>InsightBoard · Gemini</h4><div>{summary}</div></div>:<p className="v2-note">{copy.none}</p>}
-        <button className="v2-button secondary" onClick={saveSnapshot}><Save size={15}/>{copy.save}</button>
+        <button className="v2-button secondary" onClick={()=>void saveSnapshot()} disabled={reportSaveBusy}>{reportSaveBusy?<RefreshCw size={15} className="v2-spin"/>:<Save size={15}/>} {reportSaveBusy?'Saving report…':copy.save}</button>
         {message&&<div className="v2-message" role="status"><span>{message}</span><button onClick={()=>setMessage('')} aria-label="Dismiss message">×</button></div>}
       </article>
     </div>
