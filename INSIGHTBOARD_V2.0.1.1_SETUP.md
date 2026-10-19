@@ -1,61 +1,49 @@
-# InsightBoard V2.0.1.1 — Experimental Lab Branch
+# InsightBoard V2.0.1.1 — Browser-only Lab Branch
 
-This branch belongs to the existing InsightBoard repository. It is intentionally separate from main. It is not merged or intentionally deployed, so the current public demo remains the reference version.
+This branch stays in the existing InsightBoard repository and remains separate from main. It is not merged or deployed. The current production site is unchanged.
 
-## Included in this version
+## What this branch adds
 
-- Smart data checks (local): missing-value detection, possible duplicate detection, and invalid values in columns currently classified as numeric. Duplicate scanning is capped at 10,000 rows to keep large imports responsive.
-- Gemini summaries: an authenticated Supabase Edge Function sends a bounded aggregate snapshot (KPIs, selected filters, field names, category summaries, selected time aggregates and completeness) rather than the raw imported row array.
-- Language choices for summaries: English, Telugu, Hindi, Tamil, Bengali, Marathi, Kannada, Malayalam and Urdu.
-- Secure team access: Supabase email/password signup and signin.
-- Saved report history: per-user saved snapshot of dataset name, record count, selected filters, aggregate metrics and optional AI summary; raw imported rows are not saved by this feature.
-- Row-level security: PostgreSQL policies restrict report history so users can access only rows whose user_id matches their authenticated ID.
-- Production isolation: Vercel branch deployment is marked disabled in vercel.json for this feature branch. Verify Vercel Git settings before merging; do not use the feature branch as a production deployment.
-- Smoke-test workflow: GitHub Actions runs the frontend build for changes on this branch.
+- Local data-quality checks: missing values, possible exact duplicates and non-numeric values in detected numeric columns. Checks are capped at the first 10,000 rows for responsiveness.
+- Gemini summaries from a limited aggregate snapshot of the active dashboard. Raw rows are not sent by this feature.
+- Summary output languages: English, Telugu, Hindi, Tamil, Bengali, Marathi, Kannada, Malayalam and Urdu. V2 panel controls have basic English, Hindi and Telugu labels. The rest of the dashboard is not fully translated yet.
+- An API key input in the UI. The key is never hardcoded in code or sent to an InsightBoard backend. By default, the saved key is held in this browser tab session; optional Remember saves it in this browser's local storage. Forget removes the browser-stored key.
+- Saved report history stored locally in this browser (up to 20 aggregate snapshots). It is not cloud-synced, not account-protected, and does not include raw imported rows.
+- Existing imports, dynamic filters, KPI cards, six charts, table sorting/pagination and CSV/Excel/PDF exports are retained.
+- Vercel auto-deployment is configured to skip this feature branch. Check Vercel's Git settings before activation.
+- GitHub Actions build check for the V2 branch.
 
-## Honest limitations
+## No InsightBoard backend or database
 
-- AI summary, signup/signin, and report history require a Supabase project and a Gemini API key configured as an Edge Function secret. They stay disabled until setup. Adding files to GitHub does not create cloud resources.
-- The V2 panel's controls have English, Hindi and Telugu UI strings. Summary output offers nine language choices; the rest of the original dashboard is not fully translated in this increment.
-- Google Calendar integration is not implemented; it remains future scope.
-- The Gemini feature uses aggregate values, but dataset/category labels can still be sensitive. Do not send confidential, personally identifiable, customer, employee, regulated, or commercially sensitive information to a free-tier AI API.
-- An AI summary is an aid, not a verified financial report. Check figures against the source/export before relying on them.
+Supabase, database migrations, serverless functions, cloud authentication and the Supabase client have been removed from this branch. No database or server is created or connected.
 
-## Architecture
+Gemini still runs as an external Google API because an AI model must be called somewhere. In this version, the visitor's browser calls Google directly using the API key they enter. There is no private shared key embedded in the repo, and no InsightBoard proxy. This is a bring-your-own-key demo, not a secure shared-key production architecture.
 
-Existing React/Vite app -> Supabase Auth -> Supabase PostgreSQL (saved_reports, protected by RLS) and authenticated Supabase Edge Function -> Gemini Developer API.
+IMPORTANT: never send your API key to ChatGPT, commit it to GitHub, paste it into source code, or set it as a VITE_ variable. The browser-only approach cannot keep an entered key secret from the browser environment. If you want everyone to use your one shared key without entering their own, a server-side proxy is required and that would reintroduce backend/cloud infrastructure.
 
-Only a browser-safe Supabase publishable/anon key belongs in VITE_* variables. Never commit a Supabase service-role key or Gemini API key. Gemini's key belongs in Supabase Function Secrets.
+## Generate a Gemini API key
 
-## Free-tier research (reviewed 19 October 2026)
+1. Open https://aistudio.google.com/apikey and sign in to Google AI Studio.
+2. If prompted, accept Google's terms and choose/create a project as prompted.
+3. Click Create API key. New AI Studio keys are currently created as authorization keys by default.
+4. Keep the key private. If available for that key, restrict use to the Gemini API and restrict website origins to your actual domain. A restriction limits misuse but does not make a browser-shared key equivalent to a server secret.
+5. Open your deployed InsightBoard or local demo, paste the key into the Gemini API key field, and click Use key in this browser. Leave Remember unchecked to store only for this browser tab session. Check Remember only if you want it saved in local storage on this device.
+6. Select a summary language, read the data-sharing acknowledgement, tick the checkbox, and click Generate Gemini summary.
+7. Click Forget key when finished, especially on shared computers.
 
-Plan details and eligibility change. Check current conditions before activation.
+Google's security guide explicitly says not to expose API keys client-side in production and recommends a backend proxy for securing a shared application key. The UI therefore uses BYOK and warns users not to use a shared owner key: https://ai.google.dev/gemini-api/docs/api-key
 
-- Supabase Free: public limits documentation lists a 500 MB database, up to 50,000 monthly active users, 1 GB storage and 500,000 Edge Function invocations. Free resources have restrictions and usage caps; there is no lifetime guarantee. See https://supabase.com/pricing and https://supabase.com/docs/guides/platform/billing-on-supabase.
-- Supabase Free projects can be paused after roughly 7 days of low activity. The owner can resume a paused project in Supabase Dashboard; paid projects are not paused for inactivity. See https://supabase.com/docs/guides/platform/free-project-pausing.
-- Gemini API: the default model is gemini-3.5-flash-lite; Google's current model page lists it as stable and the pricing page lists a free tier for eligible use. Free tier has limited access/rate quotas and Google may use free-tier prompt content to improve products. See https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite and https://ai.google.dev/gemini-api/docs/pricing.
-- GitHub Student Developer Pack: offers vary by region, student eligibility and partner availability. Current Pack listing includes a standard .TECH domain free for one year and limited registrar offers (including selected Name.com domains and a one-year Namecheap .me offer). This is not lifetime-free; check renewal price before activating. See https://education.github.com/pack/.
-- Azure for Students: eligible students may receive $100 Azure credit for 12 months plus limited free services, without a credit card. This is not a guarantee that an entire production backend will be free forever. Services can be disabled after credits are exhausted unless changed to a paid arrangement. See https://azure.microsoft.com/en-us/free/students/.
-- Vercel: production deployment is not configured by this branch; Vercel branch auto-deployment is intended to be skipped for this branch. Check Vercel Git settings before any later activation.
+## Free tier and data-use note (reviewed 19 October 2026)
 
-## Setup — do this only when you choose to activate the V2 cloud features
+Google lists Gemini 3.5 Flash-Lite (model ID gemini-3.5-flash-lite) as stable and available with free-tier options, subject to account/model availability and quota limits. Free-tier prompts may be used to improve Google products. Don't send confidential, personally identifiable, customer, employee, regulated or commercially sensitive data. Check current pricing and terms before use: https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite and https://ai.google.dev/gemini-api/docs/pricing
 
-No cloud resource has been created by this branch. The existing website uses no dedicated database/backend and remains unchanged.
+No Supabase/Azure account, database, billing plan or separate hosting service has been configured by this branch. Creating a Gemini API key does involve Google AI Studio and its associated project/key setup, but no InsightBoard database/backend is needed for this BYOK demo.
 
-1. Create a free Supabase project at https://supabase.com. Choose a strong project password and save it privately.
-2. In Supabase Project Settings, copy the Project URL and publishable key (or legacy anon key). The publishable/anon key is the only Supabase key the browser app should receive.
-3. Clone/download this feature branch locally, copy .env.example to .env.local, then fill in VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.
-4. Install the Supabase CLI using its official method. Link the project and apply supabase/migrations/202610190001_v2_saved_reports.sql (commonly supabase link then supabase db push).
-5. In Supabase Dashboard -> Edge Function Secrets, add GEMINI_API_KEY. Never use VITE_GEMINI_API_KEY, and never paste the key into GitHub code.
-6. Deploy the Edge Function using the Supabase CLI: supabase functions deploy gemini-summary.
-7. For production, set APP_ORIGIN as a server-side function secret/environment variable to your final site origin so CORS is restricted to that domain. Local development may require a different origin.
-8. Run npm install, then npm run build. Test signup/login, Gemini summaries, RLS isolation with two test accounts, report save/list/delete, language output, mobile layout and all existing import/chart/export features.
-9. Do not put sensitive real data into the Gemini feature until its data-use policy, consent process, and organisational requirements have been reviewed.
+## Local behavior and merge steps
 
-## Local behavior without credentials
+- Without an API key, the existing dashboard and local data checks still work; the AI summary button stays unavailable until a key is supplied and consent is checked.
+- Local history and optional remembered key are stored in the browser's storage for this site only. They do not follow the user to another device/browser and are not a secure team history.
+- The key is sent from the browser to Google directly when Generate is clicked. The only data sent is the aggregate snapshot and category/field labels, not raw row objects.
+- To activate later: open https://github.com/Dipayanhaldar/insightboard-dual-dataset/tree/feature/insightboard-v2.0.1.1, click Contribute -> Open pull request, set base to main, review the diff and successful build, then merge when approved. Merging to main can trigger the existing Vercel production deployment.
 
-If no .env.local exists, the original dashboard and V2 local data-quality checks still work. Supabase auth, saved cloud history and Gemini summaries display a setup state and stay disabled. No API key, database or account has been created automatically.
-
-## One-click merge later
-
-When ready, open the feature branch: https://github.com/Dipayanhaldar/insightboard-dual-dataset/tree/feature/insightboard-v2.0.1.1. Use Contribute -> Open pull request to compare feature/insightboard-v2.0.1.1 into main. Review changed files and the Actions build, then merge only after approval. Merging will update the production-connected main branch and may trigger Vercel deployment—so do not merge until ready.
+Google Calendar reminders, secure multi-user accounts, centrally saved reports and using one shared secure API key remain out of scope for this no-backend version.
