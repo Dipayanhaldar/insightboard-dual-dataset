@@ -40,3 +40,12 @@ html[data-theme="dark"] .v2-muted,html[data-theme="dark"] .v2-quality-list li,ht
 html[data-theme="dark"] .v2-stats>div,html[data-theme="dark"] .v2-field input,html[data-theme="dark"] .v2-field select,html[data-theme="dark"] .v2-language select,html[data-theme="dark"] .v2-delete,html[data-theme="dark"] .v2-button.secondary{background:#172438;border-color:#33445d;color:#dce7f6}
 html[data-theme="dark"] .v2-summary{background:#172438;border-color:#33445d}html[data-theme="dark"] .v2-summary>div{color:#dce7f6}
 html[data-theme="dark"] .v2-config-note{background:#342b18;border-color:#63522a;color:#e7c77e}html[data-theme="dark"] .v2-message{background:#182a43;border-color:#34557e;color:#b6d3ff}
+
+/* Browser-only Gemini controls and locally stored report snapshots */
+.v2-button-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0}
+.v2-key-status{display:flex;align-items:center;gap:6px;color:#47815f;font-size:10px;margin:7px 0 10px;overflow-wrap:anywhere}
+.v2-warning{display:flex;align-items:flex-start;gap:7px;background:#fff8e9;border:1px solid #f3e1b7;color:#806124;border-radius:8px;padding:10px;margin-top:11px;font-size:10px;line-height:1.55}
+.v2-warning svg{flex:0 0 auto;margin-top:1px}.v2-warning a{color:inherit;text-decoration:underline}
+.v2-report-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+html[data-theme="dark"] .v2-key-status{color:#94dbb7}
+html[data-theme="dark"] .v2-warning{background:#342b18;border-color:#63522a;color:#e7c77e}
