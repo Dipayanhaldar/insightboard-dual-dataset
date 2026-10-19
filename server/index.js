@@ -213,7 +213,7 @@ app.post('/api/ai/summary', aiLimiter, asyncRoute(async (req, res) => {
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: instruction }] },
-        contents: [{ role: 'user', parts: [{ text: 'Analyze this active dashboard snapshot. Cite supplied numbers behind findings; do not invent figures.\\n\\n' + JSON.stringify(snapshot) }] }],
+        contents: [{ role: 'user', parts: [{ text: 'Analyze this active dashboard snapshot. Cite supplied numbers behind findings; do not invent figures.\n\n' + JSON.stringify(snapshot) }] }],
         generationConfig: { temperature: 0.2, maxOutputTokens: 850 }
       }),
       signal: AbortSignal.timeout(45000)
@@ -237,7 +237,7 @@ app.post('/api/ai/summary', aiLimiter, asyncRoute(async (req, res) => {
   }
   const summary = (result?.candidates?.[0]?.content?.parts || [])
     .map(part => typeof part.text === 'string' ? part.text : '')
-    .join('\\n')
+    .join('\n')
     .trim();
   if (!summary) return res.status(502).json({ error: 'Gemini returned no text. Please try again.' });
   return res.json({ summary, model: GEMINI_MODEL });
