@@ -18,7 +18,7 @@ This feature branch contains a React/Vite + Node.js/Express + MongoDB applicatio
 - GitHub: source code and the isolated feature branch.
 - Render Free Web Service: serves the React website and runs the Express API. Public URL with custom-domain support.
 - MongoDB Atlas Free cluster: persists accounts and saved aggregate reports independently of your laptop.
-- GitHub Student Pack .TECH domain: optional; register separately, then attach it to Render.
+- Purchased .ME domain: attach it to the V2 Render service after entering the exact registered domain and applying the DNS records Render displays.
 
 Neither your laptop being open nor any files stored on your laptop are required after successful online deployment. The website and data depend on Render and MongoDB Atlas being available.
 
@@ -79,9 +79,9 @@ Never paste the live URI, password, or JWT secret into ChatGPT or commit them to
 4. Save the environment change and deploy/restart that V2 service. Visit `/api/ai/status` on its public URL; it should return `available: true`. A successful status means the key exists, not necessarily that quota/billing is ready; test by generating one summary.
 5. Watch Google AI Studio's usage/quota and configure billing controls if your use case requires them. Keep the key restricted to the Gemini API when the key type supports that restriction.
 
-### 4. .TECH domain: claim and connect
+### 4. Purchased .ME domain: connect
 
-For a click-by-click guide, see [INSIGHTBOARD_TECH_DOMAIN_SETUP.md](INSIGHTBOARD_TECH_DOMAIN_SETUP.md). The short process is: claim the one-year student offer at https://get.tech/github-student-developer-pack, add the registered domain under Settings → Custom Domains on the selected V2 Render service, copy the DNS records shown by Render to your .TECH registrar, then verify the domain in Render. Render provisions HTTPS after DNS verification. Do not change the current production Vercel domain or GitHub `main` branch.
+For the current steps, see [INSIGHTBOARD_ME_DOMAIN_SETUP.md](INSIGHTBOARD_ME_DOMAIN_SETUP.md). The domain itself has already been purchased. Add the exact registered .ME domain under Settings → Custom Domains on the selected V2 Render service, copy the DNS records shown by Render into your domain registrar, then verify the domain in Render and wait for HTTPS provisioning. The exact domain name is required before DNS settings can be finalized. Do not change the current production Vercel domain or GitHub `main` branch.
 
 ## Local development
 
