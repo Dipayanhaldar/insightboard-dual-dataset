@@ -4,54 +4,56 @@ InsightBoard is a React + Vite data exploration dashboard designed for Vercel de
 
 ## Current features
 - Built-in datasets: Blackcoffer Corporate Data and Hyderabad Metro Rail station-reference data.
-- Import JSON arrays or objects containing `records` / `data`, plus CSV files. An **Imported Data** selection appears only after a file has been loaded.
+- Import JSON arrays or objects containing `records` / `data`, plus CSV files.
 - Imported records replace the currently active dataset; they are not merged with built-in presets.
-- URL, link, href and hyperlink fields are hidden from the dashboard fields, filters, charts, table and exports.
-- Dynamic categorical filters, KPI cards, six chart panels, and searchable, sortable, paginated records table.
-- Light mode by default, with a dark-mode toggle. The selected appearance is remembered in the current browser.
+- URL, link, href and hyperlink fields are hidden from charts, filters, tables and exports.
+- Dynamic filters, KPI cards, chart panels, and searchable/sortable/paginated records table.
 - Export filtered records as CSV or Excel (`.xlsx`).
-- Export the visible chart panels as images inside a PDF, followed by a filtered-data table (up to 1,000 rows and the first 12 fields for readable PDF layout).
-- Responsive import and chart controls for smaller screens.
-- Preset logo assets and an optional user-provided dataset logo for the current browser session.
+- Export visible chart panels plus a filtered data table to PDF.
 
 ## Run locally
 1. Install Node.js 20 LTS or newer.
-2. Open this folder in a terminal.
-3. Run `npm install`.
-4. Run `npm run dev`.
-5. Run `npm run build` to verify a production build.
+2. Run `npm install`.
+3. Run `npm run dev`.
+4. Run `npm run build` to verify production build.
 
-## Phase 2: Gemini assistant, saved summaries, and Calendar reminders
+## Serverless AI + auth prototype notes
 
-The assistant uses a Vercel serverless function (`/api/gemini.js`) so the Gemini API key is never placed in browser JavaScript or committed to GitHub. When the user checks the data-sharing acknowledgement, the request sends aggregate metrics and up to 15 sample records.
+This project includes Vercel serverless endpoints for shared-password authentication, Gemini requests, and optional Cosmos report history.
 
-### Required Vercel environment variables
-Add these in Vercel → Project → Settings → Environment Variables, then redeploy:
-- `GEMINI_API_KEY`: create in Google AI Studio and keep server-side.
-- `INSIGHTBOARD_APP_PASSWORD`: strong, unique shared access password for the prototype's AI/report endpoints.
-- `INSIGHTBOARD_SESSION_SECRET`: long random secret used to sign temporary HTTP-only sessions.
-- `GEMINI_MODEL` (optional): defaults to `gemini-3.8-flash`.
+### Security and privacy warning (important)
+- The shared password is **prototype-only** access control.
+- All authenticated users share one fixed project owner partition for saved report history.
+- This is **project-wide shared history**, not per-user isolation.
+- Do **not** use sensitive, confidential, personal, regulated, or proprietary data.
 
-The shared password is prototype access control, not individual user accounts. The normal dashboard remains usable when AI secrets are not configured; API endpoints fail closed until setup is complete.
+### Gemini data-sharing behavior
+- `/api/gemini` can send aggregate metrics and selected sample records/context to Gemini.
+- Treat all dataset/context/history values as untrusted prompt data.
+- Redact or remove sensitive fields before using AI features.
+- Prefer opt-in/acknowledged sharing behavior before sending sample records.
 
-### Optional saved report history (Azure Cosmos DB for NoSQL)
-Create an Azure Cosmos DB account and enable Free Tier if offered at account creation. Create database `insightboard` and container `reports` with partition key `/ownerId`. Free tier currently covers the first 1,000 RU/s and 25 GB on eligible provisioned-throughput accounts; usage beyond those limits may be charged, and serverless accounts aren't eligible for this specific free-tier offer. Configure an Azure budget/alert.
+### Throttling and production hardening limits
+- Login and Gemini abuse controls are best-effort in-memory serverless limiters.
+- These controls are **per instance** and not globally consistent across all serverless instances.
+- Production use should add external identity, centralized rate limiting, monitoring, and auditing.
 
-Add these Vercel variables:
-- `AZURE_COSMOS_ENDPOINT`: account endpoint URL.
-- `AZURE_COSMOS_KEY`: account key (secret; never add to GitHub).
-- `AZURE_COSMOS_DATABASE`: `insightboard` or your database name.
-- `AZURE_COSMOS_CONTAINER`: `reports` or your container name.
+## Required Vercel environment variables
+Set in Vercel → Project → Settings → Environment Variables, then redeploy:
+- `INSIGHTBOARD_APP_PASSWORD` (required for protected endpoints)
+- `INSIGHTBOARD_SESSION_SECRET` (required for signed sessions)
+- `GEMINI_API_KEY` (required for `/api/gemini`)
+- `GEMINI_MODEL` (optional, default: `gemini-3.8-flash`)
 
-Saved history contains AI summary, prompt, dataset name, timestamp and aggregate metrics. Raw uploaded records are not saved. All users who know the shared prototype password can see the same saved report history.
+Optional Cosmos history:
+- `AZURE_COSMOS_ENDPOINT`
+- `AZURE_COSMOS_KEY`
+- `AZURE_COSMOS_DATABASE` (optional, default: `insightboard`)
+- `AZURE_COSMOS_CONTAINER` (optional, default: `reports`)
 
-### Google Calendar
-The reminder action opens a pre-filled Calendar draft for tomorrow at 9:00 AM (Asia/Kolkata). The user must review and press Save. This isn't automatic account access; direct API insertion for each user requires a separate Google OAuth / Calendar API setup.
+The frontend can still run without these backend secrets; protected API endpoints fail closed until required secrets are present.
 
-### Data note
-The built-in Hyderabad Metro data is station-reference data, not live train-position or service-status information. Imported files are processed in the browser and are not uploaded to a server by default.
-
-### Cost and safety
-- Never commit API keys, Cosmos DB keys, or secrets to GitHub.
-- Use the lowest-cost eligible options, set budget alerts, and monitor usage. Student credits may expire and aren't a lifetime guarantee.
-- After setting variables, redeploy Vercel and test sign-in, one Gemini question, saving a summary and loading history.
+## Cost and safety
+- Never commit API keys or secrets.
+- Set provider budgets/alerts for Gemini and Cosmos usage.
+- Validate deployment behavior after each secret or config update.
