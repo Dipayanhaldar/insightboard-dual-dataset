@@ -255,13 +255,13 @@ function extractProviderText(providerId, payload) {
   if (providerId === 'anthropic') {
     return (payload?.content || [])
       .filter(item => item?.type === 'text' && typeof item.text === 'string')
-      .join('\n').trim();
+      .map(item => item.text).join('\n').trim();
   }
   if (providerId === 'cohere') {
     const content = payload?.message?.content || [];
     if (typeof content === 'string') return content.trim();
     return content.filter(item => item?.type === 'text' && typeof item.text === 'string')
-      .join('\n').trim();
+      .map(item => item.text).join('\n').trim();
   }
   const text = payload?.choices?.[0]?.message?.content;
   if (typeof text === 'string') return text.trim();
