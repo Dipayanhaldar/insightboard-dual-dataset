@@ -350,7 +350,7 @@ app.post('/api/ai/summary', aiLimiter, asyncRoute(async (req, res) => {
     return res.status(400).json({ error: 'Import a dataset and select a dashboard with data before requesting a summary.' });
   }
   const languages = {
-    en: 'English', te: 'Telugu', hi: 'Hindi', ta: 'Tamil', bn: 'Bengali',
+    en: 'English', te: 'Telugu', hi: 'Hindi', 'hi-en': 'Hinglish', ta: 'Tamil', bn: 'Bengali',
     mr: 'Marathi', kn: 'Kannada', ml: 'Malayalam', ur: 'Urdu', gu: 'Gujarati', pa: 'Punjabi'
   };
   const languageCode = safeText(req.body?.language, 8);
