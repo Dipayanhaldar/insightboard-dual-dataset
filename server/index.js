@@ -33,7 +33,7 @@ app.use(helmet({
       formAction: ["'self'"],
       frameAncestors: ["'self'"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
-      mediaSrc: ["'self'", "data:"],
+      mediaSrc: ["'self'", "data:", "blob:"],
       objectSrc: ["'none'"],
       scriptSrc: ["'self'"],
       scriptSrcAttr: ["'none'"],
@@ -273,22 +273,28 @@ function readRawBody(req, maxBytes) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let total = 0;
+    let tooLarge = false;
     req.on('data', chunk => {
+      if (tooLarge) return;
       total += chunk.length;
       if (total > maxBytes) {
+        tooLarge = true;
+        chunks.length = 0;
         const error = new Error('Audio upload is too large.');
         error.statusCode = 413;
         reject(error);
-        req.destroy();
         return;
       }
       chunks.push(chunk);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
+    req.on('end', () => {
+      if (!tooLarge) resolve(Buffer.concat(chunks));
+    });
+    req.on('error', error => {
+      if (!tooLarge) reject(error);
+    });
   });
 }
-
 function gnaniErrorMessage(status) {
   if (status === 400) return 'Gnani rejected the input. Check the audio format, language, selected voice, or text.';
   if (status === 401 || status === 403) return 'Gnani authentication failed. The site owner must verify GNANI_API_KEY in Render.';
@@ -312,7 +318,7 @@ app.post('/api/voice/tts', voiceLimiter, requireAuth, asyncRoute(async (req, res
   if (!GNANI_API_KEY) {
     return res.status(503).json({ error: 'Gnani is not configured yet. Add GNANI_API_KEY to the Render environment variables.' });
   }
-  const text = safeText(req.body?.text, 4000);
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
   const voice = safeText(req.body?.voice, 40);
   const language = safeText(req.body?.language, 16);
   const speed = Number(req.body?.speed ?? 1);
