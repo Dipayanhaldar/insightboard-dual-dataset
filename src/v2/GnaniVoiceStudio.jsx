@@ -92,9 +92,10 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     setText('');
     setLocalizedSummary('');
     setAudioUrl('');
+    void loadLocalizedSummary(ttsLanguage);
   }, [rows, fields, datasetName, sourceIsUploaded]);
 
-  async function loadLocalizedSummary(languageCode) {
+  async function loadLocalizedSummary(languageCode, targetMode = serviceMode) {
     if (!sourceIsUploaded || !analytics || !Array.isArray(rows) || !rows.length) {
       setTtsError('Upload a JSON or CSV dataset first. Demo datasets cannot be sent to Gnani.');
       return;
@@ -113,7 +114,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       if (!response.ok) throw new Error(result.error || 'Could not create a summary in the selected language.');
       const summary = String(result.summary || '').trim();
       if (!summary) throw new Error('The summary service returned no text. Try again.');
-      const capped = summary.slice(0, serviceMode === 'site' ? 950 : 3800);
+      const capped = summary.slice(0, targetMode === 'site' ? 950 : 3800);
       setLocalizedSummary(capped);
       setText(capped);
     } catch (error) {
@@ -123,6 +124,12 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     } finally {
       setSummaryBusy(false);
     }
+  }
+
+  function changeServiceMode(nextMode) {
+    setServiceMode(nextMode);
+    setAudioUrl('');
+    if (sourceIsUploaded) void loadLocalizedSummary(ttsLanguage, nextMode);
   }
 
   function useGnaniKey() {
@@ -173,7 +180,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     event.preventDefault();
     setTtsError('');
     if (serviceMode === 'personal' && !authToken) {
-      setTtsError('Sign in or create an InsightBoard account above to use personal-key voice tools.');
+      setTtsError('Sign in or create an InsightBoard account above to use personal-key voice tools. Your own key allows up to 4,000 characters per speech request.');
       return;
     }
     if (serviceMode === 'personal' && !gnaniKey) {
@@ -331,8 +338,8 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       {serviceMode === 'personal' && accountLocked && <div className="gnani-alert"><ShieldCheck size={16} /><span>Sign in or create an InsightBoard account in the panel above to use your personal Gnani key. In site-powered mode, sign-in is not required.</span></div>}
 
       <div className="gnani-service-modes" role="group" aria-label="Gnani billing mode">
-        <button type="button" className={serviceMode === 'personal' ? 'active' : ''} onClick={() => setServiceMode('personal')}><KeyRound size={14} /> Personal key (BYOK)</button>
-        <button type="button" className={serviceMode === 'site' ? 'active site-mode' : 'site-mode'} onClick={() => setServiceMode('site')}><ShieldCheck size={14} /> Site key · 10/IP/day</button>
+        <button type="button" className={serviceMode === 'personal' ? 'active' : ''} onClick={() => changeServiceMode('personal')}><KeyRound size={14} /> Personal key (BYOK)</button>
+        <button type="button" className={serviceMode === 'site' ? 'active site-mode' : 'site-mode'} onClick={() => changeServiceMode('site')}><ShieldCheck size={14} /> Site key · 10/IP/day</button>
       </div>
       {serviceMode === 'site' && <div className="gnani-site-limit-note"><ShieldCheck size={15} /><span><strong>Limited public access</strong><small>Up to 10 site-key requests per public IP per UTC day, combined across speech and transcription. The whole website is capped at {siteStatus.globalDailyLimit || 25} site-key requests per UTC day. Text is limited to 1,000 characters and transcription uploads to 6 MB. Personal BYOK remains separate. The cap is an abuse guard, not a guarantee of zero billing.</small></span></div>}
 
@@ -364,7 +371,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
           <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
           <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? 'This concise summary is generated from the uploaded dataset in the selected speech language. The original dataset is not changed.' : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
           <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
-          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && !gnaniKey) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
+          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && (!gnaniKey || !authToken)) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
           {audioUrl && <div className="gnani-audio-result"><div><CheckCircle2 size={16} /><strong>Speech generated</strong><span>MP3 audio · available for this session</span></div><audio controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio><a className="v2-button secondary gnani-download" href={audioUrl} download="gnani-timbre-speech.mp3"><Download size={14} /> Download MP3</a></div>}
         </form>
