@@ -233,7 +233,7 @@ function providerApiKey(req, res) {
     res.status(400).json({ error: 'Enter your own provider API key first.' });
     return '';
   }
-  if (key.length < 8 || key.length > 512 || /[\\r\\n]/.test(key)) {
+  if (key.length < 8 || key.length > 512 || /[\r\n]/.test(key)) {
     res.status(400).json({ error: 'The supplied API key format is invalid.' });
     return '';
   }
@@ -244,24 +244,24 @@ function extractProviderText(providerId, payload) {
   if (providerId === 'gemini') {
     return (payload?.candidates?.[0]?.content?.parts || [])
       .map(part => typeof part?.text === 'string' ? part.text : '')
-      .join('\\n').trim();
+      .join('\n').trim();
   }
   if (providerId === 'anthropic') {
     return (payload?.content || [])
       .filter(item => item?.type === 'text' && typeof item.text === 'string')
-      .map(item => item.text).join('\\n').trim();
+      .join('\n').trim();
   }
   if (providerId === 'cohere') {
     const content = payload?.message?.content || [];
     if (typeof content === 'string') return content.trim();
     return content.filter(item => item?.type === 'text' && typeof item.text === 'string')
-      .map(item => item.text).join('\\n').trim();
+      .join('\n').trim();
   }
   const text = payload?.choices?.[0]?.message?.content;
   if (typeof text === 'string') return text.trim();
   if (Array.isArray(text)) {
     return text.map(item => typeof item?.text === 'string' ? item.text : '')
-      .join('\\n').trim();
+      .join('\n').trim();
   }
   return '';
 }
@@ -549,7 +549,7 @@ app.post('/api/voice/stt', voiceLimiter, requireAuth, asyncRoute(async (req, res
   const GNANI_API_KEY = readGnaniApiKey(req, res);
   if (!GNANI_API_KEY) return;
   const contentType = req.get('content-type') || '';
-  if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) {
+  if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) return res.status(400).json({ error: 'Upload an audio file using the supported audio form.' });
     return res.status(400).json({ error: 'Upload an audio file using the supported audio form.' });
   }
   let body;
@@ -709,7 +709,7 @@ app.post('/api/voice/site-tts', siteVoiceLimit, asyncRoute(async (req, res) => {
 
 app.post('/api/voice/site-stt', siteVoiceLimit, asyncRoute(async (req, res) => {
   const contentType = req.get('content-type') || '';
-  if (!/^multipart\\/form-data;\\s*boundary=/i.test(contentType)) return res.status(400).json({ error: 'Upload an audio file using the supported audio form.' });
+  if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) return res.status(400).json({ error: 'Upload an audio file using the supported audio form.' });
   let body;
   try {
     body = await readRawBody(req, 6 * 1024 * 1024);
