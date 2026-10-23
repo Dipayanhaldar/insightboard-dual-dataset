@@ -81,20 +81,53 @@ Never paste the live URI, password, or JWT secret into ChatGPT or commit them to
 4. Save the environment change and deploy/restart that V2 service. Visit `/api/ai/status` on its public URL; it should return `available: true`. A successful status means the key exists, not necessarily that quota/billing is ready; test by generating one summary.
 5. Watch Google AI Studio's usage/quota and configure billing controls if your use case requires them. Keep the key restricted to the Gemini API when the key type supports that restriction.
 
-### 4. Gnani voice key (BYOK: each user uses their own key)
+### 4. Gnani voice key: personal BYOK and optional site-managed mode
 
-**Do not configure a shared `GNANI_API_KEY` in Render.** Voice Studio uses Bring Your Own Key so another visitor's speech requests cannot be billed to your Gnani account through an owner-provided server key.
+Voice Studio exposes two separate routes so personal keys remain independent from the site owner's key.
 
-1. Each person obtains an API key from their own Gnani account and checks that account's quota/pricing before using the feature.
-2. In InsightBoard, sign in and open Voice Studio. Paste the key into **Bring your own Gnani API key**, then select **Use key in this session**.
-3. The key is held in that browser session and sent over HTTPS with the authenticated request. The Express backend forwards the key to Gnani for that request only; it does not persist or log the key. The key is not stored in MongoDB or GitHub.
-4. Select **Forget key** when finished, particularly on a shared device. Avoid using this feature on a public computer. A key entered into a browser can be seen by someone who controls that browser session or developer tools.
-5. The API applies authentication and rate limits. Voice requests use the user's supplied key; the user's own Gnani account is responsible for the resulting usage and any applicable charges. InsightBoard cannot guarantee a free allowance; verify current credits, quotas and pricing directly in the user's Gnani account.
-6. Once the BYOK-enabled deployment is active, remove any previously configured `GNANI_API_KEY` from Render → Environment (or clear its value). The app no longer relies on a server-side owner key.
+**Personal-key BYOK**
+1. Each person obtains an API key from their own Gnani account and checks that account's quota/pricing.
+2. In InsightBoard, open Voice Studio, choose **Personal key (BYOK)**, paste the key, then select **Use key in this session**.
+3. The key is held in that browser session and forwarded over HTTPS for that user's authenticated request. InsightBoard does not store or log the key in MongoDB or GitHub.
+4. Select **Forget key** when finished, especially on shared devices.
 
-The Voice Studio uses Prisma v2.5 for short audio-file transcription and Timbre v2.5 for speech generation. Audio transcription accepts WAV, MP3, OGG, FLAC, AAC and M4A and is limited by the app to 15 MB; Gnani may impose a shorter duration limit depending on the endpoint. Audio is sent to Gnani for processing; InsightBoard does not save uploaded audio or generated audio to MongoDB.
+**Site-managed Gnani mode (uses the owner's key)**
+1. The Stage 2 Render service must have the owner key already configured as environment variable `GNANI_API_KEY`. Keep the actual value only in Render's Environment settings; never place it in GitHub, a React/Vite variable, or this chat.
+2. In Voice Studio, choose **Site key · 10/IP/day**. Public requests can be made without an InsightBoard sign-in.
+3. Shared usage is limited to **10 requests per IP per UTC day**, combined across TTS and STT, plus a second **100 requests site-wide per UTC day** cap by default. Change the global cap only by configuring `GNANI_SITE_DAILY_GLOBAL_LIMIT` in Render. The IP quota is stored as a keyed hash in MongoDB, not as a raw IP address; quota state survives ordinary server restarts.
+4. The route fails closed if MongoDB quota storage is unavailable. Site-mode speech is capped at 1,000 characters per request and transcription uploads at 6 MB. Gnani may impose additional endpoint/account limits.
+5. These controls reduce exposure but cannot guarantee zero billing: people can rotate networks, and a successful request still uses the owner's Gnani account. Enable provider-side usage/budget alerts or hard spending controls where available and check Gnani's current plan/terms before inviting public use.
+6. Verify `/api/voice/site-status` on the deployed Stage 2 origin. It should report whether site mode is configured and the active caps. A positive status proves that an environment key is present, not that its quota or validity is confirmed. Test with a short sample and check provider usage.
 
-### 5. Purchased .ME domain: connect
+Both modes send submitted text or audio to Gnani for processing. InsightBoard does not save generated audio or submitted recordings to MongoDB.
+
+### 5. AI API Provider Hub: ten-provider BYOK
+
+The provider hub is a curated, **non-ranked** selection of ten widely used text/chat APIs. It does not claim to be an objectively ranked global top ten, and it does not implement every modality each provider offers.
+
+| Provider | Official API/model documentation |
+|---|---|
+| OpenAI | https://developers.openai.com/api/reference/overview · https://developers.openai.com/api/docs/models |
+| Anthropic Claude | https://platform.claude.com/docs/en/api/overview · https://platform.claude.com/docs/en/models/overview |
+| Google Gemini | https://ai.google.dev/api · https://ai.google.dev/gemini-api/docs/models |
+| xAI Grok | https://docs.x.ai/developers/rest-api-reference/inference/chat-completions |
+| Mistral AI | https://docs.mistral.ai/api/endpoint/chat |
+| DeepSeek | https://api-docs.deepseek.com/api/responses · https://api-docs.deepseek.com/quick_start/pricing/ |
+| Groq | https://console.groq.com/docs/api-reference · https://console.groq.com/docs/models |
+| Cohere | https://docs.cohere.com/v2/reference/chat |
+| OpenRouter | https://openrouter.ai/developers · https://openrouter.ai/pricing |
+| Together AI | https://docs.together.ai/reference/chat-completions · https://docs.together.ai/docs/serverless/models |
+
+How to use:
+1. Open **AI API Provider Hub**, select a provider, and follow its **Get API key** link.
+2. Paste your personal key and select **Use key in this session**. Choose a model ID accepted by your account, edit the prompt, then run it.
+3. The key is stored in browser session storage and sent to InsightBoard over HTTPS with each request. The backend only accepts the fixed provider IDs listed above and forwards the key for that request; it does not persist or log the key. BYOK text requests are rate-limited to 30 per IP per hour as an abuse guard.
+4. Provider calls are billed, credited or quota-limited under the account attached to that key. Check the provider's current pricing and usage limits before use. Some providers require paid credits or model-level access. Use a small prompt/output limit while testing.
+5. Current model IDs are examples and change frequently. A provider may reject a model because it is retired, unavailable on your plan, or unsupported for chat completions. Verify the model ID in that provider's live catalog. The hub supports text/chat only; audio, speech, image/video generation, embeddings, fine-tuning and agent tools require separate endpoint integrations.
+
+Existing Gemini dashboard BYOK and Gnani personal BYOK remain in place as separate features. The hub's provider-specific keys are stored separately per provider, in session storage.
+
+### 6. Purchased .ME domain: connect
 
 For the current steps, see [INSIGHTBOARD_ME_DOMAIN_SETUP.md](INSIGHTBOARD_ME_DOMAIN_SETUP.md). The domain itself has already been purchased. Add the exact registered .ME domain under Settings → Custom Domains on the selected V2 Render service, copy the DNS records shown by Render into your domain registrar, then verify the domain in Render and wait for HTTPS provisioning. The exact domain name is required before DNS settings can be finalized. Do not change the current production Vercel domain or GitHub `main` branch.
 
