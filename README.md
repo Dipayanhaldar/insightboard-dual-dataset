@@ -7,6 +7,7 @@ InsightBoard is a React + Vite data exploration dashboard with an optional V2 ba
 - Import JSON arrays or objects containing records/data, plus CSV files. Imported records replace the currently active dataset.
 - Dynamic categorical filters, KPI cards, six chart panels, and searchable, sortable, paginated records table.
 - Light/dark themes; CSV, Excel and PDF exports; preset logo assets and Metro announcement audio.
+- Stage 2 Voice Studio: Gnani Prisma v2.5 speech-to-text and Timbre v2.5 text-to-speech, behind authenticated, rate-limited Express routes.
 
 ## V2 backend (feature branch only)
 The feature/insightboard-v2.0.1.1 branch adds Node.js + Express, MongoDB account/report storage, and a Render deployment blueprint. It does not modify main.
@@ -16,7 +17,7 @@ The feature/insightboard-v2.0.1.1 branch adds Node.js + Express, MongoDB account
 - Gemini remains browser-side Bring Your Own Key; never commit your key or share it with other users.
 - Hosting and Atlas resources are not provisioned automatically by this repository.
 
-See INSIGHTBOARD_V2.0.1.1_SETUP.md for setup, security notes, verified free-tier limitations and deployment steps.
+Set `GNANI_API_KEY` directly in the Stage 2 Render service environment after the Gnani integration is deployed. Never put it in React/Vite variables or GitHub. See INSIGHTBOARD_V2.0.1.1_SETUP.md for setup, security notes, verified free-tier limitations and deployment steps.
 
 ## Run the frontend locally
 1. Install Node.js 22 or newer.
