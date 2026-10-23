@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, History, RefreshCw, Save, Sparkles, Trash2, ShieldCheck, LogIn, UserPlus, LogOut, Database, KeyRound, ArrowUpRight } from 'lucide-react';
 import './V2Workspace.css';
+import GnaniVoiceStudio from './GnaniVoiceStudio.jsx';
 
 const MODEL = 'gemini-3.5-flash-lite';
 const LANGUAGES = [
@@ -397,6 +398,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields}) {
         {message&&<div className="v2-message" role="status"><span>{message}</span><button onClick={()=>setMessage('')} aria-label="Dismiss message">×</button></div>}
       </article>
     </div>
+    <GnaniVoiceStudio authToken={authToken} />
     <article className="v2-card v2-history">
       <div className="v2-card-title"><History size={18}/><h3>{copy.history}</h3><button className="v2-text-button" onClick={clearHistory} disabled={!authToken||!history.length||reportsBusy}><Trash2 size={14}/>{copy.clear}</button></div>
       <p className="v2-muted">{copy.historyNote}</p>
