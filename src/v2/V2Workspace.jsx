@@ -399,7 +399,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
         {message&&<div className="v2-message" role="status"><span>{message}</span><button onClick={()=>setMessage('')} aria-label="Dismiss message">×</button></div>}
       </article>
     </div>
-    <GnaniVoiceStudio authToken={authToken} rows={rows} fields={fields} datasetName={datasetName} sourceIsUploaded={sourceIsUploaded} />
+    <GnaniVoiceStudio authToken={authToken} rows={rows} fields={fields} datasetName={datasetName} sourceIsUploaded={sourceIsUploaded} analytics={analytics} />
     <AIProviderHub rows={rows} fields={fields} datasetName={datasetName} sourceIsUploaded={sourceIsUploaded} />
     <article className="v2-card v2-history">
       <div className="v2-card-title"><History size={18}/><h3>{copy.history}</h3><button className="v2-text-button" onClick={clearHistory} disabled={!authToken||!history.length||reportsBusy}><Trash2 size={14}/>{copy.clear}</button></div>
