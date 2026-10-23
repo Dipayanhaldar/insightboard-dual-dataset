@@ -6,7 +6,7 @@
 .ai-provider-title-copy h3{margin:0;font:800 20px/1.2 Manrope,system-ui,sans-serif;color:#213652;letter-spacing:-.45px}
 .ai-provider-count{flex:0 0 auto;padding:6px 9px;border-radius:999px;background:#edf3fc;color:#4268ad;font-size:9px;font-weight:800;letter-spacing:.5px}
 .ai-provider-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:16px 0 18px}
-.ai-provider-choice{display:flex;align-items:center;gap:7px;min-width:0;min-height:43px;padding:8px 10px;border:1px solid #dfe7f3;border-radius:10px;background:#fff;color:#415776;text-align:left;font:700 11px/1.35 inherit;cursor:pointer;transition:background .16s,border-color .16s,box-shadow .16s}
+.ai-provider-choice{display:flex;align-items:center;gap:7px;min-width:0;min-height:43px;padding:8px 10px;border:1px solid #dfe7f3;border-radius:10px;background:#fff;color:#415776;text-align:left;font-family:inherit;font-size:11px;font-weight:700;line-height:1.35;cursor:pointer;transition:background .16s,border-color .16s,box-shadow .16s}
 .ai-provider-choice>span:nth-child(2){flex:1;min-width:0}
 .ai-provider-choice svg{flex:0 0 auto;color:#3976dc}
 .ai-provider-choice:hover{border-color:#9dbce9;background:#f8fbff}
