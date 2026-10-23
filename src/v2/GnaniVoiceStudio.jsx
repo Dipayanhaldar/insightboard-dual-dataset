@@ -45,7 +45,7 @@ export default function GnaniVoiceStudio({ authToken }) {
   const [mode, setMode] = useState('tts');
   const [availability, setAvailability] = useState('checking');
   const [serviceMode, setServiceMode] = useState('personal');
-  const [siteStatus, setSiteStatus] = useState({ loading: true, available: false, limitPerIpPerUtcDay: 10, globalDailyLimit: 100 });
+  const [siteStatus, setSiteStatus] = useState({ loading: true, available: false, limitPerIpPerUtcDay: 10, globalDailyLimit: 25 });
   const [keyDraft, setKeyDraft] = useState('');
   const [gnaniKey, setGnaniKey] = useState(() => {
     try { return sessionStorage.getItem('insightboard-gnani-byok-key') || ''; } catch { return ''; }
@@ -74,7 +74,7 @@ export default function GnaniVoiceStudio({ authToken }) {
     fetch('/api/voice/site-status', { headers: { Accept: 'application/json' } })
       .then(response => response.ok ? response.json() : Promise.reject(new Error('Site voice status is unavailable.')))
       .then(data => { if (active) setSiteStatus({ loading: false, ...data }); })
-      .catch(() => { if (active) setSiteStatus({ loading: false, available: false, limitPerIpPerUtcDay: 10, globalDailyLimit: 100 }); });
+      .catch(() => { if (active) setSiteStatus({ loading: false, available: false, limitPerIpPerUtcDay: 10, globalDailyLimit: 25 }); });
     return () => { active = false; };
   }, []);
 
@@ -289,7 +289,7 @@ export default function GnaniVoiceStudio({ authToken }) {
         <button type="button" className={serviceMode === 'personal' ? 'active' : ''} onClick={() => setServiceMode('personal')}><KeyRound size={14} /> Personal key (BYOK)</button>
         <button type="button" className={serviceMode === 'site' ? 'active site-mode' : 'site-mode'} onClick={() => setServiceMode('site')}><ShieldCheck size={14} /> Site key · 10/IP/day</button>
       </div>
-      {serviceMode === 'site' && <div className="gnani-site-limit-note"><ShieldCheck size={15} /><span><strong>Limited public access</strong><small>Up to 10 site-key requests per public IP per UTC day, combined across speech and transcription. The whole website is capped at {siteStatus.globalDailyLimit || 100} site-key requests per UTC day. Text is limited to 1,000 characters and transcription uploads to 6 MB. Personal BYOK remains separate. The cap is an abuse guard, not a guarantee of zero billing.</small></span></div>}
+      {serviceMode === 'site' && <div className="gnani-site-limit-note"><ShieldCheck size={15} /><span><strong>Limited public access</strong><small>Up to 10 site-key requests per public IP per UTC day, combined across speech and transcription. The whole website is capped at {siteStatus.globalDailyLimit || 25} site-key requests per UTC day. Text is limited to 1,000 characters and transcription uploads to 6 MB. Personal BYOK remains separate. The cap is an abuse guard, not a guarantee of zero billing.</small></span></div>}
 
       {serviceMode === 'personal' && <div className="gnani-key-panel">
         <div className="gnani-key-heading"><KeyRound size={16} /><strong>Bring your own Gnani API key</strong><span>{gnaniKey ? 'KEY SET' : 'KEY REQUIRED'}</span></div>
@@ -339,7 +339,7 @@ export default function GnaniVoiceStudio({ authToken }) {
         </form>
       )}
 
-      <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>{serviceMode === 'site' ? 'Site key limits and data use' : 'BYOK privacy and billing'}</strong><small>{serviceMode === 'site' ? 'This mode sends requests through the site owner’s Gnani API key. It is limited to 10 requests per IP per UTC day and 100 requests site-wide per UTC day, with smaller text/audio limits. Requests and text/audio are sent to Gnani for processing. Do not submit confidential data.' : 'Your key is kept in this browser session and sent over HTTPS only when you request speech or transcription. The server uses it for that request only; InsightBoard does not save or log the key. Your Gnani account is responsible for usage associated with your key. Text/audio is sent to Gnani for processing; uploaded audio and generated audio are not saved to InsightBoard’s database.'}</small></span></div>
+      <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>{serviceMode === 'site' ? 'Site key limits and data use' : 'BYOK privacy and billing'}</strong><small>{serviceMode === 'site' ? 'This mode sends requests through the site owner’s Gnani API key. It is limited to 10 requests per IP per UTC day and 25 requests site-wide per UTC day, with smaller text/audio limits. Requests and text/audio are sent to Gnani for processing. Do not submit confidential data.' : 'Your key is kept in this browser session and sent over HTTPS only when you request speech or transcription. The server uses it for that request only; InsightBoard does not save or log the key. Your Gnani account is responsible for usage associated with your key. Text/audio is sent to Gnani for processing; uploaded audio and generated audio are not saved to InsightBoard’s database.'}</small></span></div>
       <p className="gnani-footnote"><a href="https://docs.gnani.ai/api/introduction/quick-start" target="_blank" rel="noreferrer">Gnani API quick start</a> · <a href="https://docs.gnani.ai/api/STT/speech-to-text" target="_blank" rel="noreferrer">STT docs</a> · <a href="https://docs.gnani.ai/api/TTS/tts-inference" target="_blank" rel="noreferrer">TTS docs</a> · Speech-to-text clips are limited to 60 seconds by Gnani.</p>
     </article>
   );
