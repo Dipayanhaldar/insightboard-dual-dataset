@@ -188,7 +188,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       return;
     }
     if (serviceMode === 'site' && text.trim().length > 1000) {
-      setTtsError('Site-key speech is limited to 1,000 characters. Personal BYOK supports up to 4,000 characters per request, subject to Gnani's current provider policy, account limits, and key quota.');
+      setTtsError("Site-key speech is limited to 1,000 characters. Personal BYOK supports up to 4,000 characters per request, subject to Gnani\'s current provider policy, account limits, and key quota.");
       return;
     }
     if (!text.trim()) {
