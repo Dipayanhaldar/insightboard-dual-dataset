@@ -34,3 +34,42 @@ jobs:
         run: npm run check:server
       - name: Build Vite frontend
         run: npm run build
+      - name: Smoke-test deployed Render APIs
+        env:
+          BASE_URL: https://insightboard-v2-bsiu.onrender.com
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 "$BASE_URL/api/health" -o /tmp/ib-health.json
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 "$BASE_URL/api/voice/site-status" -o /tmp/ib-voice-status.json
+          curl --fail --silent --show-error --retry 3 --retry-delay 5 --retry-all-errors --max-time 30 "$BASE_URL/api/ai/providers" -o /tmp/ib-providers.json
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const health = JSON.parse(fs.readFileSync('/tmp/ib-health.json', 'utf8'));
+          const voice = JSON.parse(fs.readFileSync('/tmp/ib-voice-status.json', 'utf8'));
+          const registry = JSON.parse(fs.readFileSync('/tmp/ib-providers.json', 'utf8'));
+          console.log('Health:', JSON.stringify(health));
+          console.log('Site Gnani status:', JSON.stringify({
+            available: voice.available,
+            limitPerIpPerUtcDay: voice.limitPerIpPerUtcDay,
+            globalDailyLimit: voice.globalDailyLimit,
+            mode: voice.mode
+          }));
+          console.log('Provider IDs:', (registry.providers || []).map(item => item.id).join(', '));
+          if (health.status !== 'ok' || health.database !== true) {
+            throw new Error('Live health check did not confirm status=ok and database=true.');
+          }
+          if (voice.mode !== 'site-managed-with-limits' ||
+              voice.limitPerIpPerUtcDay !== 10 ||
+              voice.globalDailyLimit !== 25 ||
+              voice.available !== true) {
+            throw new Error('Site Gnani key is missing or site quota values do not match expected defaults.');
+          }
+          const expected = ['openai','anthropic','gemini','xai','mistral','deepseek','groq','cohere','openrouter','together'];
+          const actual = (registry.providers || []).map(item => item.id);
+          if (registry.mode !== 'bring-your-own-key' ||
+              registry.keyStorage !== 'browser-session-only' ||
+              expected.some(id => !actual.includes(id)) ||
+              actual.length !== 10) {
+            throw new Error('Live AI provider registry is incomplete or did not report BYOK mode.');
+          }
+          NODE
