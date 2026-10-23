@@ -50,7 +50,7 @@ function downloadText(text, filename) {
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
-export default function V2Workspace({analytics,rows,fields,numericFields}) {
+export default function V2Workspace({analytics,rows,fields,numericFields,datasetName='',sourceIsUploaded=false}) {
   const [uiLanguage,setUiLanguage]=useState('en');
   const [summaryLanguage,setSummaryLanguage]=useState('en');
   const [keyDraft,setKeyDraft]=useState('');
@@ -399,8 +399,8 @@ export default function V2Workspace({analytics,rows,fields,numericFields}) {
         {message&&<div className="v2-message" role="status"><span>{message}</span><button onClick={()=>setMessage('')} aria-label="Dismiss message">×</button></div>}
       </article>
     </div>
-    <GnaniVoiceStudio authToken={authToken} />
-    <AIProviderHub />
+    <GnaniVoiceStudio authToken={authToken} rows={rows} fields={fields} datasetName={datasetName} sourceIsUploaded={sourceIsUploaded} />
+    <AIProviderHub rows={rows} fields={fields} datasetName={datasetName} sourceIsUploaded={sourceIsUploaded} />
     <article className="v2-card v2-history">
       <div className="v2-card-title"><History size={18}/><h3>{copy.history}</h3><button className="v2-text-button" onClick={clearHistory} disabled={!authToken||!history.length||reportsBusy}><Trash2 size={14}/>{copy.clear}</button></div>
       <p className="v2-muted">{copy.historyNote}</p>
