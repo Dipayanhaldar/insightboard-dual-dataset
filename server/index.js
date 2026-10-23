@@ -351,7 +351,7 @@ app.post('/api/ai/summary', aiLimiter, asyncRoute(async (req, res) => {
   }
   const languages = {
     en: 'English', te: 'Telugu', hi: 'Hindi', ta: 'Tamil', bn: 'Bengali',
-    mr: 'Marathi', kn: 'Kannada', ml: 'Malayalam', ur: 'Urdu'
+    mr: 'Marathi', kn: 'Kannada', ml: 'Malayalam', ur: 'Urdu', gu: 'Gujarati', pa: 'Punjabi'
   };
   const languageCode = safeText(req.body?.language, 8);
   const language = languages[languageCode] || 'English';
