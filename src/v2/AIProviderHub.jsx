@@ -34,7 +34,7 @@ const PROVIDERS = [
     note: 'Choose a model ID available to your Mistral account.'
   },
   {
-    id: 'deepseek', name: 'DeepSeek', model: 'deepseek-flash',
+    id: 'deepseek', name: 'DeepSeek', model: 'deepseek-v4-flash',
     keyUrl: 'https://platform.deepseek.com/api_keys', docsUrl: 'https://api-docs.deepseek.com/',
     pricingUrl: 'https://api-docs.deepseek.com/quick_start/pricing/',
     note: 'OpenAI-compatible chat API; provider balance and quotas apply.'
