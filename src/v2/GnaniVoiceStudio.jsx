@@ -114,7 +114,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       if (!response.ok) throw new Error(result.error || 'Could not create a summary in the selected language.');
       const summary = String(result.summary || '').trim();
       if (!summary) throw new Error('The summary service returned no text. Try again.');
-      const capped = summary.slice(0, targetMode === 'site' ? 950 : 3800);
+      const capped = summary.slice(0, 1000);
       setLocalizedSummary(capped);
       setText(capped);
     } catch (error) {
@@ -180,7 +180,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     event.preventDefault();
     setTtsError('');
     if (serviceMode === 'personal' && !authToken) {
-      setTtsError('Sign in or create an InsightBoard account above to use personal-key voice tools. Your own key allows up to 4,000 characters per speech request.');
+      setTtsError('Sign in or create an InsightBoard account above to use personal-key voice tools. Gnani will summarize uploaded data to a maximum of 1,000 characters for speech.');
       return;
     }
     if (serviceMode === 'personal' && !gnaniKey) {
@@ -188,7 +188,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       return;
     }
     if (serviceMode === 'site' && text.trim().length > 1000) {
-      setTtsError('Site-powered speech is limited to 1,000 characters per request. Switch to personal-key mode for longer text.');
+      setTtsError('Gnani dataset summaries are limited to 1,000 characters per audio request.');
       return;
     }
     if (!text.trim()) {
@@ -369,7 +369,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
         <form onSubmit={generateSpeech} className="gnani-form">
           <label className="v2-field"><span><Languages size={13} /> Language</span><select value={ttsLanguage} onChange={event => updateLanguage(event.target.value)}>{TTS_LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
           <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
-          <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? 'This concise summary is generated from the uploaded dataset in the selected speech language. The original dataset is not changed.' : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
+          <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / 1,000 characters</small></span><textarea maxLength={1000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? 'Gnani summarizes your uploaded dataset to a maximum of 1,000 characters in your selected speech language. Generate audio from this summary; the original dataset is not changed.' : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
           <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
           <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && (!gnaniKey || !authToken)) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
