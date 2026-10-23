@@ -20,7 +20,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 // Optional site-managed Gnani key for a strictly rate-limited public mode; BYOK routes do not use it.
 const GNANI_SITE_API_KEY = process.env.GNANI_API_KEY || '';
-const GNANI_SITE_DAILY_GLOBAL_LIMIT = Math.min(1000, Math.max(10, Number(process.env.GNANI_SITE_DAILY_GLOBAL_LIMIT) || 100));
+const GNANI_SITE_DAILY_GLOBAL_LIMIT = Math.min(1000, Math.max(10, Number(process.env.GNANI_SITE_DAILY_GLOBAL_LIMIT) || 25));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDirectory = path.resolve(__dirname, '../dist');
 
@@ -313,7 +313,7 @@ app.post('/api/ai/provider', providerByokLimiter, asyncRoute(async (req, res) =>
     body = { model, input: prompt, max_output_tokens: maxOutputTokens };
   } else if (config.kind === 'anthropic') {
     headers['x-api-key'] = key;
-    headers['anthropic-version'] = '2023-06-01';
+    headers['anthropic-version'] = '2026-10-21';
     body = { model, max_tokens: maxOutputTokens, messages: [{ role: 'user', content: prompt }] };
   } else if (config.kind === 'cohere') {
     headers.Authorization = 'Bearer ' + key;
