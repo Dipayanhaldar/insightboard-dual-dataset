@@ -16,7 +16,6 @@ const JWT_SECRET = process.env.JWT_SECRET || '';
 const TOKEN_LIFETIME = process.env.JWT_EXPIRES_IN || '8h';
 const MAX_REPORTS = Math.min(100, Math.max(1, Number(process.env.MAX_REPORTS_PER_USER) || 20));
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GNANI_API_KEY = process.env.GNANI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDirectory = path.resolve(__dirname, '../dist');
@@ -295,9 +294,23 @@ function readRawBody(req, maxBytes) {
     });
   });
 }
+
+function readGnaniApiKey(req, res) {
+  const key = (req.get('x-gnani-api-key') || '').trim();
+  if (!key) {
+    res.status(400).json({ error: 'Enter your own Gnani API key in Voice Studio before using voice tools.' });
+    return '';
+  }
+  if (key.length < 8 || key.length > 512 || /[\r\n]/.test(key)) {
+    res.status(400).json({ error: 'The supplied Gnani key format is invalid. Check the key in your Gnani account.' });
+    return '';
+  }
+  return key;
+}
+
 function gnaniErrorMessage(status) {
   if (status === 400) return 'Gnani rejected the input. Check the audio format, language, selected voice, or text.';
-  if (status === 401 || status === 403) return 'Gnani authentication failed. The site owner must verify GNANI_API_KEY in Render.';
+  if (status === 401 || status === 403) return 'Gnani rejected this API key. Check that your own key is valid and active in your Gnani account.';
   if (status === 429) return 'Gnani rate limit or quota was reached. Check your plan or try again later.';
   if (status === 503) return 'Gnani voice service is temporarily unavailable. Try again later.';
   return 'Gnani could not complete the request. Try again later.';
@@ -306,18 +319,19 @@ function gnaniErrorMessage(status) {
 app.get('/api/voice/status', (_req, res) => {
   res.set('Cache-Control', 'no-store');
   return res.json({
-    available: Boolean(GNANI_API_KEY),
+    available: true,
+    mode: 'bring-your-own-key',
+    requiresUserKey: true,
+    requiresSignIn: true,
     speechToText: 'Prisma v2.5',
     textToSpeech: 'Timbre v2.5',
-    requiresSignIn: true,
     maxAudioSeconds: 60
   });
 });
 
 app.post('/api/voice/tts', voiceLimiter, requireAuth, asyncRoute(async (req, res) => {
-  if (!GNANI_API_KEY) {
-    return res.status(503).json({ error: 'Gnani is not configured yet. Add GNANI_API_KEY to the Render environment variables.' });
-  }
+  const GNANI_API_KEY = readGnaniApiKey(req, res);
+  if (!GNANI_API_KEY) return;
   const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
   const voice = safeText(req.body?.voice, 40);
   const language = safeText(req.body?.language, 16);
@@ -365,9 +379,8 @@ app.post('/api/voice/tts', voiceLimiter, requireAuth, asyncRoute(async (req, res
 }));
 
 app.post('/api/voice/stt', voiceLimiter, requireAuth, asyncRoute(async (req, res) => {
-  if (!GNANI_API_KEY) {
-    return res.status(503).json({ error: 'Gnani is not configured yet. Add GNANI_API_KEY to the Render environment variables.' });
-  }
+  const GNANI_API_KEY = readGnaniApiKey(req, res);
+  if (!GNANI_API_KEY) return;
   const contentType = req.get('content-type') || '';
   if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) {
     return res.status(400).json({ error: 'Upload an audio file using the supported audio form.' });

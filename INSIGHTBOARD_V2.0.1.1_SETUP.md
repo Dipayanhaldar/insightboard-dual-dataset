@@ -81,17 +81,18 @@ Never paste the live URI, password, or JWT secret into ChatGPT or commit them to
 4. Save the environment change and deploy/restart that V2 service. Visit `/api/ai/status` on its public URL; it should return `available: true`. A successful status means the key exists, not necessarily that quota/billing is ready; test by generating one summary.
 5. Watch Google AI Studio's usage/quota and configure billing controls if your use case requires them. Keep the key restricted to the Gemini API when the key type supports that restriction.
 
-### 4. Gnani voice key (speech-to-text + text-to-speech)
+### 4. Gnani voice key (BYOK: each user uses their own key)
 
-The Stage 2 Voice Studio uses Gnani's current REST APIs: Prisma v2.5 for transcription and Timbre v2.5 for speech generation. The app proxies requests through Express so the provider key stays on the server. Audio transcription accepts WAV, MP3, OGG, FLAC, AAC and M4A; Gnani limits a single STT clip to 60 seconds (30 seconds or less is preferred).
+**Do not configure a shared `GNANI_API_KEY` in Render.** Voice Studio uses Bring Your Own Key so another visitor's speech requests cannot be billed to your Gnani account through an owner-provided server key.
 
-1. Open the Render dashboard and select the Stage 2 service for `https://insightboard-v2-bsiu.onrender.com`.
-2. Open **Environment** and add a new variable named `GNANI_API_KEY`.
-3. Paste your Gnani API key into the value field directly in Render. Do not paste it into ChatGPT, source files, GitHub, a React `VITE_*` variable, or a public issue.
-4. Save the environment change. After the Gnani-enabled branch has been deployed, open `/api/voice/status` on that service. It should return `available: true`. This confirms the key is present on the server, not that the key has remaining quota; perform one short TTS and STT test.
-5. Sign in to InsightBoard before generating speech or transcription. Requests are authenticated and rate-limited to limit anonymous quota abuse.
+1. Each person obtains an API key from their own Gnani account and checks that account's quota/pricing before using the feature.
+2. In InsightBoard, sign in and open Voice Studio. Paste the key into **Bring your own Gnani API key**, then select **Use key in this session**.
+3. The key is held in that browser session and sent over HTTPS with the authenticated request. The Express backend forwards the key to Gnani for that request only; it does not persist or log the key. The key is not stored in MongoDB or GitHub.
+4. Select **Forget key** when finished, particularly on a shared device. Avoid using this feature on a public computer. A key entered into a browser can be seen by someone who controls that browser session or developer tools.
+5. The API applies authentication and rate limits. Voice requests use the user's supplied key; the user's own Gnani account is responsible for the resulting usage and any applicable charges. InsightBoard cannot guarantee a free allowance; verify current credits, quotas and pricing directly in the user's Gnani account.
+6. Once the BYOK-enabled deployment is active, remove any previously configured `GNANI_API_KEY` from Render → Environment (or clear its value). The app no longer relies on a server-side owner key.
 
-The Voice Studio sends text or uploaded audio to Gnani for processing. InsightBoard does not save uploaded audio or generated audio to MongoDB; the transcript and generated audio are only held in the current page session. Check Gnani's own plan, quota, commercial-use and data-handling terms before broader or commercial use.
+The Voice Studio uses Prisma v2.5 for short audio-file transcription and Timbre v2.5 for speech generation. Audio transcription accepts WAV, MP3, OGG, FLAC, AAC and M4A and is limited by the app to 15 MB; Gnani may impose a shorter duration limit depending on the endpoint. Audio is sent to Gnani for processing; InsightBoard does not save uploaded audio or generated audio to MongoDB.
 
 ### 5. Purchased .ME domain: connect
 

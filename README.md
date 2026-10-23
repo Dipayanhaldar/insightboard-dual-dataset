@@ -17,7 +17,7 @@ The feature/insightboard-v2.0.1.1 branch adds Node.js + Express, MongoDB account
 - Gemini remains browser-side Bring Your Own Key; never commit your key or share it with other users.
 - Hosting and Atlas resources are not provisioned automatically by this repository.
 
-Set `GNANI_API_KEY` directly in the Stage 2 Render service environment after the Gnani integration is deployed. Never put it in React/Vite variables or GitHub. See INSIGHTBOARD_V2.0.1.1_SETUP.md for setup, security notes, verified free-tier limitations and deployment steps.
+**Gnani uses Bring Your Own Key (BYOK).** Each user enters their own Gnani API key in Voice Studio. The key is held in browser session storage and forwarded only for that user's authenticated request; it is not stored in MongoDB or logged by InsightBoard. Do not set a shared `GNANI_API_KEY` in Render or commit credentials. Users are responsible for usage charged to their Gnani account. See INSIGHTBOARD_V2.0.1.1_SETUP.md for setup and security notes.
 
 ## Run the frontend locally
 1. Install Node.js 22 or newer.
