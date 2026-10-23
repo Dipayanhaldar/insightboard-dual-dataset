@@ -41,7 +41,7 @@ async function errorFromResponse(response) {
   return body?.error || ('Request failed (' + response.status + ').');
 }
 
-export default function GnaniVoiceStudio({ authToken }) {
+export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], datasetName = '', sourceIsUploaded = false }) {
   const [mode, setMode] = useState('tts');
   const [availability, setAvailability] = useState('checking');
   const [serviceMode, setServiceMode] = useState('personal');
@@ -53,7 +53,7 @@ export default function GnaniVoiceStudio({ authToken }) {
   const [keyNotice, setKeyNotice] = useState('');
   const [ttsLanguage, setTtsLanguage] = useState('te-IN');
   const [voice, setVoice] = useState('Suhana');
-  const [text, setText] = useState('నమస్కారం! ఇది ఇన్‌సైట్‌బోర్డ్ వాయిస్ పరీక్ష.');
+  const [text, setText] = useState('');
   const [speed, setSpeed] = useState(1);
   const [ttsBusy, setTtsBusy] = useState(false);
   const [audioUrl, setAudioUrl] = useState('');
@@ -81,6 +81,14 @@ export default function GnaniVoiceStudio({ authToken }) {
   useEffect(() => () => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
   }, [audioUrl]);
+
+  useEffect(() => {
+    if (!sourceIsUploaded || !Array.isArray(rows) || !rows.length || !Array.isArray(fields) || !fields.length) { setText(''); setAudioUrl(''); return; }
+    const lines = rows.slice(0, 30).map((row, index) => 'Record ' + (index + 1) + ': ' + fields.slice(0, 20).map(field => field + ': ' + String(row?.[field] ?? '')).join('; '));
+    const content = (datasetName ? 'Dataset: ' + datasetName + '. ' : '') + lines.join('\n');
+    setText(content.slice(0, 3800));
+    setAudioUrl('');
+  }, [rows, fields, datasetName, sourceIsUploaded]);
 
   function useGnaniKey() {
     const value = String(keyDraft || gnaniKey).trim();
@@ -273,11 +281,10 @@ export default function GnaniVoiceStudio({ authToken }) {
             : availability === 'checking' ? 'CHECKING' : availability === 'ready' ? 'BYO KEY MODE' : availability === 'setup' ? 'API SETUP NEEDED' : 'API OFFLINE'}
         </span>
       </div>
-      <p className="v2-muted gnani-intro">Convert text into natural speech or transcribe a short audio clip with Gnani’s Timbre v2.5 and Prisma v2.5 models.</p>
+      <p className="v2-muted gnani-intro">Read your uploaded JSON/CSV dataset aloud in a language you select. Gnani is used here for spoken data access, not general-purpose transcription.</p>
 
       <div className="gnani-tabs" role="tablist" aria-label="Voice tool">
         <button type="button" role="tab" aria-selected={mode === 'tts'} className={mode === 'tts' ? 'active' : ''} onClick={() => setMode('tts')}><Volume2 size={15} /> Text to speech</button>
-        <button type="button" role="tab" aria-selected={mode === 'stt'} className={mode === 'stt' ? 'active' : ''} onClick={() => setMode('stt')}><Mic size={15} /> Speech to text</button>
       </div>
 
       {serviceMode === 'personal' && availability === 'setup' && <div className="gnani-alert"><AlertTriangle size={16} /><span><strong>Personal-key voice API is not available.</strong> Check that the Stage 2 server has deployed the BYOK-enabled code.</span></div>}
@@ -317,9 +324,9 @@ export default function GnaniVoiceStudio({ authToken }) {
         <form onSubmit={generateSpeech} className="gnani-form">
           <label className="v2-field"><span><Languages size={13} /> Language</span><select value={ttsLanguage} onChange={event => updateLanguage(event.target.value)}>{TTS_LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
           <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
-          <label className="v2-field"><span>Text to speak <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={4} value={text} onChange={event => { setText(event.target.value); setTtsError(''); }} placeholder="Type or paste the text to turn into speech." /></label>
+          <label className="v2-field"><span>Uploaded dataset content <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={5} value={text} readOnly placeholder="Upload a JSON or CSV dataset to enable spoken insights." /><small>{sourceIsUploaded ? 'Content is generated from your uploaded dataset only. To avoid changing your source data, this preview is read-only.' : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
           <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
-          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || accountLocked || providerUnavailable || (serviceMode === 'personal' && !gnaniKey) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
+          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && !gnaniKey) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
           {audioUrl && <div className="gnani-audio-result"><div><CheckCircle2 size={16} /><strong>Speech generated</strong><span>MP3 audio · available for this session</span></div><audio controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio><a className="v2-button secondary gnani-download" href={audioUrl} download="gnani-timbre-speech.mp3"><Download size={14} /> Download MP3</a></div>}
         </form>
@@ -340,7 +347,7 @@ export default function GnaniVoiceStudio({ authToken }) {
       )}
 
       <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>{serviceMode === 'site' ? 'Site key limits and data use' : 'BYOK privacy and billing'}</strong><small>{serviceMode === 'site' ? 'This mode sends requests through the site owner’s Gnani API key. It is limited to 10 requests per IP per UTC day and 25 requests site-wide per UTC day, with smaller text/audio limits. Requests and text/audio are sent to Gnani for processing. Do not submit confidential data.' : 'Your key is kept in this browser session and sent over HTTPS only when you request speech or transcription. The server uses it for that request only; InsightBoard does not save or log the key. Your Gnani account is responsible for usage associated with your key. Text/audio is sent to Gnani for processing; uploaded audio and generated audio are not saved to InsightBoard’s database.'}</small></span></div>
-      <p className="gnani-footnote"><a href="https://docs.gnani.ai/api/introduction/quick-start" target="_blank" rel="noreferrer">Gnani API quick start</a> · <a href="https://docs.gnani.ai/api/STT/speech-to-text" target="_blank" rel="noreferrer">STT docs</a> · <a href="https://docs.gnani.ai/api/TTS/tts-inference" target="_blank" rel="noreferrer">TTS docs</a> · Speech-to-text clips are limited to 60 seconds by Gnani.</p>
+      <p className="gnani-footnote"><a href="https://docs.gnani.ai/api/introduction/quick-start" target="_blank" rel="noreferrer">Gnani API quick start</a> · <a href="https://docs.gnani.ai/api/TTS/tts-inference" target="_blank" rel="noreferrer">TTS docs</a> · Gnani reads uploaded data only; it does not accept custom text or unrelated audio in this dashboard.</p>
     </article>
   );
 }
