@@ -245,7 +245,7 @@ function extractProviderText(providerId, payload) {
     if (typeof payload?.output_text === 'string') return payload.output_text.trim();
     return (payload?.output || []).flatMap(item => item?.content || [])
       .filter(item => (item?.type === 'output_text' || item?.type === 'text') && typeof item.text === 'string')
-      .map(item => item.text).join('\\n').trim();
+      .map(item => item.text).join('\n').trim();
   }
   if (providerId === 'gemini') {
     return (payload?.candidates?.[0]?.content?.parts || [])
