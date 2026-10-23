@@ -82,18 +82,21 @@ export default function GnaniVoiceStudio({ authToken }) {
       setKeyNotice('Paste your own Gnani API key first.');
       return;
     }
-    if (value.length < 8 || value.length > 512 || /[\\r\\n]/.test(value)) {
+    if (value.length < 8 || value.length > 512 || /[\r\n]/.test(value)) {
       setKeyNotice('That key does not look valid. Check it in your Gnani account and try again.');
       return;
     }
+    let storedInSession = true;
     try {
       sessionStorage.setItem('insightboard-gnani-byok-key', value);
     } catch {
-      setKeyNotice('Browser session storage is unavailable. The key will remain only in this page until it is refreshed.');
+      storedInSession = false;
     }
     setGnaniKey(value);
     setKeyDraft('');
-    setKeyNotice('Your key is set for this browser session only.');
+    setKeyNotice(storedInSession
+      ? 'Your key is set for this browser session only.'
+      : 'Session storage is blocked. The key is held only in this page and will be lost on refresh.');
     setTtsError('');
     setSttError('');
   }
