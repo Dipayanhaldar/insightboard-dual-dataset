@@ -18,7 +18,7 @@ The feature/insightboard-v2.0.1.1 branch adds Node.js + Express, MongoDB account
 - Gemini remains browser-side Bring Your Own Key; never commit your key or share it with other users.
 - Hosting and Atlas resources are not provisioned automatically by this repository.
 
-**Gnani has two separate modes.** Personal BYOK uses each visitor's own key. Optional site-managed mode uses `GNANI_API_KEY` from Render and is limited to 10 requests per public IP per UTC day plus 100 total site requests per UTC day by default; limits are stored in MongoDB and the route fails closed if quota storage is unavailable. Site mode still incurs usage against the owner's Gnani account, so set provider-side budget controls too. Never commit credentials.
+**Gnani has two separate modes.** Personal BYOK uses each visitor's own key. Optional site-managed mode uses `GNANI_API_KEY` from Render and is limited to 10 requests per public IP per UTC day plus 25 total site requests per UTC day by default; limits are stored in MongoDB and the route fails closed if quota storage is unavailable. Site mode still incurs usage against the owner's Gnani account, so set provider-side budget controls too. Never commit credentials.
 
 **The AI API Provider Hub uses BYOK.** Provider keys are held in browser session storage and forwarded to the selected provider for a request. InsightBoard does not store those keys in MongoDB. The hub supports text/chat calls only; it is not a complete integration of every provider's audio, image, video, embedding or fine-tuning APIs. Model IDs, availability and pricing can change; see the links in the hub and setup guide.
 
