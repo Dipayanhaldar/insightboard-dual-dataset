@@ -301,7 +301,7 @@ function readGnaniApiKey(req, res) {
     res.status(400).json({ error: 'Enter your own Gnani API key in Voice Studio before using voice tools.' });
     return '';
   }
-  if (key.length < 8 || key.length > 512 || /[\\r\\n]/.test(key)) {
+  if (key.length < 8 || key.length > 512 || /[\r\n]/.test(key)) {
     res.status(400).json({ error: 'The supplied Gnani key format is invalid. Check the key in your Gnani account.' });
     return '';
   }
@@ -310,7 +310,7 @@ function readGnaniApiKey(req, res) {
 
 function gnaniErrorMessage(status) {
   if (status === 400) return 'Gnani rejected the input. Check the audio format, language, selected voice, or text.';
-  if (status === 401 || status === 403) return 'Gnani authentication failed. The site owner must verify GNANI_API_KEY in Render.';
+  if (status === 401 || status === 403) return 'Gnani rejected this API key. Check that your own key is valid and active in your Gnani account.';
   if (status === 429) return 'Gnani rate limit or quota was reached. Check your plan or try again later.';
   if (status === 503) return 'Gnani voice service is temporarily unavailable. Try again later.';
   return 'Gnani could not complete the request. Try again later.';
