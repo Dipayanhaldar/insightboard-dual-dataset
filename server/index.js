@@ -558,7 +558,7 @@ app.post('/api/voice/stt', voiceLimiter, requireAuth, asyncRoute(async (req, res
   const GNANI_API_KEY = readGnaniApiKey(req, res);
   if (!GNANI_API_KEY) return;
   const contentType = req.get('content-type') || '';
-  if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) return res.status(400).json({ error: 'Upload an audio file using the supported audio form.' });
+  if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) {
     return res.status(400).json({ error: 'Upload an audio file using the supported audio form.' });
   }
   let body;
