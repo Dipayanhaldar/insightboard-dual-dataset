@@ -114,7 +114,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       if (!response.ok) throw new Error(result.error || 'Could not create a summary in the selected language.');
       const summary = String(result.summary || '').trim();
       if (!summary) throw new Error('The summary service returned no text. Try again.');
-      const capped = summary.slice(0, 1000);
+      const capped = summary.slice(0, targetMode === 'site' ? 950 : 3800);
       setLocalizedSummary(capped);
       setText(capped);
     } catch (error) {
@@ -188,7 +188,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       return;
     }
     if (serviceMode === 'site' && text.trim().length > 1000) {
-      setTtsError('Gnani dataset summaries are limited to 1,000 characters per audio request.');
+      setTtsError('Site-key speech is limited to 1,000 characters. Personal BYOK supports up to 4,000 characters per request, subject to Gnani's current provider policy, account limits, and key quota.');
       return;
     }
     if (!text.trim()) {
@@ -341,11 +341,11 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
         <button type="button" className={serviceMode === 'personal' ? 'active' : ''} onClick={() => changeServiceMode('personal')}><KeyRound size={14} /> Personal key (BYOK)</button>
         <button type="button" className={serviceMode === 'site' ? 'active site-mode' : 'site-mode'} onClick={() => changeServiceMode('site')}><ShieldCheck size={14} /> Site key · 10/IP/day</button>
       </div>
-      {serviceMode === 'site' && <div className="gnani-site-limit-note"><ShieldCheck size={15} /><span><strong>Limited public access</strong><small>Up to 10 site-key requests per public IP per UTC day, combined across speech and transcription. The whole website is capped at {siteStatus.globalDailyLimit || 25} site-key requests per UTC day. Text is limited to 1,000 characters and transcription uploads to 6 MB. Personal BYOK remains separate. The cap is an abuse guard, not a guarantee of zero billing.</small></span></div>}
+      {serviceMode === 'site' && <div className="gnani-site-limit-note"><ShieldCheck size={15} /><span><strong>Limited public access</strong><small>Up to 10 site-key requests per public IP per UTC day, combined across speech and transcription. The whole website is capped at {siteStatus.globalDailyLimit || 25} site-key requests per UTC day. Speech text is limited to 1,000 characters and transcription uploads to 6 MB. Personal BYOK can support up to 4,000 characters per request subject to provider policy and your quota. The cap is an abuse guard, not a guarantee of zero billing.</small></span></div>}
 
       {serviceMode === 'personal' && <div className="gnani-key-panel">
         <div className="gnani-key-heading"><KeyRound size={16} /><strong>Bring your own Gnani API key</strong><span>{gnaniKey ? 'KEY SET' : 'KEY REQUIRED'}</span></div>
-        <p>Use the key from your own Gnani account. InsightBoard does not use a shared owner key for voice requests.</p>
+        <p>Use a paid or otherwise eligible key from your own Gnani account. Site-provided keys are limited to 1,000 characters; personal BYOK supports up to 4,000 characters per request under the current integration, only where allowed by Gnani's provider policy and your account quota. Your key's plan may impose a lower limit or additional charges.</p>
         <label className="v2-field gnani-key-field">
           <span>Your Gnani API key</span>
           <input
@@ -369,7 +369,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
         <form onSubmit={generateSpeech} className="gnani-form">
           <label className="v2-field"><span><Languages size={13} /> Language</span><select value={ttsLanguage} onChange={event => updateLanguage(event.target.value)}>{TTS_LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
           <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
-          <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / 1,000 characters</small></span><textarea maxLength={1000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? 'Gnani summarizes your uploaded dataset to a maximum of 1,000 characters in your selected speech language. Generate audio from this summary; the original dataset is not changed.' : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
+          <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? 'Gnani summarizes your uploaded dataset in your selected speech language. Site-key mode is limited to 1,000 characters; personal BYOK can use up to 4,000 characters per speech request, subject to Gnani's current provider limits and your account/key quota. The original dataset is not changed.' : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
           <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
           <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && (!gnaniKey || !authToken)) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
