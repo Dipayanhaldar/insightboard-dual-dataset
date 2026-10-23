@@ -86,3 +86,22 @@ html[data-theme="dark"] .gnani-alert{background:#342b18;border-color:#63522a;col
 html[data-theme="dark"] .gnani-alert code{background:#493d22;color:#ffdf99}
 html[data-theme="dark"] .gnani-error{background:#351e27;border-color:#64323b;color:#ffb9c1}
 @media(prefers-reduced-motion:reduce){.gnani-tabs button,.gnani-upload{transition:none!important}}
+
+
+/* Per-user Gnani BYOK key panel */
+.gnani-key-panel{margin:0 0 17px;padding:15px;border:1px solid #dbe5f2;border-radius:13px;background:#f8fbff}
+.gnani-key-heading{display:flex;align-items:center;gap:8px;color:#2e4564}
+.gnani-key-heading strong{font-size:12px;flex:1}
+.gnani-key-heading>span{font-size:9px;font-weight:800;letter-spacing:.4px;padding:5px 7px;border-radius:999px;background:#e8f1ff;color:#2e67bd}
+.gnani-key-panel>p{margin:8px 0 12px;color:#72839a;font-size:10px;line-height:1.55}
+.gnani-key-field{margin:0 0 10px!important}
+.gnani-key-field input{box-sizing:border-box;width:100%;min-width:0;padding:11px 12px;border:1px solid #dbe5f2;border-radius:10px;background:#fff;color:#263b58;font:inherit;font-size:12px}
+.gnani-key-field input:focus{outline:3px solid rgba(55,125,255,.22);border-color:#7aa7f3}
+.gnani-key-actions{display:flex;gap:8px;flex-wrap:wrap}
+.gnani-key-actions .v2-button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:35px}
+.gnani-key-notice{margin:8px 0 0!important;color:#467053!important;font-size:10px!important}
+html[data-theme="dark"] .gnani-key-panel{background:#172438;border-color:#31435b}
+html[data-theme="dark"] .gnani-key-heading{color:#e2ebf8}
+html[data-theme="dark"] .gnani-key-heading>span{background:#203a60;color:#a9cbff}
+html[data-theme="dark"] .gnani-key-field input{background:#142237;border-color:#33465f;color:#e2ebf8}
+@media(max-width:620px){.gnani-key-actions{display:grid;grid-template-columns:1fr}.gnani-key-actions .v2-button{width:100%}}
