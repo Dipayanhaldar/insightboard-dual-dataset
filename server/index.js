@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { createHmac } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,6 +18,9 @@ const TOKEN_LIFETIME = process.env.JWT_EXPIRES_IN || '8h';
 const MAX_REPORTS = Math.min(100, Math.max(1, Number(process.env.MAX_REPORTS_PER_USER) || 20));
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+// Optional site-managed Gnani key for a strictly rate-limited public mode; BYOK routes do not use it.
+const GNANI_SITE_API_KEY = process.env.GNANI_API_KEY || '';
+const GNANI_SITE_DAILY_GLOBAL_LIMIT = Math.min(1000, Math.max(10, Number(process.env.GNANI_SITE_DAILY_GLOBAL_LIMIT) || 25));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDirectory = path.resolve(__dirname, '../dist');
 
@@ -69,6 +73,13 @@ const voiceLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Gnani voice rate limit reached. Try again later.' }
 });
+const providerByokLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'AI provider playground limit reached for this IP. Try again in an hour.' }
+});
 
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
@@ -84,8 +95,17 @@ const reportSchema = new mongoose.Schema({
   summary: { type: String, default: '', maxlength: 6000 }
 }, { timestamps: true, minimize: false });
 reportSchema.index({ userId: 1, createdAt: -1 });
+const siteVoiceUsageSchema = new mongoose.Schema({
+  bucketKey: { type: String, required: true },
+  dayStart: { type: Date, required: true },
+  count: { type: Number, default: 0, min: 0 },
+  expiresAt: { type: Date, required: true }
+}, { versionKey: false });
+siteVoiceUsageSchema.index({ bucketKey: 1, dayStart: 1 }, { unique: true });
+siteVoiceUsageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 const Report = mongoose.models.Report || mongoose.model('Report', reportSchema);
+const SiteVoiceUsage = mongoose.models.SiteVoiceUsage || mongoose.model('SiteVoiceUsage', siteVoiceUsageSchema);
 
 const asyncRoute = handler => (req, res, next) =>
   Promise.resolve(handler(req, res, next)).catch(next);
@@ -191,6 +211,162 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/ai/status', (_req, res) => {
   res.json({ available: Boolean(GEMINI_API_KEY), model: GEMINI_MODEL });
 });
+
+
+
+const AI_PROVIDER_CONFIG = {
+  openai: { label: 'OpenAI', kind: 'openaiResponses', endpoint: 'https://api.openai.com/v1/responses' },
+  anthropic: { label: 'Anthropic Claude', kind: 'anthropic', endpoint: 'https://api.anthropic.com/v1/messages' },
+  gemini: { label: 'Google Gemini', kind: 'gemini', endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/' },
+  xai: { label: 'xAI Grok', kind: 'openai', endpoint: 'https://api.x.ai/v1/chat/completions' },
+  mistral: { label: 'Mistral AI', kind: 'openai', endpoint: 'https://api.mistral.ai/v1/chat/completions' },
+  deepseek: { label: 'DeepSeek', kind: 'openai', endpoint: 'https://api.deepseek.com/chat/completions' },
+  groq: { label: 'Groq', kind: 'openai', endpoint: 'https://api.groq.com/openai/v1/chat/completions' },
+  cohere: { label: 'Cohere', kind: 'cohere', endpoint: 'https://api.cohere.com/v2/chat' },
+  openrouter: { label: 'OpenRouter', kind: 'openai', endpoint: 'https://openrouter.ai/api/v1/chat/completions' },
+  together: { label: 'Together AI', kind: 'openai', endpoint: 'https://api.together.ai/v1/chat/completions' }
+};
+
+function providerApiKey(req, res) {
+  const key = (req.get('x-provider-api-key') || '').trim();
+  if (!key) {
+    res.status(400).json({ error: 'Enter your own provider API key first.' });
+    return '';
+  }
+  if (key.length < 8 || key.length > 512 || /[\r\n]/.test(key)) {
+    res.status(400).json({ error: 'The supplied API key format is invalid.' });
+    return '';
+  }
+  return key;
+}
+
+function extractProviderText(providerId, payload) {
+  if (providerId === 'openai') {
+    if (typeof payload?.output_text === 'string') return payload.output_text.trim();
+    return (payload?.output || []).flatMap(item => item?.content || [])
+      .filter(item => (item?.type === 'output_text' || item?.type === 'text') && typeof item.text === 'string')
+      .map(item => item.text).join('\n').trim();
+  }
+  if (providerId === 'gemini') {
+    return (payload?.candidates?.[0]?.content?.parts || [])
+      .map(part => typeof part?.text === 'string' ? part.text : '')
+      .join('\n').trim();
+  }
+  if (providerId === 'anthropic') {
+    return (payload?.content || [])
+      .filter(item => item?.type === 'text' && typeof item.text === 'string')
+      .map(item => item.text).join('\n').trim();
+  }
+  if (providerId === 'cohere') {
+    const content = payload?.message?.content || [];
+    if (typeof content === 'string') return content.trim();
+    return content.filter(item => item?.type === 'text' && typeof item.text === 'string')
+      .map(item => item.text).join('\n').trim();
+  }
+  const text = payload?.choices?.[0]?.message?.content;
+  if (typeof text === 'string') return text.trim();
+  if (Array.isArray(text)) {
+    return text.map(item => typeof item?.text === 'string' ? item.text : '')
+      .join('\n').trim();
+  }
+  return '';
+}
+
+app.get('/api/ai/providers', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json({
+    providers: Object.entries(AI_PROVIDER_CONFIG).map(([id, item]) => ({ id, name: item.label })),
+    mode: 'bring-your-own-key',
+    keyStorage: 'browser-session-only'
+  });
+});
+
+// General text/chat playground. Provider keys are accepted per request and are never persisted by InsightBoard.
+app.post('/api/ai/provider', providerByokLimiter, asyncRoute(async (req, res) => {
+  const providerId = safeText(req.body?.provider, 32).toLowerCase();
+  const config = AI_PROVIDER_CONFIG[providerId];
+  if (!config) return res.status(400).json({ error: 'Select one of the supported AI API providers.' });
+  const key = providerApiKey(req, res);
+  if (!key) return;
+  const model = safeText(req.body?.model, 140);
+  const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
+  const maxOutputTokens = Number(req.body?.maxOutputTokens ?? 512);
+  if (!model) return res.status(400).json({ error: 'Enter a model ID from the selected provider’s current model catalog.' });
+  if (!prompt) return res.status(400).json({ error: 'Enter a prompt.' });
+  if (prompt.length > 12000) return res.status(400).json({ error: 'Prompt is too long. Keep it to 12,000 characters or fewer.' });
+  if (!Number.isInteger(maxOutputTokens) || maxOutputTokens < 64 || maxOutputTokens > 2048) {
+    return res.status(400).json({ error: 'Choose an output limit between 64 and 2,048 tokens.' });
+  }
+
+  let endpoint = config.endpoint;
+  let headers = { 'Content-Type': 'application/json' };
+  let body;
+  if (config.kind === 'gemini') {
+    endpoint += encodeURIComponent(model) + ':generateContent';
+    headers['x-goog-api-key'] = key;
+    body = {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens, temperature: 0.3 }
+    };
+  } else if (config.kind === 'openaiResponses') {
+    headers.Authorization = 'Bearer ' + key;
+    body = { model, input: prompt, max_output_tokens: maxOutputTokens };
+  } else if (config.kind === 'anthropic') {
+    headers['x-api-key'] = key;
+    headers['anthropic-version'] = '2026-10-21';
+    body = { model, max_tokens: maxOutputTokens, messages: [{ role: 'user', content: prompt }] };
+  } else if (config.kind === 'cohere') {
+    headers.Authorization = 'Bearer ' + key;
+    body = { model, max_tokens: maxOutputTokens, messages: [{ role: 'user', content: prompt }], stream: false };
+  } else {
+    headers.Authorization = 'Bearer ' + key;
+    if (providerId === 'openrouter') {
+      headers['HTTP-Referer'] = 'https://insightboard-v2-bsiu.onrender.com';
+      headers['X-Title'] = 'InsightBoard V2';
+    }
+    body = {
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: maxOutputTokens,
+      temperature: 0.3,
+      stream: false
+    };
+  }
+
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(45000)
+    });
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+      return res.status(504).json({ error: 'The AI provider took too long to respond. Try again.' });
+    }
+    return res.status(502).json({ error: 'Could not reach the selected AI provider.' });
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    // Do not return provider payloads: they can echo sensitive request details.
+    console.warn('BYOK provider request failed:', providerId, response.status);
+    if (response.status === 401 || response.status === 403) {
+      return res.status(502).json({ error: 'The provider rejected this key or this account does not have access to the selected model.' });
+    }
+    if (response.status === 429) return res.status(429).json({ error: 'Provider quota or rate limit reached. Check that provider account.' });
+    if (response.status === 400 || response.status === 404) {
+      return res.status(400).json({ error: 'The provider rejected this model or request. Verify the model ID in the provider’s current documentation.' });
+    }
+    return res.status(502).json({ error: 'The provider could not complete the request. Try again later.' });
+  }
+
+  const answer = extractProviderText(providerId, payload);
+  if (!answer) return res.status(502).json({ error: 'The provider returned no text. Verify the model supports text generation.' });
+  res.set('Cache-Control', 'no-store');
+  return res.json({ answer, provider: config.label, model });
+}));
 
 app.post('/api/ai/summary', aiLimiter, asyncRoute(async (req, res) => {
   if (!GEMINI_API_KEY) {
@@ -412,6 +588,163 @@ app.post('/api/voice/stt', voiceLimiter, requireAuth, asyncRoute(async (req, res
     console.warn('Gnani STT returned HTTP', response.status);
     return res.status(response.status >= 500 ? 502 : response.status || 502)
       .json({ error: gnaniErrorMessage(response.status || 502) });
+  }
+  const transcript = safeText(result?.transcript, 30000);
+  if (!transcript) return res.status(502).json({ error: 'Gnani returned no transcript for this audio.' });
+  res.set('Cache-Control', 'no-store');
+  return res.json({ success: true, transcript, requestId: safeText(result?.request_id, 120) });
+}));
+
+
+
+// Site-managed Gnani speech mode. This key is deliberately separate from the personal-key BYOK routes above.
+// Limits are stored in MongoDB so normal app restarts do not reset the per-IP daily allowance.
+function utcDayStart() {
+  const day = new Date();
+  day.setUTCHours(0, 0, 0, 0);
+  return day;
+}
+
+async function incrementSiteVoiceBucket(bucketKey, dayStart, limit) {
+  try {
+    await SiteVoiceUsage.updateOne(
+      { bucketKey, dayStart },
+      { $setOnInsert: { count: 0, expiresAt: new Date(dayStart.getTime() + 48 * 60 * 60 * 1000) } },
+      { upsert: true }
+    );
+  } catch (error) {
+    // Parallel first requests can race to create the same unique bucket.
+    if (error?.code !== 11000) throw error;
+  }
+  const updated = await SiteVoiceUsage.findOneAndUpdate(
+    { bucketKey, dayStart, count: { $lt: limit } },
+    { $inc: { count: 1 } },
+    { new: true }
+  ).lean();
+  return updated ? { allowed: true, count: updated.count, remaining: Math.max(0, limit - updated.count) } : { allowed: false, count: limit, remaining: 0 };
+}
+
+const siteVoiceLimit = asyncRoute(async (req, res, next) => {
+  if (!GNANI_SITE_API_KEY) {
+    return res.status(503).json({ error: 'Site-powered Gnani is not configured. Use your personal Gnani key or contact the site owner.' });
+  }
+  if (!databaseReady()) {
+    // Fail closed: never permit unmetered shared-key calls when the persistent limiter is unavailable.
+    return res.status(503).json({ error: 'Site voice quota storage is unavailable. Use your personal Gnani key or try later.' });
+  }
+  const ip = safeText(req.ip || req.socket?.remoteAddress || '', 128);
+  if (!ip) return res.status(503).json({ error: 'Could not establish a client IP for site voice protection.' });
+  const dayStart = utcDayStart();
+  const secret = JWT_SECRET || GNANI_SITE_API_KEY;
+  const ipBucket = 'ip:' + createHmac('sha256', secret).update(ip).digest('hex');
+  let perIp;
+  let global;
+  try {
+    perIp = await incrementSiteVoiceBucket(ipBucket, dayStart, 10);
+    if (!perIp.allowed) {
+      res.set('X-Site-Voice-Limit', '10');
+      res.set('X-Site-Voice-Remaining', '0');
+      return res.status(429).json({ error: 'This public IP has used its 10 site-powered Gnani requests for today. Try again after the daily reset, or use your own Gnani key.' });
+    }
+    global = await incrementSiteVoiceBucket('global-site-voice', dayStart, GNANI_SITE_DAILY_GLOBAL_LIMIT);
+  } catch (error) {
+    console.error('Persistent site voice quota check failed:', error?.name || 'Error');
+    return res.status(503).json({ error: 'Site voice quota storage failed closed. Use your personal Gnani key or try later.' });
+  }
+  if (!global.allowed) {
+    res.set('X-Site-Voice-Limit', '10');
+    res.set('X-Site-Voice-Remaining', String(perIp.remaining));
+    return res.status(429).json({ error: 'The site-wide Gnani daily allowance has been reached. Try tomorrow or use your own Gnani key.' });
+  }
+  res.set('X-Site-Voice-Limit', '10');
+  res.set('X-Site-Voice-Remaining', String(perIp.remaining));
+  return next();
+});
+
+app.get('/api/voice/site-status', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json({
+    available: Boolean(GNANI_SITE_API_KEY),
+    mode: 'site-managed-with-limits',
+    limitPerIpPerUtcDay: 10,
+    globalDailyLimit: GNANI_SITE_DAILY_GLOBAL_LIMIT,
+    requiresSignIn: false,
+    dataSentToGnani: true
+  });
+});
+
+app.post('/api/voice/site-tts', siteVoiceLimit, asyncRoute(async (req, res) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const voice = safeText(req.body?.voice, 40);
+  const language = safeText(req.body?.language, 16);
+  const speed = Number(req.body?.speed ?? 1);
+  if (!text) return res.status(400).json({ error: 'Enter the text you want to turn into speech.' });
+  if (text.length > 1000) return res.status(400).json({ error: 'Site-powered speech is limited to 1,000 characters per request. Use your own Gnani key for longer text.' });
+  if (!GNANI_TTS_LANGUAGES.has(language)) return res.status(400).json({ error: 'Select a supported TTS language.' });
+  if (!Object.hasOwn(GNANI_VOICES, voice) || GNANI_VOICES[voice] !== language) {
+    return res.status(400).json({ error: 'Select a voice designed for the selected language.' });
+  }
+  if (!Number.isFinite(speed) || speed < 0.85 || speed > 1.15) {
+    return res.status(400).json({ error: 'Speech speed must be between 0.85 and 1.15.' });
+  }
+  let response;
+  try {
+    response = await fetch('https://api.vachana.ai/api/v1/tts/inference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key-ID': GNANI_SITE_API_KEY },
+      body: JSON.stringify({
+        text, model: 'timbre-v2.5', voice, language, speed,
+        audio_config: { container: 'mp3', bitrate: '128k', sample_rate: 24000, num_channels: 1 }
+      }),
+      signal: AbortSignal.timeout(60000)
+    });
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return res.status(504).json({ error: 'Gnani took too long to generate speech. Please try again.' });
+    return res.status(502).json({ error: 'Could not reach Gnani. Please try again later.' });
+  }
+  if (!response.ok) {
+    console.warn('Site Gnani TTS returned HTTP', response.status);
+    if (response.status === 401 || response.status === 403) return res.status(502).json({ error: 'The site Gnani key was rejected. The owner must check the provider account.' });
+    if (response.status === 429) return res.status(429).json({ error: 'Gnani quota or rate limit reached. Use your own key or try later.' });
+    return res.status(502).json({ error: 'Gnani could not complete the speech request.' });
+  }
+  const audio = Buffer.from(await response.arrayBuffer());
+  if (!audio.length) return res.status(502).json({ error: 'Gnani returned an empty audio file.' });
+  res.set('Content-Type', 'audio/mpeg');
+  res.set('Content-Disposition', 'inline; filename="gnani-site-tts.mp3"');
+  res.set('Cache-Control', 'no-store');
+  return res.status(200).send(audio);
+}));
+
+app.post('/api/voice/site-stt', siteVoiceLimit, asyncRoute(async (req, res) => {
+  const contentType = req.get('content-type') || '';
+  if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) return res.status(400).json({ error: 'Upload an audio file using the supported audio form.' });
+  let body;
+  try {
+    body = await readRawBody(req, 6 * 1024 * 1024);
+  } catch (error) {
+    if (error?.statusCode === 413) return res.status(413).json({ error: 'Site-powered transcription audio is limited to 6 MB. Use your own key for larger files.' });
+    throw error;
+  }
+  if (!body.length) return res.status(400).json({ error: 'Choose an audio file before transcribing.' });
+  let response;
+  try {
+    response = await fetch('https://api.vachana.ai/stt/v3', {
+      method: 'POST',
+      headers: { 'Content-Type': contentType, 'X-API-Key-ID': GNANI_SITE_API_KEY },
+      body,
+      signal: AbortSignal.timeout(60000)
+    });
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return res.status(504).json({ error: 'Gnani took too long to transcribe this audio. Please try again.' });
+    return res.status(502).json({ error: 'Could not reach Gnani. Please try again later.' });
+  }
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result?.success === false) {
+    console.warn('Site Gnani STT returned HTTP', response.status);
+    if (response.status === 401 || response.status === 403) return res.status(502).json({ error: 'The site Gnani key was rejected. The owner must check the provider account.' });
+    if (response.status === 429) return res.status(429).json({ error: 'Gnani quota or rate limit reached. Use your own key or try later.' });
+    return res.status(502).json({ error: 'Gnani could not complete the transcription request.' });
   }
   const transcript = safeText(result?.transcript, 30000);
   if (!transcript) return res.status(502).json({ error: 'Gnani returned no transcript for this audio.' });

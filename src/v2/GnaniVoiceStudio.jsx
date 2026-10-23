@@ -44,6 +44,8 @@ async function errorFromResponse(response) {
 export default function GnaniVoiceStudio({ authToken }) {
   const [mode, setMode] = useState('tts');
   const [availability, setAvailability] = useState('checking');
+  const [serviceMode, setServiceMode] = useState('personal');
+  const [siteStatus, setSiteStatus] = useState({ loading: true, available: false, limitPerIpPerUtcDay: 10, globalDailyLimit: 25 });
   const [keyDraft, setKeyDraft] = useState('');
   const [gnaniKey, setGnaniKey] = useState(() => {
     try { return sessionStorage.getItem('insightboard-gnani-byok-key') || ''; } catch { return ''; }
@@ -69,6 +71,10 @@ export default function GnaniVoiceStudio({ authToken }) {
       .then(response => response.ok ? response.json() : Promise.reject(new Error('Voice status is unavailable.')))
       .then(data => { if (active) setAvailability(data.available && data.requiresUserKey ? 'ready' : 'setup'); })
       .catch(() => { if (active) setAvailability('offline'); });
+    fetch('/api/voice/site-status', { headers: { Accept: 'application/json' } })
+      .then(response => response.ok ? response.json() : Promise.reject(new Error('Site voice status is unavailable.')))
+      .then(data => { if (active) setSiteStatus({ loading: false, ...data }); })
+      .catch(() => { if (active) setSiteStatus({ loading: false, available: false, limitPerIpPerUtcDay: 10, globalDailyLimit: 25 }); });
     return () => { active = false; };
   }, []);
 
@@ -120,12 +126,16 @@ export default function GnaniVoiceStudio({ authToken }) {
   async function generateSpeech(event) {
     event.preventDefault();
     setTtsError('');
-    if (!authToken) {
-      setTtsError('Sign in or create an InsightBoard account above to use the voice tools.');
+    if (serviceMode === 'personal' && !authToken) {
+      setTtsError('Sign in or create an InsightBoard account above to use personal-key voice tools.');
       return;
     }
-    if (!gnaniKey) {
+    if (serviceMode === 'personal' && !gnaniKey) {
       setTtsError('Add your own Gnani API key in the Voice Studio key panel first.');
+      return;
+    }
+    if (serviceMode === 'site' && text.trim().length > 1000) {
+      setTtsError('Site-powered speech is limited to 1,000 characters per request. Switch to personal-key mode for longer text.');
       return;
     }
     if (!text.trim()) {
@@ -135,9 +145,16 @@ export default function GnaniVoiceStudio({ authToken }) {
     setTtsBusy(true);
     setAudioUrl('');
     try {
-      const response = await fetch('/api/voice/tts', {
+      const headers = { 'Content-Type': 'application/json' };
+      let endpoint = '/api/voice/site-tts';
+      if (serviceMode === 'personal') {
+        endpoint = '/api/voice/tts';
+        headers.Authorization = 'Bearer ' + authToken;
+        headers['X-Gnani-Api-Key'] = gnaniKey;
+      }
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken, 'X-Gnani-Api-Key': gnaniKey },
+        headers,
         body: JSON.stringify({ text: text.trim(), language: ttsLanguage, voice: voice, speed: Number(speed) })
       });
       if (!response.ok) throw new Error(await errorFromResponse(response));
@@ -168,9 +185,12 @@ export default function GnaniVoiceStudio({ authToken }) {
       event.target.value = '';
       return;
     }
-    if (file.size > AUDIO_LIMIT_BYTES) {
+    const audioLimit = serviceMode === 'site' ? 6 * 1024 * 1024 : AUDIO_LIMIT_BYTES;
+    if (file.size > audioLimit) {
       setAudioFile(null);
-      setSttError('The upload limit is 15 MB. Choose a smaller audio file.');
+      setSttError(serviceMode === 'site'
+        ? 'Site-powered transcription is limited to 6 MB. Switch to personal-key mode for larger files.'
+        : 'The upload limit is 15 MB. Choose a smaller audio file.');
       event.target.value = '';
       return;
     }
@@ -181,12 +201,16 @@ export default function GnaniVoiceStudio({ authToken }) {
     event.preventDefault();
     setSttError('');
     setTranscript('');
-    if (!authToken) {
-      setSttError('Sign in or create an InsightBoard account above to use the voice tools.');
+    if (serviceMode === 'personal' && !authToken) {
+      setSttError('Sign in or create an InsightBoard account above to use personal-key voice tools.');
       return;
     }
-    if (!gnaniKey) {
+    if (serviceMode === 'personal' && !gnaniKey) {
       setSttError('Add your own Gnani API key in the Voice Studio key panel first.');
+      return;
+    }
+    if (serviceMode === 'site' && audioFile && audioFile.size > 6 * 1024 * 1024) {
+      setSttError('Site-powered transcription is limited to 6 MB. Switch to personal-key mode for larger files.');
       return;
     }
     if (!audioFile) {
@@ -199,9 +223,16 @@ export default function GnaniVoiceStudio({ authToken }) {
       form.append('audio_file', audioFile);
       form.append('language_code', sttLanguage);
       form.append('format', 'transcribe');
-      const response = await fetch('/api/voice/stt', {
+      const headers = {};
+      let endpoint = '/api/voice/site-stt';
+      if (serviceMode === 'personal') {
+        endpoint = '/api/voice/stt';
+        headers.Authorization = 'Bearer ' + authToken;
+        headers['X-Gnani-Api-Key'] = gnaniKey;
+      }
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { Authorization: 'Bearer ' + authToken, 'X-Gnani-Api-Key': gnaniKey },
+        headers,
         body: form
       });
       const payload = await response.json().catch(() => ({}));
@@ -225,8 +256,8 @@ export default function GnaniVoiceStudio({ authToken }) {
     }
   }
 
-  const accountLocked = !authToken;
-  const providerUnavailable = availability !== 'ready';
+  const accountLocked = serviceMode === 'personal' && !authToken;
+  const providerUnavailable = serviceMode === 'site' ? !siteStatus.available : availability !== 'ready';
 
   return (
     <article className="v2-card gnani-studio" aria-labelledby="gnani-title">
@@ -236,8 +267,10 @@ export default function GnaniVoiceStudio({ authToken }) {
           <span className="v2-overline">GNANI VOICE AI</span>
           <h3 id="gnani-title">Voice Studio</h3>
         </div>
-        <span className={'gnani-status ' + availability}>
-          {availability === 'checking' ? 'CHECKING' : availability === 'ready' ? 'BYO KEY MODE' : availability === 'setup' ? 'API SETUP NEEDED' : 'API OFFLINE'}
+        <span className={'gnani-status ' + (serviceMode === 'site' ? (siteStatus.available ? 'ready' : 'setup') : availability)}>
+          {serviceMode === 'site'
+            ? (siteStatus.loading ? 'CHECKING SITE KEY' : siteStatus.available ? 'SITE KEY · 10/IP/DAY' : 'SITE KEY NOT READY')
+            : availability === 'checking' ? 'CHECKING' : availability === 'ready' ? 'BYO KEY MODE' : availability === 'setup' ? 'API SETUP NEEDED' : 'API OFFLINE'}
         </span>
       </div>
       <p className="v2-muted gnani-intro">Convert text into natural speech or transcribe a short audio clip with Gnani’s Timbre v2.5 and Prisma v2.5 models.</p>
@@ -247,11 +280,18 @@ export default function GnaniVoiceStudio({ authToken }) {
         <button type="button" role="tab" aria-selected={mode === 'stt'} className={mode === 'stt' ? 'active' : ''} onClick={() => setMode('stt')}><Mic size={15} /> Speech to text</button>
       </div>
 
-      {availability === 'setup' && <div className="gnani-alert"><AlertTriangle size={16} /><span><strong>Voice API is not available.</strong> Check that the Stage 2 server has deployed the BYOK-enabled code.</span></div>}
-      {availability === 'offline' && <div className="gnani-alert"><AlertTriangle size={16} /><span>Could not check the voice API status. Confirm the Stage 2 API deployment is online.</span></div>}
-      {accountLocked && <div className="gnani-alert"><ShieldCheck size={16} /><span>Sign in or create an InsightBoard account in the panel above to enable voice requests. Gnani usage is charged to the key you supply, not a shared InsightBoard key.</span></div>}
+      {serviceMode === 'personal' && availability === 'setup' && <div className="gnani-alert"><AlertTriangle size={16} /><span><strong>Personal-key voice API is not available.</strong> Check that the Stage 2 server has deployed the BYOK-enabled code.</span></div>}
+      {serviceMode === 'personal' && availability === 'offline' && <div className="gnani-alert"><AlertTriangle size={16} /><span>Could not check the personal-key voice API status. Confirm the Stage 2 API deployment is online.</span></div>}
+      {serviceMode === 'site' && !siteStatus.available && <div className="gnani-alert"><AlertTriangle size={16} /><span><strong>Site-powered Gnani is unavailable.</strong> The owner key must be configured as <code>GNANI_API_KEY</code> on the Stage 2 server. You can still switch back to personal-key mode.</span></div>}
+      {serviceMode === 'personal' && accountLocked && <div className="gnani-alert"><ShieldCheck size={16} /><span>Sign in or create an InsightBoard account in the panel above to use your personal Gnani key. In site-powered mode, sign-in is not required.</span></div>}
 
-      <div className="gnani-key-panel">
+      <div className="gnani-service-modes" role="group" aria-label="Gnani billing mode">
+        <button type="button" className={serviceMode === 'personal' ? 'active' : ''} onClick={() => setServiceMode('personal')}><KeyRound size={14} /> Personal key (BYOK)</button>
+        <button type="button" className={serviceMode === 'site' ? 'active site-mode' : 'site-mode'} onClick={() => setServiceMode('site')}><ShieldCheck size={14} /> Site key · 10/IP/day</button>
+      </div>
+      {serviceMode === 'site' && <div className="gnani-site-limit-note"><ShieldCheck size={15} /><span><strong>Limited public access</strong><small>Up to 10 site-key requests per public IP per UTC day, combined across speech and transcription. The whole website is capped at {siteStatus.globalDailyLimit || 25} site-key requests per UTC day. Text is limited to 1,000 characters and transcription uploads to 6 MB. Personal BYOK remains separate. The cap is an abuse guard, not a guarantee of zero billing.</small></span></div>}
+
+      {serviceMode === 'personal' && <div className="gnani-key-panel">
         <div className="gnani-key-heading"><KeyRound size={16} /><strong>Bring your own Gnani API key</strong><span>{gnaniKey ? 'KEY SET' : 'KEY REQUIRED'}</span></div>
         <p>Use the key from your own Gnani account. InsightBoard does not use a shared owner key for voice requests.</p>
         <label className="v2-field gnani-key-field">
@@ -271,15 +311,15 @@ export default function GnaniVoiceStudio({ authToken }) {
           <button type="button" className="v2-button secondary" onClick={forgetGnaniKey}>Forget key</button>
         </div>
         {keyNotice && <p className="gnani-key-notice" role="status">{keyNotice}</p>}
-      </div>
+      </div>}
 
       {mode === 'tts' ? (
         <form onSubmit={generateSpeech} className="gnani-form">
           <label className="v2-field"><span><Languages size={13} /> Language</span><select value={ttsLanguage} onChange={event => updateLanguage(event.target.value)}>{TTS_LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
           <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
-          <label className="v2-field"><span>Text to speak <small>{text.length.toLocaleString()} / 4,000 characters</small></span><textarea maxLength={4000} rows={4} value={text} onChange={event => { setText(event.target.value); setTtsError(''); }} placeholder="Type or paste the text to turn into speech." /></label>
+          <label className="v2-field"><span>Text to speak <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={4} value={text} onChange={event => { setText(event.target.value); setTtsError(''); }} placeholder="Type or paste the text to turn into speech." /></label>
           <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
-          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || accountLocked || providerUnavailable || !gnaniKey || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
+          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || accountLocked || providerUnavailable || (serviceMode === 'personal' && !gnaniKey) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
           {audioUrl && <div className="gnani-audio-result"><div><CheckCircle2 size={16} /><strong>Speech generated</strong><span>MP3 audio · available for this session</span></div><audio controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio><a className="v2-button secondary gnani-download" href={audioUrl} download="gnani-timbre-speech.mp3"><Download size={14} /> Download MP3</a></div>}
         </form>
@@ -290,16 +330,16 @@ export default function GnaniVoiceStudio({ authToken }) {
             <input type="file" accept=".wav,.mp3,.ogg,.flac,.aac,.m4a,audio/wav,audio/mpeg,audio/ogg,audio/flac,audio/aac,audio/mp4" onChange={selectAudioFile} />
             <span className="gnani-upload-icon"><Mic size={21} /></span>
             <strong>{audioFile ? audioFile.name : 'Choose an audio file'}</strong>
-            <small>{audioFile ? (audioFile.size / (1024 * 1024)).toFixed(2) + ' MB · ready to transcribe' : 'WAV, MP3, OGG, FLAC, AAC or M4A · up to 60 seconds · 15 MB max'}</small>
+            <small>{audioFile ? (audioFile.size / (1024 * 1024)).toFixed(2) + ' MB · ready to transcribe' : (serviceMode === 'site' ? 'WAV, MP3, OGG, FLAC, AAC or M4A · 6 MB max for site-key mode' : 'WAV, MP3, OGG, FLAC, AAC or M4A · up to 60 seconds · 15 MB max')}</small>
             <span className="v2-button secondary"><FileText size={14} /> Browse files</span>
           </label>
-          <button className="v2-button primary gnani-action" type="submit" disabled={sttBusy || accountLocked || providerUnavailable || !gnaniKey || !audioFile}>{sttBusy ? <RefreshCw size={15} className="v2-spin" /> : <Mic size={15} />}{sttBusy ? 'Transcribing audio…' : 'Transcribe audio'}</button>
+          <button className="v2-button primary gnani-action" type="submit" disabled={sttBusy || accountLocked || providerUnavailable || (serviceMode === 'personal' && !gnaniKey) || !audioFile || (serviceMode === 'site' && audioFile.size > 6 * 1024 * 1024)}>{sttBusy ? <RefreshCw size={15} className="v2-spin" /> : <Mic size={15} />}{sttBusy ? 'Transcribing audio…' : 'Transcribe audio'}</button>
           {sttError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{sttError}</p>}
           {transcript && <div className="gnani-transcript"><div className="gnani-transcript-heading"><div><CheckCircle2 size={16} /><strong>Transcript</strong></div><button type="button" className="v2-button secondary" onClick={() => void copyTranscript()}><Copy size={13} />{copied ? 'Copied' : 'Copy text'}</button></div><textarea rows={6} readOnly value={transcript} aria-label="Transcribed text" /><p>Transcript is held in this page’s current state and is not saved in InsightBoard’s report database.</p></div>}
         </form>
       )}
 
-      <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>BYOK privacy and billing</strong><small>Your key is kept in this browser session and sent over HTTPS only when you request speech or transcription. The server uses it for that request only; InsightBoard does not save or log the key and no shared owner key is used. Your Gnani account is responsible for usage associated with your key. Text/audio is sent to Gnani for processing; uploaded audio and generated audio are not saved to InsightBoard’s database.</small></span></div>
+      <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>{serviceMode === 'site' ? 'Site key limits and data use' : 'BYOK privacy and billing'}</strong><small>{serviceMode === 'site' ? 'This mode sends requests through the site owner’s Gnani API key. It is limited to 10 requests per IP per UTC day and 25 requests site-wide per UTC day, with smaller text/audio limits. Requests and text/audio are sent to Gnani for processing. Do not submit confidential data.' : 'Your key is kept in this browser session and sent over HTTPS only when you request speech or transcription. The server uses it for that request only; InsightBoard does not save or log the key. Your Gnani account is responsible for usage associated with your key. Text/audio is sent to Gnani for processing; uploaded audio and generated audio are not saved to InsightBoard’s database.'}</small></span></div>
       <p className="gnani-footnote"><a href="https://docs.gnani.ai/api/introduction/quick-start" target="_blank" rel="noreferrer">Gnani API quick start</a> · <a href="https://docs.gnani.ai/api/STT/speech-to-text" target="_blank" rel="noreferrer">STT docs</a> · <a href="https://docs.gnani.ai/api/TTS/tts-inference" target="_blank" rel="noreferrer">TTS docs</a> · Speech-to-text clips are limited to 60 seconds by Gnani.</p>
     </article>
   );

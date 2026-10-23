@@ -105,3 +105,22 @@ html[data-theme="dark"] .gnani-key-heading{color:#e2ebf8}
 html[data-theme="dark"] .gnani-key-heading>span{background:#203a60;color:#a9cbff}
 html[data-theme="dark"] .gnani-key-field input{background:#142237;border-color:#33465f;color:#e2ebf8}
 @media(max-width:620px){.gnani-key-actions{display:grid;grid-template-columns:1fr}.gnani-key-actions .v2-button{width:100%}}
+
+
+/* Optional site-managed Gnani key mode. Personal BYOK controls remain separate. */
+.gnani-service-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:5px;margin:14px 0;border:1px solid #e1e9f5;border-radius:12px;background:#f2f6fc}
+.gnani-service-modes button{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:41px;border:1px solid transparent;border-radius:9px;background:transparent;color:#687a91;padding:9px 10px;font-size:11px;font-weight:800;cursor:pointer}
+.gnani-service-modes button.active{background:#fff;border-color:#d9e5f7;color:#2b69c9;box-shadow:0 3px 10px rgba(44,89,154,.08)}
+.gnani-service-modes button.site-mode.active{background:#fff8e9;border-color:#efd9a7;color:#865e16}
+.gnani-site-limit-note{display:flex;align-items:flex-start;gap:9px;padding:12px 13px;margin:10px 0 14px;border:1px solid #e8d6ac;background:#fff8e9;border-radius:12px;color:#8a5b0b;font-size:10px;line-height:1.6}
+.gnani-site-limit-note>svg{flex:0 0 auto;margin-top:1px}
+.gnani-site-limit-note>span{display:grid;gap:4px}
+.gnani-site-limit-note strong{font-size:11px}
+.gnani-site-limit-note small{font-size:10px;color:#846f4d;line-height:1.6}
+html[data-theme="dark"] .gnani-service-modes{background:#172438;border-color:#31425a}
+html[data-theme="dark"] .gnani-service-modes button{color:#a7b7cd}
+html[data-theme="dark"] .gnani-service-modes button.active{background:#233956;border-color:#45668f;color:#e2edff}
+html[data-theme="dark"] .gnani-service-modes button.site-mode.active{background:#392f1c;border-color:#6c5628;color:#ffdf99}
+html[data-theme="dark"] .gnani-site-limit-note{background:#342b18;border-color:#63522a;color:#e7c77e}
+html[data-theme="dark"] .gnani-site-limit-note small{color:#c6b183}
+@media(max-width:520px){.gnani-service-modes{grid-template-columns:1fr}.gnani-service-modes button{padding:9px 7px;font-size:10px}}
