@@ -70,12 +70,13 @@ function readSessionKey(providerId) {
   catch { return ''; }
 }
 
-export default function AIProviderHub() {
+export default function AIProviderHub({ rows = [], fields = [], datasetName = '', sourceIsUploaded = false }) {
   const [providerId, setProviderId] = useState('openai');
   const [apiKey, setApiKey] = useState(() => readSessionKey('openai'));
   const [keyDraft, setKeyDraft] = useState('');
   const [model, setModel] = useState(PROVIDERS[0].model);
-  const [prompt, setPrompt] = useState('Explain how AI APIs can be used safely in a student-built analytics dashboard. Keep the answer practical and concise.');
+  const [analysisMode, setAnalysisMode] = useState('overview');
+  const datasetReady = sourceIsUploaded && Array.isArray(rows) && rows.length > 0 && Array.isArray(fields) && fields.length > 0;
   const [maxOutputTokens, setMaxOutputTokens] = useState(512);
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState('');
@@ -139,12 +140,8 @@ export default function AIProviderHub() {
       setError('Enter a model ID from this provider’s current model catalog.');
       return;
     }
-    if (!prompt.trim()) {
-      setError('Enter a prompt.');
-      return;
-    }
-    if (prompt.length > 12000) {
-      setError('Keep the prompt to 12,000 characters or fewer.');
+    if (!datasetReady) {
+      setError('Upload a JSON or CSV dataset first. AI analysis is restricted to user-uploaded data.');
       return;
     }
 
@@ -156,7 +153,7 @@ export default function AIProviderHub() {
           'Content-Type': 'application/json',
           'X-Provider-Api-Key': key
         },
-        body: JSON.stringify({ provider: providerId, model: model.trim(), prompt: prompt.trim(), maxOutputTokens })
+        body: JSON.stringify({ provider: providerId, model: model.trim(), datasetName, fields, rows, analysisMode, maxOutputTokens })
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result?.error || 'Provider request failed. Check the key, model ID, quota and account access.');
@@ -176,12 +173,12 @@ export default function AIProviderHub() {
       <div className="v2-card-title">
         <span className="ai-provider-icon"><Cpu size={18} /></span>
         <div className="ai-provider-title-copy">
-          <span className="v2-overline">MULTI-PROVIDER PLAYGROUND</span>
+          <span className="v2-overline">UPLOADED-DATA ANALYSIS</span>
           <h3 id="ai-provider-title">AI API Provider Hub</h3>
         </div>
         <span className="ai-provider-count">10 PROVIDERS</span>
       </div>
-      <p className="v2-muted">Test text/chat generation with your own key from ten widely used AI API providers. Choose a provider, verify its model ID and send a short prompt.</p>
+      <p className="v2-muted">Analyze only the JSON/CSV dataset you upload. This hub does not accept general-purpose prompts. The existing Gemini dashboard summary remains separate.</p>
 
       <div className="ai-provider-grid">
         {PROVIDERS.map((item, index) => (
@@ -231,12 +228,13 @@ export default function AIProviderHub() {
             </select>
           </label>
         </div>
-        <label className="v2-field">
-          <span>Prompt <small>{prompt.length.toLocaleString()} / 12,000 characters</small></span>
-          <textarea rows={4} maxLength={12000} value={prompt} onChange={event => setPrompt(event.target.value)} placeholder="Ask the selected model a question." />
-        </label>
-        <button type="submit" className="v2-button primary ai-provider-run" disabled={busy || (!apiKey && !keyDraft.trim()) || !model.trim() || !prompt.trim()}>
-          {busy ? <><span className="ai-provider-spinner" /> Contacting {provider.name}…</> : <><Sparkles size={15} /> Run prompt with {provider.name}</>}
+        <div className="ai-provider-dataset-context">
+          <strong>Active uploaded dataset</strong>
+          <p>{datasetReady ? `${datasetName || 'Uploaded dataset'} · ${rows.length.toLocaleString()} rows · ${fields.length} fields` : 'No user-uploaded JSON/CSV dataset is active. Upload a file to enable AI analysis.'}</p>
+        </div>
+        <label className="v2-field"><span>Data analysis task</span><select value={analysisMode} onChange={event => setAnalysisMode(event.target.value)}><option value="overview">Summarize the dataset</option><option value="trends">Identify trends and comparisons</option><option value="quality">Check data quality and anomalies</option><option value="recommendations">Suggest evidence-based next steps</option></select></label>
+        <button type="submit" className="v2-button primary ai-provider-run" disabled={busy || !datasetReady || (!apiKey && !keyDraft.trim()) || !model.trim()}>
+          {busy ? <><span className="ai-provider-spinner" /> Analyzing uploaded data with {provider.name}…</> : <><Sparkles size={15} /> Analyze uploaded data with {provider.name}</>}
         </button>
       </form>
 
@@ -248,7 +246,7 @@ export default function AIProviderHub() {
         <ShieldCheck size={16} />
         <div>
           <strong>Bring Your Own Key · privacy and billing</strong>
-          <p>The selected key is stored in this browser session only and sent to InsightBoard over HTTPS with each request. InsightBoard forwards it to the selected provider for that request; the key and prompt are not saved in MongoDB. The provider processes the prompt under its own terms. Usage, credits and any charges belong to the provider account associated with that key. This playground handles text/chat only, not every image, audio, video, embedding or fine-tuning API each provider offers.</p>
+          <p>The selected key is stored in this browser session only and sent to InsightBoard over HTTPS with each request. InsightBoard forwards the uploaded dataset and selected analysis task to the provider. The provider processes submitted data under its own terms. Usage, credits and any charges belong to the provider account associated with that key. This playground handles text/chat only, not every image, audio, video, embedding or fine-tuning API each provider offers.</p>
         </div>
       </div>
       <p className="ai-provider-footnote">The ten providers are a curated, non-ranked shortlist—not an objective global top-ten ranking. Model IDs, access, limits and pricing change; the live provider catalog is authoritative. Provider calls from this playground are rate-limited to 30 per IP per hour as an abuse guard.</p>
