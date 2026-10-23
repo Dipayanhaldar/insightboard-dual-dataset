@@ -215,7 +215,7 @@ app.get('/api/ai/status', (_req, res) => {
 
 
 const AI_PROVIDER_CONFIG = {
-  openai: { label: 'OpenAI', kind: 'openai', endpoint: 'https://api.openai.com/v1/chat/completions' },
+  openai: { label: 'OpenAI', kind: 'openaiResponses', endpoint: 'https://api.openai.com/v1/responses' },
   anthropic: { label: 'Anthropic Claude', kind: 'anthropic', endpoint: 'https://api.anthropic.com/v1/messages' },
   gemini: { label: 'Google Gemini', kind: 'gemini', endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/' },
   xai: { label: 'xAI Grok', kind: 'openai', endpoint: 'https://api.x.ai/v1/chat/completions' },
@@ -224,7 +224,7 @@ const AI_PROVIDER_CONFIG = {
   groq: { label: 'Groq', kind: 'openai', endpoint: 'https://api.groq.com/openai/v1/chat/completions' },
   cohere: { label: 'Cohere', kind: 'cohere', endpoint: 'https://api.cohere.com/v2/chat' },
   openrouter: { label: 'OpenRouter', kind: 'openai', endpoint: 'https://openrouter.ai/api/v1/chat/completions' },
-  together: { label: 'Together AI', kind: 'openai', endpoint: 'https://api.together.xyz/v1/chat/completions' }
+  together: { label: 'Together AI', kind: 'openai', endpoint: 'https://api.together.ai/v1/chat/completions' }
 };
 
 function providerApiKey(req, res) {
@@ -241,6 +241,12 @@ function providerApiKey(req, res) {
 }
 
 function extractProviderText(providerId, payload) {
+  if (providerId === 'openai') {
+    if (typeof payload?.output_text === 'string') return payload.output_text.trim();
+    return (payload?.output || []).flatMap(item => item?.content || [])
+      .filter(item => (item?.type === 'output_text' || item?.type === 'text') && typeof item.text === 'string')
+      .map(item => item.text).join('\\n').trim();
+  }
   if (providerId === 'gemini') {
     return (payload?.candidates?.[0]?.content?.parts || [])
       .map(part => typeof part?.text === 'string' ? part.text : '')
@@ -302,6 +308,9 @@ app.post('/api/ai/provider', providerByokLimiter, asyncRoute(async (req, res) =>
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens, temperature: 0.3 }
     };
+  } else if (config.kind === 'openaiResponses') {
+    headers.Authorization = 'Bearer ' + key;
+    body = { model, input: prompt, max_output_tokens: maxOutputTokens };
   } else if (config.kind === 'anthropic') {
     headers['x-api-key'] = key;
     headers['anthropic-version'] = '2023-06-01';
