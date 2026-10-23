@@ -41,7 +41,7 @@ async function errorFromResponse(response) {
   return body?.error || ('Request failed (' + response.status + ').');
 }
 
-export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], datasetName = '', sourceIsUploaded = false }) {
+export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], datasetName = '', sourceIsUploaded = false, analytics = {} }) {
   const [mode, setMode] = useState('tts');
   const [availability, setAvailability] = useState('checking');
   const [serviceMode, setServiceMode] = useState('personal');
@@ -54,6 +54,8 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
   const [ttsLanguage, setTtsLanguage] = useState('te-IN');
   const [voice, setVoice] = useState('Suhana');
   const [text, setText] = useState('');
+  const [localizedSummary, setLocalizedSummary] = useState('');
+  const [summaryBusy, setSummaryBusy] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [ttsBusy, setTtsBusy] = useState(false);
   const [audioUrl, setAudioUrl] = useState('');
@@ -83,12 +85,45 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
   }, [audioUrl]);
 
   useEffect(() => {
-    if (!sourceIsUploaded || !Array.isArray(rows) || !rows.length || !Array.isArray(fields) || !fields.length) { setText(''); setAudioUrl(''); return; }
-    const lines = rows.slice(0, 30).map((row, index) => 'Record ' + (index + 1) + ': ' + fields.slice(0, 20).map(field => field + ': ' + String(row?.[field] ?? '')).join('; '));
-    const content = (datasetName ? 'Dataset: ' + datasetName + '. ' : '') + lines.join('\n');
-    setText(content.slice(0, 3800));
+    if (!sourceIsUploaded || !Array.isArray(rows) || !rows.length || !Array.isArray(fields) || !fields.length) {
+      setText(''); setLocalizedSummary(''); setAudioUrl(''); return;
+    }
+    // The voice content is a concise, language-matched dashboard summary, not a raw dump of rows.
+    setText('');
+    setLocalizedSummary('');
     setAudioUrl('');
   }, [rows, fields, datasetName, sourceIsUploaded]);
+
+  async function loadLocalizedSummary(languageCode) {
+    if (!sourceIsUploaded || !analytics || !Array.isArray(rows) || !rows.length) {
+      setTtsError('Upload a JSON or CSV dataset first. Demo datasets cannot be sent to Gnani.');
+      return;
+    }
+    const languageMap = { 'en-IN':'en', 'hi-IN':'hi', 'hi-en':'hi', 'te-IN':'te', 'ta-IN':'ta', 'kn-IN':'kn', 'ml-IN':'ml', 'mr-IN':'mr', 'bn-IN':'bn', 'gu-IN':'gu', 'pa-IN':'pa' };
+    setSummaryBusy(true);
+    setTtsError('');
+    setAudioUrl('');
+    try {
+      const response = await fetch('/api/ai/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshot: analytics, language: languageMap[languageCode] || 'en' })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not create a summary in the selected language.');
+      const summary = String(result.summary || '').trim();
+      if (!summary) throw new Error('The summary service returned no text. Try again.');
+      const capped = summary.slice(0, serviceMode === 'site' ? 950 : 3800);
+      setLocalizedSummary(capped);
+      setText(capped);
+    } catch (error) {
+      setLocalizedSummary('');
+      setText('');
+      setTtsError((error?.message || 'Could not create the language-matched summary.') + ' Check the dashboard summary service and try again.');
+    } finally {
+      setSummaryBusy(false);
+    }
+  }
 
   function useGnaniKey() {
     const value = String(keyDraft || gnaniKey).trim();
@@ -129,6 +164,9 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     setVoice(TTS_VOICES[nextLanguage]?.[0] || '');
     setTtsError('');
     setAudioUrl('');
+    setLocalizedSummary('');
+    setText('');
+    if (sourceIsUploaded) void loadLocalizedSummary(nextLanguage);
   }
 
   async function generateSpeech(event) {
@@ -147,7 +185,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       return;
     }
     if (!text.trim()) {
-      setTtsError('Enter some text before generating speech.');
+      setTtsError('Select an output language to generate a matching-language summary, then generate speech.');
       return;
     }
     setTtsBusy(true);
@@ -324,9 +362,9 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
         <form onSubmit={generateSpeech} className="gnani-form">
           <label className="v2-field"><span><Languages size={13} /> Language</span><select value={ttsLanguage} onChange={event => updateLanguage(event.target.value)}>{TTS_LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
           <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
-          <label className="v2-field"><span>Uploaded dataset content <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={5} value={text} readOnly placeholder="Upload a JSON or CSV dataset to enable spoken insights." /><small>{sourceIsUploaded ? 'Content is generated from your uploaded dataset only. To avoid changing your source data, this preview is read-only.' : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
+          <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? 'This concise summary is generated from the uploaded dataset in the selected speech language. The original dataset is not changed.' : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
           <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
-          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && !gnaniKey) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
+          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && !gnaniKey) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
           {audioUrl && <div className="gnani-audio-result"><div><CheckCircle2 size={16} /><strong>Speech generated</strong><span>MP3 audio · available for this session</span></div><audio controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio><a className="v2-button secondary gnani-download" href={audioUrl} download="gnani-timbre-speech.mp3"><Download size={14} /> Download MP3</a></div>}
         </form>
