@@ -1,0 +1,88 @@
+.gnani-studio{margin-top:18px;background:linear-gradient(145deg,#fff 0%,#f9fbff 56%,#f4fbfa 100%);border-color:#dce7f6}
+.gnani-title-row{align-items:center;gap:12px}
+.gnani-mark{width:40px;height:40px;display:grid;place-items:center;flex:0 0 auto;border-radius:13px;color:white;background:linear-gradient(135deg,#367cf1,#655de7 60%,#25aaa6);box-shadow:0 7px 18px rgba(57,104,218,.18)}
+.gnani-heading-copy{display:grid;gap:3px;min-width:0;flex:1}
+.gnani-heading-copy .v2-overline{margin:0;font-size:8px}
+.gnani-heading-copy h3{font:800 20px/1.2 Manrope,system-ui,sans-serif;color:#213652;margin:0;letter-spacing:-.5px}
+.gnani-status{flex:0 0 auto;border-radius:999px;padding:6px 9px;font-size:9px;font-weight:800;letter-spacing:.55px;background:#edf1f7;color:#67788e}
+.gnani-status.ready{background:#e6f8ef;color:#18794e}
+.gnani-status.setup,.gnani-status.offline{background:#fff2dd;color:#8a5b0b}
+.gnani-intro{margin:12px 0 18px;max-width:800px}
+.gnani-tabs{display:flex;gap:8px;padding:5px;border:1px solid #e1e9f5;border-radius:12px;background:#f2f6fc;width:max-content;max-width:100%;margin-bottom:17px}
+.gnani-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;border-radius:9px;background:transparent;color:#687a91;padding:10px 13px;font-size:12px;font-weight:800;cursor:pointer;transition:background .18s ease,color .18s ease,box-shadow .18s ease}
+.gnani-tabs button.active{background:white;border-color:#d9e5f7;color:#2b69c9;box-shadow:0 3px 10px rgba(44,89,154,.08)}
+.gnani-tabs button:focus-visible,.gnani-upload:focus-within{outline:3px solid rgba(55,125,255,.3);outline-offset:3px}
+.gnani-alert{display:flex;align-items:flex-start;gap:9px;padding:12px 13px;margin:10px 0;border:1px solid #f0dfb9;background:#fff8e9;border-radius:12px;color:#795d27;font-size:11px;line-height:1.6}
+.gnani-alert>svg{flex:0 0 auto;margin-top:1px}
+.gnani-alert code{background:rgba(255,255,255,.7);padding:2px 5px;border-radius:5px;font-size:10px}
+.gnani-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+.gnani-form>.v2-field{margin:8px 0 12px}
+.gnani-form>.v2-field>span{display:flex;align-items:center;gap:6px}
+.gnani-form>.v2-field>span small{margin-left:auto;font-size:10px;color:#8896aa;font-weight:500}
+.gnani-form>.v2-field select,.gnani-form>.v2-field textarea{box-sizing:border-box;width:100%;font:inherit;font-size:12px;line-height:1.55;color:#263b58;border:1px solid #dbe5f2;border-radius:10px;background:white;padding:11px 12px;min-width:0}
+.gnani-form>.v2-field textarea{resize:vertical;min-height:112px}
+.gnani-form>.v2-field select:focus,.gnani-form>.v2-field textarea:focus,.gnani-speed input:focus-visible{outline:3px solid rgba(55,125,255,.22);border-color:#7aa7f3}
+.gnani-form>.v2-field:nth-child(3){grid-column:1/-1}
+.gnani-speed{display:grid;grid-template-columns:auto minmax(100px,1fr) auto;align-items:center;gap:12px;margin:3px 0 15px;color:#61738c;font-size:11px}
+.gnani-speed label{font-weight:700}
+.gnani-speed input{width:100%;accent-color:#377dff}
+.gnani-speed output{min-width:40px;text-align:right;color:#2e62b2;font-weight:800;font-variant-numeric:tabular-nums}
+.gnani-action{grid-column:1/-1;width:100%;min-height:46px}
+.gnani-error{display:flex;align-items:flex-start;gap:7px;grid-column:1/-1;margin:10px 0 0;padding:11px 12px;border:1px solid #f0caca;background:#fff3f3;color:#ad3434;border-radius:10px;font-size:11px;line-height:1.5}
+.gnani-error svg{flex:0 0 auto;margin-top:1px}
+.gnani-audio-result,.gnani-transcript{grid-column:1/-1;margin-top:14px;border:1px solid #dce7f6;background:#fff;border-radius:14px;padding:15px}
+.gnani-audio-result>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:#24845d;margin-bottom:12px}
+.gnani-audio-result>div strong{font-size:12px}
+.gnani-audio-result>div span{font-size:10px;color:#8391a5;margin-left:auto}
+.gnani-audio-result audio{display:block;width:100%;max-width:100%;margin:10px 0}
+.gnani-download{display:inline-flex;text-decoration:none;margin-top:5px!important}
+.gnani-upload{grid-column:1/-1;display:grid;justify-items:center;text-align:center;gap:9px;padding:23px 15px;margin:5px 0 15px;border:1px dashed #aac4e8;border-radius:14px;background:linear-gradient(145deg,#f7faff,#f9fcff);color:#385678;cursor:pointer;transition:border-color .18s ease,background .18s ease}
+.gnani-upload:hover{border-color:#5f94eb;background:#f2f7ff}
+.gnani-upload input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.gnani-upload-icon{display:grid;place-items:center;width:45px;height:45px;border-radius:14px;background:#e8f1ff;color:#3274dd}
+.gnani-upload strong{font-size:12px;overflow-wrap:anywhere}
+.gnani-upload small{font-size:10px;color:#7d8fa7;line-height:1.5}
+.gnani-upload .v2-button{margin-top:3px;pointer-events:none}
+.gnani-transcript-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.gnani-transcript-heading>div{display:flex;align-items:center;gap:7px;color:#23845c}
+.gnani-transcript-heading strong{font-size:12px}
+.gnani-transcript-heading .v2-button{margin:0!important;padding:8px 10px}
+.gnani-transcript textarea{box-sizing:border-box;width:100%;resize:vertical;min-height:120px;border:1px solid #dce5f1;border-radius:10px;padding:12px;color:#2e405b;background:#fbfdff;font:inherit;font-size:12px;line-height:1.7}
+.gnani-transcript>p{margin:8px 0 0;color:#8897aa;font-size:10px;line-height:1.5}
+.gnani-privacy{display:flex;align-items:flex-start;gap:10px;margin-top:17px;padding:13px;border:1px solid #d2ecdf;background:#effaf4;border-radius:12px;color:#21825c}
+.gnani-privacy>svg{flex:0 0 auto;margin-top:1px}
+.gnani-privacy>span{display:grid;gap:4px}
+.gnani-privacy strong{font-size:11px;color:#206e50}
+.gnani-privacy small{font-size:10px;line-height:1.6;color:#587e6d}
+.gnani-footnote{margin:12px 0 0;color:#8190a5;font-size:10px;line-height:1.65}
+.gnani-footnote a{color:#3673d2;text-decoration:none;font-weight:700}
+.gnani-footnote a:hover{text-decoration:underline}
+@media(max-width:620px){
+ .gnani-form{grid-template-columns:1fr}
+ .gnani-form>.v2-field:nth-child(3),.gnani-action,.gnani-error,.gnani-audio-result,.gnani-transcript,.gnani-upload{grid-column:1}
+ .gnani-title-row{align-items:flex-start;flex-wrap:wrap}
+ .gnani-status{margin-left:auto}
+ .gnani-heading-copy h3{font-size:18px}
+ .gnani-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%;box-sizing:border-box}
+ .gnani-tabs button{padding:10px 6px;font-size:11px}
+ .gnani-speed{gap:8px;grid-template-columns:auto minmax(60px,1fr) auto}
+ .gnani-audio-result>div span{width:100%;margin-left:24px}
+ .gnani-transcript-heading{align-items:flex-start}
+ .gnani-upload{padding:19px 10px}
+}
+html[data-theme="dark"] .gnani-studio{background:linear-gradient(145deg,#111b2c 0%,#152137 56%,#142b2c 100%);border-color:#2b3e59}
+html[data-theme="dark"] .gnani-heading-copy h3{color:#eaf2ff}
+html[data-theme="dark"] .gnani-tabs{background:#172438;border-color:#31425a}
+html[data-theme="dark"] .gnani-tabs button{color:#a7b7cd}
+html[data-theme="dark"] .gnani-tabs button.active{background:#233956;border-color:#45668f;color:#e2edff}
+html[data-theme="dark"] .gnani-form>.v2-field select,html[data-theme="dark"] .gnani-form>.v2-field textarea,html[data-theme="dark"] .gnani-transcript textarea{background:#142237;border-color:#33465f;color:#e2ebf8}
+html[data-theme="dark"] .gnani-upload{background:linear-gradient(145deg,#17263d,#152237);border-color:#3b5b86;color:#d0def2}
+html[data-theme="dark"] .gnani-upload-icon{background:#203a60;color:#a9cbff}
+html[data-theme="dark"] .gnani-audio-result,html[data-theme="dark"] .gnani-transcript{background:#172438;border-color:#31435b}
+html[data-theme="dark"] .gnani-transcript textarea{background:#111d30}
+html[data-theme="dark"] .gnani-privacy{background:#142e28;border-color:#265748;color:#9de0bf}
+html[data-theme="dark"] .gnani-privacy strong,html[data-theme="dark"] .gnani-privacy small{color:#a5d9c1}
+html[data-theme="dark"] .gnani-alert{background:#342b18;border-color:#63522a;color:#e7c77e}
+html[data-theme="dark"] .gnani-alert code{background:#493d22;color:#ffdf99}
+html[data-theme="dark"] .gnani-error{background:#351e27;border-color:#64323b;color:#ffb9c1}
+@media(prefers-reduced-motion:reduce){.gnani-tabs button,.gnani-upload{transition:none!important}}

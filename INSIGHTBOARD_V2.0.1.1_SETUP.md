@@ -4,6 +4,8 @@ This feature branch contains a React/Vite + Node.js/Express + MongoDB applicatio
 
 ## What changed
 
+- Added a Gnani Voice Studio for text-to-speech (Timbre v2.5, MP3 download) and speech-to-text (Prisma v2.5, short audio-file transcription) with authenticated, rate-limited server proxy routes. The Gnani API key remains in Render environment variables.
+
 - React dashboard and its existing dataset imports, filters, KPIs, charts, table, exports and Metro assets remain in place.
 - Added a Node.js + Express API served from the same origin as the built React app.
 - Added MongoDB-backed user accounts and report history. Passwords are hashed; each user can access only their own reports.
@@ -79,7 +81,19 @@ Never paste the live URI, password, or JWT secret into ChatGPT or commit them to
 4. Save the environment change and deploy/restart that V2 service. Visit `/api/ai/status` on its public URL; it should return `available: true`. A successful status means the key exists, not necessarily that quota/billing is ready; test by generating one summary.
 5. Watch Google AI Studio's usage/quota and configure billing controls if your use case requires them. Keep the key restricted to the Gemini API when the key type supports that restriction.
 
-### 4. Purchased .ME domain: connect
+### 4. Gnani voice key (speech-to-text + text-to-speech)
+
+The Stage 2 Voice Studio uses Gnani's current REST APIs: Prisma v2.5 for transcription and Timbre v2.5 for speech generation. The app proxies requests through Express so the provider key stays on the server. Audio transcription accepts WAV, MP3, OGG, FLAC, AAC and M4A; Gnani limits a single STT clip to 60 seconds (30 seconds or less is preferred).
+
+1. Open the Render dashboard and select the Stage 2 service for `https://insightboard-v2-bsiu.onrender.com`.
+2. Open **Environment** and add a new variable named `GNANI_API_KEY`.
+3. Paste your Gnani API key into the value field directly in Render. Do not paste it into ChatGPT, source files, GitHub, a React `VITE_*` variable, or a public issue.
+4. Save the environment change. After the Gnani-enabled branch has been deployed, open `/api/voice/status` on that service. It should return `available: true`. This confirms the key is present on the server, not that the key has remaining quota; perform one short TTS and STT test.
+5. Sign in to InsightBoard before generating speech or transcription. Requests are authenticated and rate-limited to limit anonymous quota abuse.
+
+The Voice Studio sends text or uploaded audio to Gnani for processing. InsightBoard does not save uploaded audio or generated audio to MongoDB; the transcript and generated audio are only held in the current page session. Check Gnani's own plan, quota, commercial-use and data-handling terms before broader or commercial use.
+
+### 5. Purchased .ME domain: connect
 
 For the current steps, see [INSIGHTBOARD_ME_DOMAIN_SETUP.md](INSIGHTBOARD_ME_DOMAIN_SETUP.md). The domain itself has already been purchased. Add the exact registered .ME domain under Settings → Custom Domains on the selected V2 Render service, copy the DNS records shown by Render into your domain registrar, then verify the domain in Render and wait for HTTPS provisioning. The exact domain name is required before DNS settings can be finalized. Do not change the current production Vercel domain or GitHub `main` branch.
 
@@ -103,7 +117,7 @@ For the current steps, see [INSIGHTBOARD_ME_DOMAIN_SETUP.md](INSIGHTBOARD_ME_DOM
 
 ## Safety and data behavior
 
-- Do not paste database passwords, JWT secrets or Gemini keys into ChatGPT or commit them to GitHub.
+- Do not paste database passwords, JWT secrets, Gemini keys, or Gnani keys into ChatGPT or commit them to GitHub.
 - Password hashes, not plaintext passwords, are stored in MongoDB. Tokens expire after eight hours.
 - Saved reports are scoped by user ID and contain aggregate values rather than raw rows. The backend sanitizes snapshots against a whitelist of fields.
 - The Gemini feature sends the active dashboard's aggregate snapshot only after the user requests a summary and confirms consent. In site-managed mode, the Express backend sends it to Google with a server-side key; in BYOK mode, the browser sends the aggregate snapshot directly to Google. Raw imported rows are not sent.
