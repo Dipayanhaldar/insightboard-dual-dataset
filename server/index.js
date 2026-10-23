@@ -17,7 +17,7 @@ const TOKEN_LIFETIME = process.env.JWT_EXPIRES_IN || '8h';
 const MAX_REPORTS = Math.min(100, Math.max(1, Number(process.env.MAX_REPORTS_PER_USER) || 20));
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GNANI_API_KEY = process.env.GNANI_API_KEY || '';
-const GNANI_ALLOWED_EMAILS = new Set((process.env.GNANI_ALLOWED_EMAILS || '').split(',').map(email => email.trim().toLowerCase()).filter(Boolean));
+const GNANI_ALLOWED_USER_IDS = new Set((process.env.GNANI_ALLOWED_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean));
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDirectory = path.resolve(__dirname, '../dist');
@@ -169,11 +169,11 @@ function requireAuth(req, res, next) {
   }
 }
 function requireGnaniOwner(req, res, next) {
-  if (!GNANI_ALLOWED_EMAILS.size) {
-    return res.status(503).json({ error: 'Gnani voice access is locked until the owner configures GNANI_ALLOWED_EMAILS in Render.' });
+  if (!GNANI_ALLOWED_USER_IDS.size) {
+    return res.status(503).json({ error: 'Gnani voice access is locked until the owner configures GNANI_ALLOWED_USER_IDS in Render.' });
   }
-  const email = typeof req.auth?.email === 'string' ? req.auth.email.trim().toLowerCase() : '';
-  if (!email || !GNANI_ALLOWED_EMAILS.has(email)) {
+  const userId = typeof req.auth?.sub === 'string' ? req.auth.sub : '';
+  if (!userId || !GNANI_ALLOWED_USER_IDS.has(userId)) {
     return res.status(403).json({ error: 'Gnani voice tools are restricted to approved owner accounts.' });
   }
   next();
@@ -319,7 +319,7 @@ app.get('/api/voice/status', (_req, res) => {
   res.set('Cache-Control', 'no-store');
   return res.json({
     available: Boolean(GNANI_API_KEY),
-    ownerAccessConfigured: GNANI_ALLOWED_EMAILS.size > 0,
+    ownerAccessConfigured: GNANI_ALLOWED_USER_IDS.size > 0,
     speechToText: 'Prisma v2.5',
     textToSpeech: 'Timbre v2.5',
     requiresSignIn: true,
