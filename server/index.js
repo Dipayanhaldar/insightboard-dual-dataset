@@ -383,13 +383,20 @@ app.post('/api/ai/summary', aiLimiter, asyncRoute(async (req, res) => {
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
     console.warn('Gemini API returned HTTP', response.status);
+    const detail = safeText(result?.error?.message || result?.error?.status || '', 240);
     if (response.status === 429) {
-      return res.status(429).json({ error: 'Gemini quota or rate limit reached. Please wait before trying again.' });
+      return res.status(429).json({ error: 'Gemini quota or rate limit reached. Check Google AI Studio usage and project quota.' + (detail ? ' Provider detail: ' + detail : '') });
     }
-    if ([400, 401, 403].includes(response.status)) {
-      return res.status(502).json({ error: 'Gemini rejected the server configuration or request. The site owner should verify GEMINI_API_KEY and model access in Google AI Studio.' });
+    if (response.status === 401) {
+      return res.status(502).json({ error: 'Gemini rejected the API key. Create a current key in Google AI Studio and update GEMINI_API_KEY in Render. Do not paste the key into source code or chat.' + (detail ? ' Provider detail: ' + detail : '') });
     }
-    return res.status(502).json({ error: 'Gemini is temporarily unavailable. Please try again later.' });
+    if (response.status === 403) {
+      return res.status(502).json({ error: 'Gemini denied access. Check the key type, project eligibility, model access and billing. As of September 2026, unrestricted legacy Standard keys are rejected; create an Authorization key in Google AI Studio or apply the supported Gemini API restriction.' + (detail ? ' Provider detail: ' + detail : '') });
+    }
+    if (response.status === 400 || response.status === 404) {
+      return res.status(502).json({ error: 'Gemini rejected this request or model. Verify GEMINI_MODEL and request settings in the current model documentation.' + (detail ? ' Provider detail: ' + detail : '') });
+    }
+    return res.status(502).json({ error: 'Gemini is temporarily unavailable (' + response.status + '). Retry only for a temporary server error.' + (detail ? ' Provider detail: ' + detail : '') });
   }
   const summary = (result?.candidates?.[0]?.content?.parts || [])
     .map(part => typeof part.text === 'string' ? part.text : '')
@@ -457,12 +464,21 @@ function readGnaniApiKey(req, res) {
   return key;
 }
 
-function gnaniErrorMessage(status) {
-  if (status === 400) return 'Gnani rejected the input. Check the audio format, language, selected voice, or text.';
-  if (status === 401 || status === 403) return 'Gnani rejected this API key. Check that your own key is valid and active in your Gnani account.';
-  if (status === 429) return 'Gnani rate limit or quota was reached. Check your plan or try again later.';
-  if (status === 503) return 'Gnani voice service is temporarily unavailable. Try again later.';
-  return 'Gnani could not complete the request. Try again later.';
+async function readGnaniProviderDetail(response) {
+  const payload = await response.clone().json().catch(() => ({}));
+  const candidate = payload?.error?.message || payload?.error?.detail || payload?.message || payload?.detail;
+  return typeof candidate === 'string' ? safeText(candidate, 220) : '';
+}
+
+function gnaniErrorMessage(status, detail = '') {
+  let base;
+  if (status === 400) base = 'Gnani rejected the request. Check the selected language/voice, text, and audio format.';
+  else if (status === 401 || status === 403) base = 'Gnani authentication or access was rejected. Verify the exact API key from your Gnani account and confirm the account/API access is active.';
+  else if (status === 429) base = 'Gnani rate limit or quota was reached. Check the account plan and remaining quota.';
+  else if (status === 503) base = 'Gnani voice service is temporarily unavailable.';
+  else if (status >= 500) base = 'Gnani returned a server error.';
+  else base = 'Gnani could not complete the request.';
+  return detail ? base + ' Provider detail: ' + detail : base;
 }
 
 app.get('/api/voice/status', (_req, res) => {
@@ -517,7 +533,8 @@ app.post('/api/voice/tts', voiceLimiter, requireAuth, asyncRoute(async (req, res
   }
   if (!response.ok) {
     console.warn('Gnani TTS returned HTTP', response.status);
-    return res.status(response.status >= 500 ? 502 : response.status).json({ error: gnaniErrorMessage(response.status) });
+    const detail = await readGnaniProviderDetail(response);
+    return res.status(response.status >= 500 ? 502 : response.status).json({ error: gnaniErrorMessage(response.status, detail) });
   }
   const audio = Buffer.from(await response.arrayBuffer());
   if (!audio.length) return res.status(502).json({ error: 'Gnani returned an empty audio file.' });
@@ -559,8 +576,10 @@ app.post('/api/voice/stt', voiceLimiter, requireAuth, asyncRoute(async (req, res
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result?.success === false) {
     console.warn('Gnani STT returned HTTP', response.status);
-    return res.status(response.status >= 500 ? 502 : response.status || 502)
-      .json({ error: gnaniErrorMessage(response.status || 502) });
+    const detail = safeText(result?.error?.message || result?.message || '', 220);
+    const providerStatus = response.status || (result?.success === false ? 400 : 502);
+    return res.status(providerStatus >= 500 ? 502 : providerStatus)
+      .json({ error: gnaniErrorMessage(providerStatus, detail) });
   }
   const transcript = safeText(result?.transcript, 30000);
   if (!transcript) return res.status(502).json({ error: 'Gnani returned no transcript for this audio.' });
@@ -677,9 +696,10 @@ app.post('/api/voice/site-tts', siteVoiceLimit, asyncRoute(async (req, res) => {
   }
   if (!response.ok) {
     console.warn('Site Gnani TTS returned HTTP', response.status);
-    if (response.status === 401 || response.status === 403) return res.status(502).json({ error: 'The site Gnani key was rejected. The owner must check the provider account.' });
-    if (response.status === 429) return res.status(429).json({ error: 'Gnani quota or rate limit reached. Use your own key or try later.' });
-    return res.status(502).json({ error: 'Gnani could not complete the speech request.' });
+    const detail = await readGnaniProviderDetail(response);
+    if (response.status === 401 || response.status === 403) return res.status(502).json({ error: gnaniErrorMessage(response.status, detail) + ' The site owner must verify GNANI_API_KEY in Render.' });
+    if (response.status === 429) return res.status(429).json({ error: gnaniErrorMessage(response.status, detail) + ' You can switch to your own key or try after quota reset.' });
+    return res.status(502).json({ error: gnaniErrorMessage(response.status, detail) });
   }
   const audio = Buffer.from(await response.arrayBuffer());
   if (!audio.length) return res.status(502).json({ error: 'Gnani returned an empty audio file.' });
@@ -715,9 +735,11 @@ app.post('/api/voice/site-stt', siteVoiceLimit, asyncRoute(async (req, res) => {
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result?.success === false) {
     console.warn('Site Gnani STT returned HTTP', response.status);
-    if (response.status === 401 || response.status === 403) return res.status(502).json({ error: 'The site Gnani key was rejected. The owner must check the provider account.' });
-    if (response.status === 429) return res.status(429).json({ error: 'Gnani quota or rate limit reached. Use your own key or try later.' });
-    return res.status(502).json({ error: 'Gnani could not complete the transcription request.' });
+    const detail = safeText(result?.error?.message || result?.message || '', 220);
+    const providerStatus = response.status || (result?.success === false ? 400 : 502);
+    if (providerStatus === 401 || providerStatus === 403) return res.status(502).json({ error: gnaniErrorMessage(providerStatus, detail) + ' The site owner must verify GNANI_API_KEY in Render.' });
+    if (providerStatus === 429) return res.status(429).json({ error: gnaniErrorMessage(providerStatus, detail) + ' You can switch to your own key or try after quota reset.' });
+    return res.status(providerStatus >= 500 ? 502 : providerStatus).json({ error: gnaniErrorMessage(providerStatus, detail) });
   }
   const transcript = safeText(result?.transcript, 30000);
   if (!transcript) return res.status(502).json({ error: 'Gnani returned no transcript for this audio.' });
