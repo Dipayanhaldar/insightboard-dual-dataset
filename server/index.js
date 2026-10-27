@@ -335,7 +335,30 @@ app.post('/api/ai/provider', providerByokLimiter, asyncRoute(async (req, res) =>
   try { response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(45000) }); }
   catch (error) { if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return res.status(504).json({ error: 'The AI provider took too long to respond. Try again.' }); return res.status(502).json({ error: 'Could not reach the selected AI provider.' }); }
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) { console.warn('BYOK provider request failed:', providerId, response.status); if (response.status === 401 || response.status === 403) return res.status(502).json({ error: 'The provider rejected this key or this account does not have access to the selected model.' }); if (response.status === 429) return res.status(429).json({ error: 'Provider quota or rate limit reached. Check that provider account.' }); if (response.status === 400 || response.status === 404) return res.status(400).json({ error: 'The provider rejected this model or request. Verify the model ID in the provider’s current documentation.' }); return res.status(502).json({ error: 'The provider could not complete the request. Try again later.' }); }
+  if (!response.ok) {
+    console.warn('BYOK provider request failed:', providerId, response.status);
+    const providerDetail = safeText(
+      payload?.error?.message || payload?.message || payload?.error?.type || '',
+      240
+    );
+    const detail = providerDetail ? ' Provider detail: ' + providerDetail : '';
+    if (response.status === 401) {
+      return res.status(502).json({ error: config.label + ' rejected the API key. Verify the key is active and intended for this API.' + detail });
+    }
+    if (response.status === 403) {
+      const keyGuidance = providerId === 'gemini'
+        ? ' Check that you are using a current Gemini Authorization key or a supported Gemini-API-restricted key, and that the project/model has access.'
+        : ' Check the provider account permissions and model access.';
+      return res.status(502).json({ error: config.label + ' denied access.' + keyGuidance + detail });
+    }
+    if (response.status === 429) {
+      return res.status(429).json({ error: config.label + ' quota or rate limit reached. Check the provider account and usage limits.' + detail });
+    }
+    if (response.status === 400 || response.status === 404) {
+      return res.status(400).json({ error: config.label + ' rejected this model or request. Verify the model ID and request parameters in the provider’s current documentation.' + detail });
+    }
+    return res.status(502).json({ error: config.label + ' request failed (HTTP ' + response.status + '). Retry only if this is a temporary provider error.' + detail });
+  }
   const answer = extractProviderText(providerId, payload);
   if (!answer) return res.status(502).json({ error: 'The provider returned no text. Verify the model supports text generation.' });
   res.set('Cache-Control', 'no-store');
