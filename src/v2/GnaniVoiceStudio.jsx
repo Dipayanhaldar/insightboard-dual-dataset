@@ -51,12 +51,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
   const [ttsError, setTtsError] = useState('');
   const [sttLanguage, setSttLanguage] = useState('te-IN');
   const [audioFile, setAudioFile] = useState(null);
-  const [sttBusy, setSttBusy] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [sttError, setSttError] = useState('');
-  const [copied, setCopied] = useState(false);
   const [summaryNotice, setSummaryNotice] = useState('');
-  const [browserSttBusy, setBrowserSttBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -216,43 +211,6 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     }
   }
 
-  function playBrowserSpeechFallback() {
-    if (!sourceIsUploaded || !analytics) {
-      setTtsError('Upload a JSON or CSV dataset first to create a local voice-demo summary.');
-      return;
-    }
-    if (!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance !== 'function') {
-      setTtsError('This browser does not provide speech synthesis. Try current Chrome or Edge, or use a saved audio sample for the viva.');
-      return;
-    }
-    const languageMap = { 'en-IN':'en', 'hi-IN':'hi', 'hi-en':'hi', 'te-IN':'te', 'ta-IN':'ta', 'kn-IN':'kn', 'ml-IN':'ml', 'mr-IN':'mr', 'bn-IN':'bn', 'gu-IN':'gu', 'pa-IN':'pa' };
-    const fallbackText = buildLocalDemoSummary(analytics, languageMap[ttsLanguage] || 'en').slice(0, 900);
-    setText(fallbackText);
-    setLocalizedSummary(fallbackText);
-    setSummaryNotice('Browser voice fallback: the text is generated locally from dashboard aggregates. This does not call Gemini or Gnani; voice quality and language availability depend on the browser/operating system.');
-    setTtsError('');
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new window.SpeechSynthesisUtterance(fallbackText);
-      const voices = window.speechSynthesis.getVoices();
-      const requestedPrefix = ttsLanguage === 'hi-en' ? 'hi' : ttsLanguage.split('-')[0].toLowerCase();
-      const preferred = voices.find(item => String(item.lang || '').toLowerCase() === ttsLanguage.toLowerCase())
-        || voices.find(item => String(item.lang || '').toLowerCase().startsWith(requestedPrefix + '-'))
-        || voices.find(item => String(item.lang || '').toLowerCase().startsWith('en-'));
-      if (preferred) {
-        utterance.voice = preferred;
-        utterance.lang = preferred.lang;
-      } else {
-        utterance.lang = ttsLanguage === 'hi-en' ? 'hi-IN' : ttsLanguage;
-      }
-      utterance.rate = Math.max(0.85, Math.min(1.15, Number(speed) || 1));
-      utterance.onerror = () => setTtsError('The browser could not play this voice. Try another installed system voice or use a saved demo audio file.');
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      setTtsError('Browser voice playback failed. Check your browser audio settings.');
-    }
-  }
-
   const accountLocked = serviceMode === 'personal' && !authToken;
   const providerUnavailable = serviceMode === 'site' ? !siteStatus.available : availability !== 'ready';
 
@@ -311,7 +269,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
         </form>
 
       <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>{serviceMode === 'site' ? 'Site key limits and data use' : 'BYOK privacy and billing'}</strong><small>{serviceMode === 'site' ? 'This mode sends requests through the site owner’s Gnani API key. It is limited to 10 requests per IP per UTC day and 25 requests site-wide per UTC day, with smaller text/audio limits. Requests and text/audio are sent to Gnani for processing. Do not submit confidential data.' : 'Your key is kept in this browser session and sent over HTTPS only when you request speech. The server uses it for that request only; InsightBoard does not save or log the key. Your Gnani account is responsible for usage associated with your key. Text/audio is sent to Gnani for processing; generated audio is not saved to InsightBoard’s database.'}</small></span></div>
-      <p className="gnani-footnote"><a href="https://docs.gnani.ai/api/introduction/quick-start" target="_blank" rel="noreferrer">Gnani API quick start</a> · <a href="https://docs.gnani.ai/api/TTS/tts-inference" target="_blank" rel="noreferrer">TTS docs</a> · Gnani reads uploaded data only; it does not accept custom text or unrelated audio in this dashboard.</p>
+      <p className="gnani-footnote"><a href="https://docs.gnani.ai/api/introduction/quick-start" target="_blank" rel="noreferrer">Gnani API quick start</a> · <a href="https://docs.gnani.ai/api/TTS/tts-inference" target="_blank" rel="noreferrer">TTS docs</a> · Text-to-speech is generated from the active uploaded dataset summary.</p>
     </article>
   );
 }
