@@ -401,18 +401,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
             : availability === 'checking' ? 'CHECKING' : availability === 'ready' ? 'BYO KEY MODE' : availability === 'setup' ? 'API SETUP NEEDED' : 'API OFFLINE'}
         </span>
       </div>
-      <p className="v2-muted gnani-intro">Read your uploaded JSON/CSV dataset aloud in a language you select. Gnani is used here for spoken data access, not general-purpose transcription.</p>
-
-      <div className="gnani-tabs" role="tablist" aria-label="Voice tool">
-        <button type="button" role="tab" aria-selected={mode === 'tts'} className={mode === 'tts' ? 'active' : ''} onClick={() => setMode('tts')}><Volume2 size={15} /> Text to speech</button>
-        <button type="button" role="tab" aria-selected={mode === 'stt'} className={mode === 'stt' ? 'active' : ''} onClick={() => setMode('stt')}><Mic size={15} /> Speech to text</button>
-      </div>
-
-      {serviceMode === 'personal' && availability === 'setup' && <div className="gnani-alert"><AlertTriangle size={16} /><span><strong>Personal-key voice API is not available.</strong> Check that the Stage 2 server has deployed the BYOK-enabled code.</span></div>}
-      {serviceMode === 'personal' && availability === 'offline' && <div className="gnani-alert"><AlertTriangle size={16} /><span>Could not check the personal-key voice API status. Confirm the Stage 2 API deployment is online.</span></div>}
-      {serviceMode === 'site' && !siteStatus.available && <div className="gnani-alert"><AlertTriangle size={16} /><span><strong>Site-powered Gnani is unavailable.</strong> The owner key must be configured as <code>GNANI_API_KEY</code> on the Stage 2 server. You can still switch back to personal-key mode.</span></div>}
-      {serviceMode === 'personal' && accountLocked && <div className="gnani-alert"><ShieldCheck size={16} /><span>Sign in or create an InsightBoard account in the panel above to use your personal Gnani key. In site-powered mode, sign-in is not required.</span></div>}
-      {summaryNotice && <div className="gnani-alert" role="status"><AlertTriangle size={16} /><span>{summaryNotice}</span></div>}
+      <p className="v2-muted gnani-intro">Read your uploaded JSON/CSV dataset aloud in a language you select.</p>
 
       <div className="gnani-service-modes" role="group" aria-label="Gnani billing mode">
         <button type="button" className={serviceMode === 'personal' ? 'active' : ''} onClick={() => changeServiceMode('personal')}><KeyRound size={14} /> Personal key (BYOK)</button>
@@ -442,7 +431,6 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
         {keyNotice && <p className="gnani-key-notice" role="status">{keyNotice}</p>}
       </div>}
 
-      {mode === 'tts' ? (
         <form onSubmit={generateSpeech} className="gnani-form">
           <label className="v2-field"><span><Languages size={13} /> Language</span><select value={ttsLanguage} onChange={event => updateLanguage(event.target.value)}>{TTS_LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
           <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
@@ -453,23 +441,6 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
           {audioUrl && <div className="gnani-audio-result"><div><CheckCircle2 size={16} /><strong>Speech generated</strong><span>MP3 audio · available for this session</span></div><audio controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio><a className="v2-button secondary gnani-download" href={audioUrl} download="gnani-timbre-speech.mp3"><Download size={14} /> Download MP3</a></div>}
         </form>
-      ) : (
-        <form onSubmit={transcribeAudio} className="gnani-form">
-          <label className="v2-field"><span><Languages size={13} /> Spoken language</span><select value={sttLanguage} onChange={event => setSttLanguage(event.target.value)}>{STT_LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
-          <label className="gnani-upload">
-            <input type="file" accept=".wav,.mp3,.ogg,.flac,.aac,.m4a,audio/wav,audio/mpeg,audio/ogg,audio/flac,audio/aac,audio/mp4" onChange={selectAudioFile} />
-            <span className="gnani-upload-icon"><Mic size={21} /></span>
-            <strong>{audioFile ? audioFile.name : 'Choose an audio file'}</strong>
-            <small>{audioFile ? (audioFile.size / (1024 * 1024)).toFixed(2) + ' MB · ready to transcribe' : (serviceMode === 'site' ? 'WAV, MP3, OGG, FLAC, AAC or M4A · 6 MB max for site-key mode' : 'WAV, MP3, OGG, FLAC, AAC or M4A · up to 60 seconds · 15 MB max')}</small>
-            <span className="v2-button secondary"><FileText size={14} /> Browse files</span>
-          </label>
-          <button className="v2-button primary gnani-action" type="submit" disabled={sttBusy || accountLocked || providerUnavailable || (serviceMode === 'personal' && !gnaniKey) || !audioFile || (serviceMode === 'site' && audioFile.size > 6 * 1024 * 1024)}>{sttBusy ? <RefreshCw size={15} className="v2-spin" /> : <Mic size={15} />}{sttBusy ? 'Transcribing audio…' : 'Transcribe with Gnani'}</button>
-          <button className="v2-button secondary gnani-action" type="button" onClick={startBrowserTranscriptionFallback} disabled={browserSttBusy}>{browserSttBusy ? <RefreshCw size={15} className="v2-spin" /> : <Mic size={15} />}{browserSttBusy ? 'Listening… speak now' : 'Try browser microphone demo (no Gnani key)'}</button>
-          <p className="gnani-footnote">Browser speech recognition needs microphone permission and may use the browser’s own speech service; availability and language support vary. It is a demo fallback, not Gnani Prisma.</p>
-          {sttError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{sttError}</p>}
-          {transcript && <div className="gnani-transcript"><div className="gnani-transcript-heading"><div><CheckCircle2 size={16} /><strong>Transcript</strong></div><button type="button" className="v2-button secondary" onClick={() => void copyTranscript()}><Copy size={13} />{copied ? 'Copied' : 'Copy text'}</button></div><textarea rows={6} readOnly value={transcript} aria-label="Transcribed text" /><p>Transcript is held in this page’s current state and is not saved in InsightBoard’s report database.</p></div>}
-        </form>
-      )}
 
       <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>{serviceMode === 'site' ? 'Site key limits and data use' : 'BYOK privacy and billing'}</strong><small>{serviceMode === 'site' ? 'This mode sends requests through the site owner’s Gnani API key. It is limited to 10 requests per IP per UTC day and 25 requests site-wide per UTC day, with smaller text/audio limits. Requests and text/audio are sent to Gnani for processing. Do not submit confidential data.' : 'Your key is kept in this browser session and sent over HTTPS only when you request speech or transcription. The server uses it for that request only; InsightBoard does not save or log the key. Your Gnani account is responsible for usage associated with your key. Text/audio is sent to Gnani for processing; uploaded audio and generated audio are not saved to InsightBoard’s database.'}</small></span></div>
       <p className="gnani-footnote"><a href="https://docs.gnani.ai/api/introduction/quick-start" target="_blank" rel="noreferrer">Gnani API quick start</a> · <a href="https://docs.gnani.ai/api/TTS/tts-inference" target="_blank" rel="noreferrer">TTS docs</a> · Gnani reads uploaded data only; it does not accept custom text or unrelated audio in this dashboard.</p>
