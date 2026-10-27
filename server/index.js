@@ -434,7 +434,6 @@ const GNANI_VOICES = {
   'Kaveri': 'en-IN', 'Trupti': 'en-IN', 'Devika': 'en-IN', 'Pranav': 'en-IN', 'Shlok': 'en-IN', 'Girish': 'en-IN',
   'Nalini': 'hi-IN', 'Bhavna': 'hi-IN', 'Yashvi': 'hi-IN', 'Urmila': 'hi-IN', 'Jwala': 'hi-IN', 'Chitra': 'hi-IN',
   'Ambuja': 'hi-IN', 'Deepak': 'hi-IN', 'Roopesh': 'hi-IN', 'Vikrant': 'hi-IN', 'Hemraj': 'hi-IN', 'Jalaj': 'hi-IN', 'Omkar': 'hi-IN',
-  'Poorvi': 'hi-en',
   'Asmita': 'ta-IN', 'Trisha': 'ta-IN', 'Brinda': 'ta-IN', 'Vedika': 'ta-IN', 'Noopur': 'ta-IN',
   'Suhana': 'te-IN', 'Lehara': 'te-IN', 'Lavanya': 'te-IN', 'Yukti': 'te-IN', 'Varuni': 'te-IN',
   'Saanvi': 'kn-IN', 'Kavin': 'kn-IN',
@@ -444,35 +443,7 @@ const GNANI_VOICES = {
   'Falak': 'gu-IN', 'Veera': 'gu-IN',
   'Mehuli': 'pa-IN', 'Zayan': 'pa-IN'
 };
-const GNANI_STT_LANGUAGES = new Set(['bn-IN', 'en-IN', 'gu-IN', 'hi-IN', 'kn-IN', 'ml-IN', 'mr-IN', 'pa-IN', 'ta-IN', 'te-IN']);
 const GNANI_TTS_LANGUAGES = new Set(['en-IN', 'hi-IN', 'hi-en', 'ta-IN', 'te-IN', 'kn-IN', 'ml-IN', 'mr-IN', 'bn-IN', 'gu-IN', 'pa-IN']);
-
-function readRawBody(req, maxBytes) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let total = 0;
-    let tooLarge = false;
-    req.on('data', chunk => {
-      if (tooLarge) return;
-      total += chunk.length;
-      if (total > maxBytes) {
-        tooLarge = true;
-        chunks.length = 0;
-        const error = new Error('Audio upload is too large.');
-        error.statusCode = 413;
-        reject(error);
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on('end', () => {
-      if (!tooLarge) resolve(Buffer.concat(chunks));
-    });
-    req.on('error', error => {
-      if (!tooLarge) reject(error);
-    });
-  });
-}
 
 function readGnaniApiKey(req, res) {
   const key = (req.get('x-gnani-api-key') || '').trim();
@@ -511,7 +482,6 @@ app.get('/api/voice/status', (_req, res) => {
     mode: 'bring-your-own-key',
     requiresUserKey: true,
     requiresSignIn: true,
-    speechToText: 'Prisma v2.5',
     textToSpeech: 'Timbre v2.5',
     maxAudioSeconds: 60
   });
@@ -566,51 +536,6 @@ app.post('/api/voice/tts', voiceLimiter, requireAuth, asyncRoute(async (req, res
   res.set('Cache-Control', 'no-store');
   return res.status(200).send(audio);
 }));
-
-app.post('/api/voice/stt', voiceLimiter, requireAuth, asyncRoute(async (req, res) => {
-  const GNANI_API_KEY = readGnaniApiKey(req, res);
-  if (!GNANI_API_KEY) return;
-  const contentType = req.get('content-type') || '';
-  if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) {
-    return res.status(400).json({ error: 'Upload an audio file using the supported audio form.' });
-  }
-  let body;
-  try {
-    body = await readRawBody(req, 15 * 1024 * 1024);
-  } catch (error) {
-    if (error?.statusCode === 413) return res.status(413).json({ error: 'Audio upload exceeds the 15 MB limit.' });
-    throw error;
-  }
-  if (!body.length) return res.status(400).json({ error: 'Choose an audio file before transcribing.' });
-  let response;
-  try {
-    response = await fetch('https://api.vachana.ai/stt/v3', {
-      method: 'POST',
-      headers: { 'Content-Type': contentType, 'X-API-Key-ID': GNANI_API_KEY },
-      body,
-      signal: AbortSignal.timeout(60000)
-    });
-  } catch (error) {
-    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
-      return res.status(504).json({ error: 'Gnani took too long to transcribe this audio. Please try again.' });
-    }
-    return res.status(502).json({ error: 'Could not reach Gnani. Please try again later.' });
-  }
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok || result?.success === false) {
-    console.warn('Gnani STT returned HTTP', response.status);
-    const detail = safeText(result?.error?.message || result?.message || '', 220);
-    const providerStatus = response.status || (result?.success === false ? 400 : 502);
-    return res.status(providerStatus >= 500 ? 502 : providerStatus)
-      .json({ error: gnaniErrorMessage(providerStatus, detail) });
-  }
-  const transcript = safeText(result?.transcript, 30000);
-  if (!transcript) return res.status(502).json({ error: 'Gnani returned no transcript for this audio.' });
-  res.set('Cache-Control', 'no-store');
-  return res.json({ success: true, transcript, requestId: safeText(result?.request_id, 120) });
-}));
-
-
 
 // Site-managed Gnani speech mode. This key is deliberately separate from the personal-key BYOK routes above.
 // Limits are stored in MongoDB so normal app restarts do not reset the per-IP daily allowance.
@@ -730,44 +655,6 @@ app.post('/api/voice/site-tts', siteVoiceLimit, asyncRoute(async (req, res) => {
   res.set('Content-Disposition', 'inline; filename="gnani-site-tts.mp3"');
   res.set('Cache-Control', 'no-store');
   return res.status(200).send(audio);
-}));
-
-app.post('/api/voice/site-stt', siteVoiceLimit, asyncRoute(async (req, res) => {
-  const contentType = req.get('content-type') || '';
-  if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) return res.status(400).json({ error: 'Upload an audio file using the supported audio form.' });
-  let body;
-  try {
-    body = await readRawBody(req, 6 * 1024 * 1024);
-  } catch (error) {
-    if (error?.statusCode === 413) return res.status(413).json({ error: 'Site-powered transcription audio is limited to 6 MB. Use your own key for larger files.' });
-    throw error;
-  }
-  if (!body.length) return res.status(400).json({ error: 'Choose an audio file before transcribing.' });
-  let response;
-  try {
-    response = await fetch('https://api.vachana.ai/stt/v3', {
-      method: 'POST',
-      headers: { 'Content-Type': contentType, 'X-API-Key-ID': GNANI_SITE_API_KEY },
-      body,
-      signal: AbortSignal.timeout(60000)
-    });
-  } catch (error) {
-    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return res.status(504).json({ error: 'Gnani took too long to transcribe this audio. Please try again.' });
-    return res.status(502).json({ error: 'Could not reach Gnani. Please try again later.' });
-  }
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok || result?.success === false) {
-    console.warn('Site Gnani STT returned HTTP', response.status);
-    const detail = safeText(result?.error?.message || result?.message || '', 220);
-    const providerStatus = response.status || (result?.success === false ? 400 : 502);
-    if (providerStatus === 401 || providerStatus === 403) return res.status(502).json({ error: gnaniErrorMessage(providerStatus, detail) + ' The site owner must verify GNANI_API_KEY in Render.' });
-    if (providerStatus === 429) return res.status(429).json({ error: gnaniErrorMessage(providerStatus, detail) + ' You can switch to your own key or try after quota reset.' });
-    return res.status(providerStatus >= 500 ? 502 : providerStatus).json({ error: gnaniErrorMessage(providerStatus, detail) });
-  }
-  const transcript = safeText(result?.transcript, 30000);
-  if (!transcript) return res.status(502).json({ error: 'Gnani returned no transcript for this audio.' });
-  res.set('Cache-Control', 'no-store');
-  return res.json({ success: true, transcript, requestId: safeText(result?.request_id, 120) });
 }));
 
 app.post('/api/auth/register', authLimiter, requireDatabase, asyncRoute(async (req, res) => {
