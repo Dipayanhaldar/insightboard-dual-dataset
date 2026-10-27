@@ -1,22 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
-  AlertTriangle, CheckCircle2, Copy, Download, FileText, Headphones, KeyRound,
-  Languages, Mic, RefreshCw, ShieldCheck, Volume2, Wand2
+  AlertTriangle, CheckCircle2, Download, Headphones, KeyRound,
+  Languages, RefreshCw, ShieldCheck, Volume2, Wand2
 } from 'lucide-react';
 import './GnaniVoiceStudio.css';
 import { buildLocalDemoSummary } from './localDemoInsights.js';
 
-const STT_LANGUAGES = [
-  ['bn-IN', 'Bengali — বাংলা'], ['en-IN', 'English (India)'], ['gu-IN', 'Gujarati — ગુજરાતી'],
-  ['hi-IN', 'Hindi — हिन्दी'], ['kn-IN', 'Kannada — ಕನ್ನಡ'], ['ml-IN', 'Malayalam — മലയാളം'],
-  ['mr-IN', 'Marathi — मराठी'], ['pa-IN', 'Punjabi — ਪੰਜਾਬੀ'], ['ta-IN', 'Tamil — தமிழ்'],
-  ['te-IN', 'Telugu — తెలుగు']
-];
-
 const TTS_VOICES = {
   'en-IN': ['Kaveri', 'Trupti', 'Devika', 'Pranav', 'Shlok', 'Girish'],
   'hi-IN': ['Nalini', 'Bhavna', 'Yashvi', 'Urmila', 'Jwala', 'Chitra', 'Ambuja', 'Deepak', 'Roopesh', 'Vikrant', 'Hemraj', 'Jalaj', 'Omkar'],
-  'hi-en': ['Poorvi'],
   'ta-IN': ['Asmita', 'Trisha', 'Brinda', 'Vedika', 'Noopur'],
   'te-IN': ['Suhana', 'Lehara', 'Lavanya', 'Yukti', 'Varuni'],
   'kn-IN': ['Saanvi', 'Kavin'],
@@ -28,14 +20,11 @@ const TTS_VOICES = {
 };
 
 const TTS_LANGUAGES = [
-  ['en-IN', 'English (India)'], ['hi-IN', 'Hindi — हिन्दी'], ['hi-en', 'Hinglish'],
+  ['en-IN', 'English (India)'], ['hi-IN', 'Hindi — हिन्दी'],
   ['te-IN', 'Telugu — తెలుగు'], ['ta-IN', 'Tamil — தமிழ்'], ['kn-IN', 'Kannada — ಕನ್ನಡ'],
   ['ml-IN', 'Malayalam — മലയാളം'], ['mr-IN', 'Marathi — मराठी'], ['bn-IN', 'Bengali — বাংলা'],
   ['gu-IN', 'Gujarati — ગુજરાતી'], ['pa-IN', 'Punjabi — ਪੰਜਾਬੀ']
 ];
-
-const AUDIO_LIMIT_BYTES = 15 * 1024 * 1024;
-const AUDIO_TYPES = new Set(['audio/wav', 'audio/x-wav', 'audio/mpeg', 'audio/ogg', 'audio/flac', 'audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/m4a']);
 
 async function errorFromResponse(response) {
   const body = await response.json().catch(() => ({}));
@@ -43,7 +32,6 @@ async function errorFromResponse(response) {
 }
 
 export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], datasetName = '', sourceIsUploaded = false, analytics = {} }) {
-  const [mode, setMode] = useState('tts');
   const [availability, setAvailability] = useState('checking');
   const [serviceMode, setServiceMode] = useState('personal');
   const [siteStatus, setSiteStatus] = useState({ loading: true, available: false, limitPerIpPerUtcDay: 10, globalDailyLimit: 25 });
@@ -103,7 +91,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       setTtsError('Upload a JSON or CSV dataset first. Demo datasets cannot be sent to Gnani.');
       return;
     }
-    const languageMap = { 'en-IN':'en', 'hi-IN':'hi', 'hi-en':'hi', 'te-IN':'te', 'ta-IN':'ta', 'kn-IN':'kn', 'ml-IN':'ml', 'mr-IN':'mr', 'bn-IN':'bn', 'gu-IN':'gu', 'pa-IN':'pa' };
+    const languageMap = { 'en-IN':'en', 'hi-IN':'hi', 'te-IN':'te', 'ta-IN':'ta', 'kn-IN':'kn', 'ml-IN':'ml', 'mr-IN':'mr', 'bn-IN':'bn', 'gu-IN':'gu', 'pa-IN':'pa' };
     setSummaryBusy(true);
     setTtsError('');
     setAudioUrl('');
@@ -161,7 +149,6 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       ? 'Your key is set for this browser session only.'
       : 'Session storage is blocked. The key is held only in this page and will be lost on refresh.');
     setTtsError('');
-    setSttError('');
   }
 
   function forgetGnaniKey() {
@@ -170,7 +157,6 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     setKeyDraft('');
     setKeyNotice('Gnani key removed from this browser session.');
     setAudioUrl('');
-    setTranscript('');
   }
 
   function updateLanguage(nextLanguage) {
@@ -267,123 +253,6 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     }
   }
 
-  function startBrowserTranscriptionFallback() {
-    const BrowserRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!BrowserRecognition) {
-      setSttError('This browser does not expose SpeechRecognition. Use current Chrome or Edge, allow microphone access, or use a short prerecorded clip with Gnani after fixing the API key.');
-      return;
-    }
-    setSttError('');
-    setTranscript('');
-    setBrowserSttBusy(true);
-    try {
-      const recognition = new BrowserRecognition();
-      recognition.lang = sttLanguage;
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-      recognition.onresult = event => {
-        const spoken = Array.from(event.results || []).map(result => result?.[0]?.transcript || '').join(' ').trim();
-        if (spoken) setTranscript(spoken);
-        else setSttError('The browser returned no transcript. Try speaking more clearly or select another language.');
-      };
-      recognition.onerror = event => {
-        setSttError('Browser speech recognition failed (' + String(event?.error || 'unknown error') + '). Allow microphone access and check your browser/network.');
-        setBrowserSttBusy(false);
-      };
-      recognition.onend = () => setBrowserSttBusy(false);
-      recognition.start();
-    } catch (error) {
-      setBrowserSttBusy(false);
-      setSttError(error?.message || 'Could not start browser speech recognition. Check microphone permissions.');
-    }
-  }
-
-  function selectAudioFile(event) {
-    const file = event.target.files?.[0] || null;
-    setSttError('');
-    setTranscript('');
-    if (!file) {
-      setAudioFile(null);
-      return;
-    }
-    const extensionSupported = /\.(wav|mp3|ogg|flac|aac|m4a)$/i.test(file.name);
-    if (!extensionSupported && !AUDIO_TYPES.has(file.type)) {
-      setAudioFile(null);
-      setSttError('Choose a WAV, MP3, OGG, FLAC, AAC, or M4A audio file.');
-      event.target.value = '';
-      return;
-    }
-    const audioLimit = serviceMode === 'site' ? 6 * 1024 * 1024 : AUDIO_LIMIT_BYTES;
-    if (file.size > audioLimit) {
-      setAudioFile(null);
-      setSttError(serviceMode === 'site'
-        ? 'Site-powered transcription is limited to 6 MB. Switch to personal-key mode for larger files.'
-        : 'The upload limit is 15 MB. Choose a smaller audio file.');
-      event.target.value = '';
-      return;
-    }
-    setAudioFile(file);
-  }
-
-  async function transcribeAudio(event) {
-    event.preventDefault();
-    setSttError('');
-    setTranscript('');
-    if (serviceMode === 'personal' && !authToken) {
-      setSttError('Sign in or create an InsightBoard account above to use personal-key voice tools.');
-      return;
-    }
-    if (serviceMode === 'personal' && !gnaniKey) {
-      setSttError('Add your own Gnani API key in the Voice Studio key panel first.');
-      return;
-    }
-    if (serviceMode === 'site' && audioFile && audioFile.size > 6 * 1024 * 1024) {
-      setSttError('Site-powered transcription is limited to 6 MB. Switch to personal-key mode for larger files.');
-      return;
-    }
-    if (!audioFile) {
-      setSttError('Choose an audio file to transcribe.');
-      return;
-    }
-    setSttBusy(true);
-    try {
-      const form = new FormData();
-      form.append('audio_file', audioFile);
-      form.append('language_code', sttLanguage);
-      form.append('format', 'transcribe');
-      const headers = {};
-      let endpoint = '/api/voice/site-stt';
-      if (serviceMode === 'personal') {
-        endpoint = '/api/voice/stt';
-        headers.Authorization = 'Bearer ' + authToken;
-        headers['X-Gnani-Api-Key'] = gnaniKey;
-      }
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: form
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.error || ('Transcription failed (' + response.status + ').'));
-      if (!payload?.transcript) throw new Error('Gnani returned no transcript for this audio.');
-      setTranscript(payload.transcript);
-    } catch (error) {
-      setSttError(error?.message || 'Transcription failed. Please try again.');
-    } finally {
-      setSttBusy(false);
-    }
-  }
-
-  async function copyTranscript() {
-    try {
-      await navigator.clipboard.writeText(transcript);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      setSttError('Clipboard access was blocked by your browser. Select the transcript text and copy it manually.');
-    }
-  }
-
   const accountLocked = serviceMode === 'personal' && !authToken;
   const providerUnavailable = serviceMode === 'site' ? !siteStatus.available : availability !== 'ready';
 
@@ -407,7 +276,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
         <button type="button" className={serviceMode === 'personal' ? 'active' : ''} onClick={() => changeServiceMode('personal')}><KeyRound size={14} /> Personal key (BYOK)</button>
         <button type="button" className={serviceMode === 'site' ? 'active site-mode' : 'site-mode'} onClick={() => changeServiceMode('site')}><ShieldCheck size={14} /> Site key · 10/IP/day</button>
       </div>
-      {serviceMode === 'site' && <div className="gnani-site-limit-note"><ShieldCheck size={15} /><span><strong>Limited public access</strong><small>Up to 10 site-key requests per public IP per UTC day, combined across speech and transcription. The whole website is capped at {siteStatus.globalDailyLimit || 25} site-key requests per UTC day. Speech text is limited to 1,000 characters and transcription uploads to 6 MB. Personal BYOK can support up to 4,000 characters per request subject to provider policy and your quota. The cap is an abuse guard, not a guarantee of zero billing.</small></span></div>}
+      {serviceMode === 'site' && <div className="gnani-site-limit-note"><ShieldCheck size={15} /><span><strong>Limited public access</strong><small>Up to 10 site-key requests per public IP per UTC day, . The whole website is capped at {siteStatus.globalDailyLimit || 25} site-key requests per UTC day. Speech text is limited to 1,000 characters and speech uploads to 6 MB. Personal BYOK can support up to 4,000 characters per request subject to provider policy and your quota. The cap is an abuse guard, not a guarantee of zero billing.</small></span></div>}
 
       {serviceMode === 'personal' && <div className="gnani-key-panel">
         <div className="gnani-key-heading"><KeyRound size={16} /><strong>Bring your own Gnani API key</strong><span>{gnaniKey ? 'KEY SET' : 'KEY REQUIRED'}</span></div>
@@ -437,12 +306,11 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
           <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? "Gnani summarizes your uploaded dataset in your selected speech language. Site-key mode is limited to 1,000 characters; personal BYOK can use up to 4,000 characters per speech request, subject to Gnani's current provider limits and your account/key quota. The original dataset is not changed." : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
           <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
           <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && (!gnaniKey || !authToken)) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate Gnani speech'}</button>
-          <button className="v2-button secondary gnani-action" type="button" onClick={playBrowserSpeechFallback} disabled={!sourceIsUploaded || summaryBusy}>Play browser voice fallback (no API key)</button>
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
           {audioUrl && <div className="gnani-audio-result"><div><CheckCircle2 size={16} /><strong>Speech generated</strong><span>MP3 audio · available for this session</span></div><audio controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio><a className="v2-button secondary gnani-download" href={audioUrl} download="gnani-timbre-speech.mp3"><Download size={14} /> Download MP3</a></div>}
         </form>
 
-      <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>{serviceMode === 'site' ? 'Site key limits and data use' : 'BYOK privacy and billing'}</strong><small>{serviceMode === 'site' ? 'This mode sends requests through the site owner’s Gnani API key. It is limited to 10 requests per IP per UTC day and 25 requests site-wide per UTC day, with smaller text/audio limits. Requests and text/audio are sent to Gnani for processing. Do not submit confidential data.' : 'Your key is kept in this browser session and sent over HTTPS only when you request speech or transcription. The server uses it for that request only; InsightBoard does not save or log the key. Your Gnani account is responsible for usage associated with your key. Text/audio is sent to Gnani for processing; uploaded audio and generated audio are not saved to InsightBoard’s database.'}</small></span></div>
+      <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>{serviceMode === 'site' ? 'Site key limits and data use' : 'BYOK privacy and billing'}</strong><small>{serviceMode === 'site' ? 'This mode sends requests through the site owner’s Gnani API key. It is limited to 10 requests per IP per UTC day and 25 requests site-wide per UTC day, with smaller text/audio limits. Requests and text/audio are sent to Gnani for processing. Do not submit confidential data.' : 'Your key is kept in this browser session and sent over HTTPS only when you request speech. The server uses it for that request only; InsightBoard does not save or log the key. Your Gnani account is responsible for usage associated with your key. Text/audio is sent to Gnani for processing; generated audio is not saved to InsightBoard’s database.'}</small></span></div>
       <p className="gnani-footnote"><a href="https://docs.gnani.ai/api/introduction/quick-start" target="_blank" rel="noreferrer">Gnani API quick start</a> · <a href="https://docs.gnani.ai/api/TTS/tts-inference" target="_blank" rel="noreferrer">TTS docs</a> · Gnani reads uploaded data only; it does not accept custom text or unrelated audio in this dashboard.</p>
     </article>
   );
