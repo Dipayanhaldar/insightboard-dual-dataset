@@ -328,7 +328,7 @@ app.post('/api/ai/provider', providerByokLimiter, asyncRoute(async (req, res) =>
   let body;
   if (config.kind === 'gemini') { endpoint += encodeURIComponent(model) + ':generateContent'; headers['x-goog-api-key'] = key; body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens, temperature: 0.2 } }; }
   else if (config.kind === 'openaiResponses') { headers.Authorization = 'Bearer ' + key; body = { model, input: prompt, max_output_tokens: maxOutputTokens }; }
-  else if (config.kind === 'anthropic') { headers['x-api-key'] = key; headers['anthropic-version'] = '2026-10-21'; body = { model, max_tokens: maxOutputTokens, messages: [{ role: 'user', content: prompt }] }; }
+  else if (config.kind === 'anthropic') { headers['x-api-key'] = key; headers['anthropic-version'] = '2023-06-01'; body = { model, max_tokens: maxOutputTokens, messages: [{ role: 'user', content: prompt }] }; }
   else if (config.kind === 'cohere') { headers.Authorization = 'Bearer ' + key; body = { model, max_tokens: maxOutputTokens, messages: [{ role: 'user', content: prompt }], stream: false }; }
   else { headers.Authorization = 'Bearer ' + key; if (providerId === 'openrouter') { headers['HTTP-Referer'] = 'https://insightboard-v2-bsiu.onrender.com'; headers['X-Title'] = 'InsightBoard V2'; } body = { model, messages: [{ role: 'user', content: prompt }], max_tokens: maxOutputTokens, temperature: 0.2, stream: false }; }
   let response;
@@ -443,7 +443,7 @@ const GNANI_VOICES = {
   'Falak': 'gu-IN', 'Veera': 'gu-IN',
   'Mehuli': 'pa-IN', 'Zayan': 'pa-IN'
 };
-const GNANI_TTS_LANGUAGES = new Set(['en-IN', 'hi-IN', 'hi-en', 'ta-IN', 'te-IN', 'kn-IN', 'ml-IN', 'mr-IN', 'bn-IN', 'gu-IN', 'pa-IN']);
+const GNANI_TTS_LANGUAGES = new Set(['en-IN', 'hi-IN', 'ta-IN', 'te-IN', 'kn-IN', 'ml-IN', 'mr-IN', 'bn-IN', 'gu-IN', 'pa-IN']);
 
 function readGnaniApiKey(req, res) {
   const key = (req.get('x-gnani-api-key') || '').trim();
