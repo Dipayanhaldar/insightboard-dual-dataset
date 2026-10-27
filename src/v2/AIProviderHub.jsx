@@ -249,7 +249,7 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
           <p>The selected key is stored in this browser session only and sent to InsightBoard over HTTPS with each request. InsightBoard forwards the uploaded dataset and selected analysis task to the provider. The provider processes submitted data under its own terms. Usage, credits and any charges belong to the provider account associated with that key. This playground handles text/chat only, not every image, audio, video, embedding or fine-tuning API each provider offers.</p>
         </div>
       </div>
-      <p className="ai-provider-footnote">The ten providers are a curated, non-ranked shortlist—not an objective global top-ten ranking. Model IDs, access, limits and pricing change; the live provider catalog is authoritative. Provider calls from this playground are rate-limited to 30 per IP per hour as an abuse guard.</p>
+      <p className="ai-provider-footnote">The ten providers are a curated shortlist, not a guarantee that every account has free access. A key's free/paid status and available quota cannot be determined from its text alone; the live request checks the provider. Errors are classified: 401 usually means an invalid/revoked key, 403 means permissions/model access or billing restrictions, 429 means quota/rate limit or insufficient credits, and 400/404 often means an unsupported model ID or request. 5xx/timeout errors usually indicate a temporary provider/service problem. Check the provider's Pricing link and account usage page. Model IDs, access, limits and pricing change; provider calls are rate-limited to 30 per IP per hour.</p>
     </article>
   );
 }
