@@ -4,6 +4,7 @@ import {
   Languages, Mic, RefreshCw, ShieldCheck, Volume2, Wand2
 } from 'lucide-react';
 import './GnaniVoiceStudio.css';
+import { buildLocalDemoSummary } from './localDemoInsights.js';
 
 const STT_LANGUAGES = [
   ['bn-IN', 'Bengali — বাংলা'], ['en-IN', 'English (India)'], ['gu-IN', 'Gujarati — ગુજરાતી'],
@@ -66,6 +67,8 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
   const [transcript, setTranscript] = useState('');
   const [sttError, setSttError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [summaryNotice, setSummaryNotice] = useState('');
+  const [browserSttBusy, setBrowserSttBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -86,7 +89,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
 
   useEffect(() => {
     if (!sourceIsUploaded || !Array.isArray(rows) || !rows.length || !Array.isArray(fields) || !fields.length) {
-      setText(''); setLocalizedSummary(''); setAudioUrl(''); return;
+      setText(''); setLocalizedSummary(''); setAudioUrl(''); setSummaryNotice(''); return;
     }
     // The voice content is a concise, language-matched dashboard summary, not a raw dump of rows.
     setText('');
@@ -117,10 +120,14 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       const capped = summary.slice(0, targetMode === 'site' ? 950 : 3800);
       setLocalizedSummary(capped);
       setText(capped);
+      setSummaryNotice('');
     } catch (error) {
-      setLocalizedSummary('');
-      setText('');
-      setTtsError((error?.message || 'Could not create the language-matched summary.') + ' Check the dashboard summary service and try again.');
+      const detail = error?.message || 'The Gemini summary service is unavailable.';
+      const fallback = buildLocalDemoSummary(analytics, languageMap[languageCode] || 'en');
+      const capped = fallback.slice(0, targetMode === 'site' ? 950 : 3800);
+      setLocalizedSummary(capped);
+      setText(capped);
+      setSummaryNotice('Gemini summary unavailable: ' + detail + ' A local rule-based demo summary is shown instead; no AI response was generated.');
     } finally {
       setSummaryBusy(false);
     }
@@ -220,6 +227,74 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       setTtsError(error?.message || 'Speech generation failed. Please try again.');
     } finally {
       setTtsBusy(false);
+    }
+  }
+
+  function playBrowserSpeechFallback() {
+    if (!sourceIsUploaded || !analytics) {
+      setTtsError('Upload a JSON or CSV dataset first to create a local voice-demo summary.');
+      return;
+    }
+    if (!('speechSynthesis' in window) || typeof window.SpeechSynthesisUtterance !== 'function') {
+      setTtsError('This browser does not provide speech synthesis. Try current Chrome or Edge, or use a saved audio sample for the viva.');
+      return;
+    }
+    const languageMap = { 'en-IN':'en', 'hi-IN':'hi', 'hi-en':'hi', 'te-IN':'te', 'ta-IN':'ta', 'kn-IN':'kn', 'ml-IN':'ml', 'mr-IN':'mr', 'bn-IN':'bn', 'gu-IN':'gu', 'pa-IN':'pa' };
+    const fallbackText = buildLocalDemoSummary(analytics, languageMap[ttsLanguage] || 'en').slice(0, 900);
+    setText(fallbackText);
+    setLocalizedSummary(fallbackText);
+    setSummaryNotice('Browser voice fallback: the text is generated locally from dashboard aggregates. This does not call Gemini or Gnani; voice quality and language availability depend on the browser/operating system.');
+    setTtsError('');
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new window.SpeechSynthesisUtterance(fallbackText);
+      const voices = window.speechSynthesis.getVoices();
+      const requestedPrefix = ttsLanguage === 'hi-en' ? 'hi' : ttsLanguage.split('-')[0].toLowerCase();
+      const preferred = voices.find(item => String(item.lang || '').toLowerCase() === ttsLanguage.toLowerCase())
+        || voices.find(item => String(item.lang || '').toLowerCase().startsWith(requestedPrefix + '-'))
+        || voices.find(item => String(item.lang || '').toLowerCase().startsWith('en-'));
+      if (preferred) {
+        utterance.voice = preferred;
+        utterance.lang = preferred.lang;
+      } else {
+        utterance.lang = ttsLanguage === 'hi-en' ? 'hi-IN' : ttsLanguage;
+      }
+      utterance.rate = Math.max(0.85, Math.min(1.15, Number(speed) || 1));
+      utterance.onerror = () => setTtsError('The browser could not play this voice. Try another installed system voice or use a saved demo audio file.');
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setTtsError('Browser voice playback failed. Check your browser audio settings.');
+    }
+  }
+
+  function startBrowserTranscriptionFallback() {
+    const BrowserRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!BrowserRecognition) {
+      setSttError('This browser does not expose SpeechRecognition. Use current Chrome or Edge, allow microphone access, or use a short prerecorded clip with Gnani after fixing the API key.');
+      return;
+    }
+    setSttError('');
+    setTranscript('');
+    setBrowserSttBusy(true);
+    try {
+      const recognition = new BrowserRecognition();
+      recognition.lang = sttLanguage;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onresult = event => {
+        const spoken = Array.from(event.results || []).map(result => result?.[0]?.transcript || '').join(' ').trim();
+        if (spoken) setTranscript(spoken);
+        else setSttError('The browser returned no transcript. Try speaking more clearly or select another language.');
+      };
+      recognition.onerror = event => {
+        setSttError('Browser speech recognition failed (' + String(event?.error || 'unknown error') + '). Allow microphone access and check your browser/network.');
+        setBrowserSttBusy(false);
+      };
+      recognition.onend = () => setBrowserSttBusy(false);
+      recognition.start();
+    } catch (error) {
+      setBrowserSttBusy(false);
+      setSttError(error?.message || 'Could not start browser speech recognition. Check microphone permissions.');
     }
   }
 
@@ -330,12 +405,14 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
 
       <div className="gnani-tabs" role="tablist" aria-label="Voice tool">
         <button type="button" role="tab" aria-selected={mode === 'tts'} className={mode === 'tts' ? 'active' : ''} onClick={() => setMode('tts')}><Volume2 size={15} /> Text to speech</button>
+        <button type="button" role="tab" aria-selected={mode === 'stt'} className={mode === 'stt' ? 'active' : ''} onClick={() => setMode('stt')}><Mic size={15} /> Speech to text</button>
       </div>
 
       {serviceMode === 'personal' && availability === 'setup' && <div className="gnani-alert"><AlertTriangle size={16} /><span><strong>Personal-key voice API is not available.</strong> Check that the Stage 2 server has deployed the BYOK-enabled code.</span></div>}
       {serviceMode === 'personal' && availability === 'offline' && <div className="gnani-alert"><AlertTriangle size={16} /><span>Could not check the personal-key voice API status. Confirm the Stage 2 API deployment is online.</span></div>}
       {serviceMode === 'site' && !siteStatus.available && <div className="gnani-alert"><AlertTriangle size={16} /><span><strong>Site-powered Gnani is unavailable.</strong> The owner key must be configured as <code>GNANI_API_KEY</code> on the Stage 2 server. You can still switch back to personal-key mode.</span></div>}
       {serviceMode === 'personal' && accountLocked && <div className="gnani-alert"><ShieldCheck size={16} /><span>Sign in or create an InsightBoard account in the panel above to use your personal Gnani key. In site-powered mode, sign-in is not required.</span></div>}
+      {summaryNotice && <div className="gnani-alert" role="status"><AlertTriangle size={16} /><span>{summaryNotice}</span></div>}
 
       <div className="gnani-service-modes" role="group" aria-label="Gnani billing mode">
         <button type="button" className={serviceMode === 'personal' ? 'active' : ''} onClick={() => changeServiceMode('personal')}><KeyRound size={14} /> Personal key (BYOK)</button>
@@ -371,7 +448,8 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
           <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
           <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? "Gnani summarizes your uploaded dataset in your selected speech language. Site-key mode is limited to 1,000 characters; personal BYOK can use up to 4,000 characters per speech request, subject to Gnani's current provider limits and your account/key quota. The original dataset is not changed." : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
           <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
-          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && (!gnaniKey || !authToken)) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate speech'}</button>
+          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && (!gnaniKey || !authToken)) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate Gnani speech'}</button>
+          <button className="v2-button secondary gnani-action" type="button" onClick={playBrowserSpeechFallback} disabled={!sourceIsUploaded || summaryBusy}>Play browser voice fallback (no API key)</button>
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
           {audioUrl && <div className="gnani-audio-result"><div><CheckCircle2 size={16} /><strong>Speech generated</strong><span>MP3 audio · available for this session</span></div><audio controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio><a className="v2-button secondary gnani-download" href={audioUrl} download="gnani-timbre-speech.mp3"><Download size={14} /> Download MP3</a></div>}
         </form>
@@ -385,7 +463,9 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
             <small>{audioFile ? (audioFile.size / (1024 * 1024)).toFixed(2) + ' MB · ready to transcribe' : (serviceMode === 'site' ? 'WAV, MP3, OGG, FLAC, AAC or M4A · 6 MB max for site-key mode' : 'WAV, MP3, OGG, FLAC, AAC or M4A · up to 60 seconds · 15 MB max')}</small>
             <span className="v2-button secondary"><FileText size={14} /> Browse files</span>
           </label>
-          <button className="v2-button primary gnani-action" type="submit" disabled={sttBusy || accountLocked || providerUnavailable || (serviceMode === 'personal' && !gnaniKey) || !audioFile || (serviceMode === 'site' && audioFile.size > 6 * 1024 * 1024)}>{sttBusy ? <RefreshCw size={15} className="v2-spin" /> : <Mic size={15} />}{sttBusy ? 'Transcribing audio…' : 'Transcribe audio'}</button>
+          <button className="v2-button primary gnani-action" type="submit" disabled={sttBusy || accountLocked || providerUnavailable || (serviceMode === 'personal' && !gnaniKey) || !audioFile || (serviceMode === 'site' && audioFile.size > 6 * 1024 * 1024)}>{sttBusy ? <RefreshCw size={15} className="v2-spin" /> : <Mic size={15} />}{sttBusy ? 'Transcribing audio…' : 'Transcribe with Gnani'}</button>
+          <button className="v2-button secondary gnani-action" type="button" onClick={startBrowserTranscriptionFallback} disabled={browserSttBusy}>{browserSttBusy ? <RefreshCw size={15} className="v2-spin" /> : <Mic size={15} />}{browserSttBusy ? 'Listening… speak now' : 'Try browser microphone demo (no Gnani key)'}</button>
+          <p className="gnani-footnote">Browser speech recognition needs microphone permission and may use the browser’s own speech service; availability and language support vary. It is a demo fallback, not Gnani Prisma.</p>
           {sttError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{sttError}</p>}
           {transcript && <div className="gnani-transcript"><div className="gnani-transcript-heading"><div><CheckCircle2 size={16} /><strong>Transcript</strong></div><button type="button" className="v2-button secondary" onClick={() => void copyTranscript()}><Copy size={13} />{copied ? 'Copied' : 'Copy text'}</button></div><textarea rows={6} readOnly value={transcript} aria-label="Transcribed text" /><p>Transcript is held in this page’s current state and is not saved in InsightBoard’s report database.</p></div>}
         </form>
