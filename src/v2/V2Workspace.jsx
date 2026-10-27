@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, History, RefreshCw, Save, Sparkles, Trash2
 import './V2Workspace.css';
 import GnaniVoiceStudio from './GnaniVoiceStudio.jsx';
 import AIProviderHub from './AIProviderHub.jsx';
+import { buildLocalDemoSummary } from './localDemoInsights.js';
 
 const MODEL = 'gemini-3.5-flash-lite';
 const LANGUAGES = [
@@ -60,6 +61,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
   const [aiStatus,setAiStatus]=useState({state:'checking',model:MODEL});
   const [busy,setBusy]=useState(false);
   const [summary,setSummary]=useState('');
+  const [summarySource,setSummarySource]=useState('');
   const [message,setMessage]=useState('');
   const [history,setHistory]=useState([]);
   const [authToken,setAuthToken]=useState(()=>{try{return sessionStorage.getItem('insightboard-api-token')||'';}catch{return '';}});
@@ -205,6 +207,13 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
 
 
 
+  function generateLocalDemoSummary() {
+    const localSummary = buildLocalDemoSummary(analytics, summaryLanguage);
+    setSummary(localSummary);
+    setSummarySource('local');
+    setMessage('Generated a local rule-based demo insight. No Gemini request was made, so this fallback works without an API key.');
+  }
+
   async function generateSummary() {
     const personalKey=String(keyDraft||apiKey).trim();
     const usePersonalKey=Boolean(personalKey);
@@ -213,7 +222,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
       setMessage('Enter your own Gemini API key below, or wait until the site-managed AI service is configured.');
       return;
     }
-    setBusy(true);setMessage('');setSummary('');
+    setBusy(true);setMessage('');setSummary('');setSummarySource('');
     try {
       let response;
       let result={};
@@ -266,9 +275,14 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
       const generated=typeof result.summary==='string'?result.summary.trim():'';
       if(!generated)throw new Error('The AI service returned no summary. Please try again.');
       setSummary(generated);
+      setSummarySource('gemini');
       setMessage(usePersonalKey?'Summary generated using your Gemini key.':'Summary generated using the site-managed AI service.');
     } catch(error) {
-      setMessage(error?.message||'Could not generate an AI summary. Try again later.');
+      const detail = error?.message || 'Gemini request failed.';
+      const localSummary = buildLocalDemoSummary(analytics, summaryLanguage);
+      setSummary(localSummary);
+      setSummarySource('local');
+      setMessage('Gemini unavailable: ' + detail + ' Showing a local rule-based demo summary instead; no AI response was generated.');
     } finally {setBusy(false);}
   }
 
@@ -391,10 +405,11 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
         <label className="v2-field"><span>{copy.language}</span><select value={summaryLanguage} onChange={event=>setSummaryLanguage(event.target.value)}>{LANGUAGES.map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>
         <label className="v2-consent"><input type="checkbox" checked={consent} onChange={event=>setConsent(event.target.checked)}/><span>{copy.consent}</span></label>
         <button className="v2-button primary v2-generate-button" onClick={()=>void generateSummary()} disabled={busy||(!apiKey&&!keyDraft.trim()&&aiStatus.state!=='ready')||!consent}>{busy?<RefreshCw size={15} className="v2-spin"/>:<Sparkles size={15}/>} {busy?'Analyzing your snapshot…':copy.summarize}</button>
+        <button className="v2-button secondary v2-generate-button" onClick={generateLocalDemoSummary} disabled={busy}><Database size={15}/> Generate local demo insight (no API key)</button>
         {aiStatus.state==='setup'&&!apiKey&&!keyDraft.trim()&&<div className="v2-config-note"><AlertTriangle size={15}/><span>The hosted AI service is not configured yet. You can use your own key above now. The site owner can optionally configure <code>GEMINI_API_KEY</code> in Render for shared access.</span></div>}
         {aiStatus.state==='offline'&&!apiKey&&!keyDraft.trim()&&<div className="v2-config-note"><AlertTriangle size={15}/><span>Could not reach the AI status endpoint. You can still use your own Gemini key directly from this browser.</span></div>}
         {(apiKey||keyDraft.trim())&&<div className="v2-warning"><AlertTriangle size={15}/><span>{copy.warning} <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" rel="noreferrer">Google key security guidance</a>.</span></div>}
-        {summary?<div className="v2-summary" aria-live="polite"><h4>InsightBoard · Gemini</h4><div>{summary}</div></div>:<p className="v2-note">{copy.none}</p>}
+        {summary?<div className="v2-summary" aria-live="polite"><h4>InsightBoard · {summarySource==='local'?'Local demo insight (not AI-generated)':'Gemini'}</h4><div>{summary}</div></div>:<p className="v2-note">{copy.none}</p>}
         <button className="v2-button secondary" onClick={()=>void saveSnapshot()} disabled={reportSaveBusy}>{reportSaveBusy?<RefreshCw size={15} className="v2-spin"/>:<Save size={15}/>} {reportSaveBusy?'Saving report…':copy.save}</button>
         {message&&<div className="v2-message" role="status"><span>{message}</span><button onClick={()=>setMessage('')} aria-label="Dismiss message">×</button></div>}
       </article>
