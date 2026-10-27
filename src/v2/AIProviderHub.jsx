@@ -4,25 +4,25 @@ import './AIProviderHub.css';
 
 const PROVIDERS = [
   {
-    id: 'openai', name: 'OpenAI', model: 'gpt-6-luna',
+    id: 'openai', name: 'OpenAI', model: 'gpt-4.1-mini',
     keyUrl: 'https://platform.openai.com/api-keys', docsUrl: 'https://developers.openai.com/api/reference/overview',
     pricingUrl: 'https://openai.com/api/pricing/',
     note: 'GPT family and other OpenAI API models.'
   },
   {
-    id: 'anthropic', name: 'Anthropic Claude', model: 'claude-haiku-5-5',
+    id: 'anthropic', name: 'Anthropic Claude', model: 'claude-3-5-haiku-latest',
     keyUrl: 'https://console.anthropic.com/settings/keys', docsUrl: 'https://platform.claude.com/docs/en/api/overview',
     pricingUrl: 'https://www.anthropic.com/pricing',
     note: 'Claude Messages API; model access depends on your Anthropic account.'
   },
   {
-    id: 'gemini', name: 'Google Gemini', model: 'gemini-3.8-flash',
+    id: 'gemini', name: 'Google Gemini', model: 'gemini-2.5-flash',
     keyUrl: 'https://aistudio.google.com/app/apikey', docsUrl: 'https://ai.google.dev/api',
     pricingUrl: 'https://ai.google.dev/gemini-api/docs/pricing',
     note: 'Separate provider playground key; your existing Gemini dashboard BYOK flow is unchanged.'
   },
   {
-    id: 'xai', name: 'xAI Grok', model: 'grok-4.7',
+    id: 'xai', name: 'xAI Grok', model: 'grok-3-mini',
     keyUrl: 'https://console.x.ai/', docsUrl: 'https://docs.x.ai/docs',
     pricingUrl: 'https://docs.x.ai/developers/pricing',
     note: 'OpenAI-compatible chat completions endpoint.'
@@ -34,7 +34,7 @@ const PROVIDERS = [
     note: 'Choose a model ID available to your Mistral account.'
   },
   {
-    id: 'deepseek', name: 'DeepSeek', model: 'deepseek-flash',
+    id: 'deepseek', name: 'DeepSeek', model: 'deepseek-chat',
     keyUrl: 'https://platform.deepseek.com/api_keys', docsUrl: 'https://api-docs.deepseek.com/',
     pricingUrl: 'https://api-docs.deepseek.com/quick_start/pricing/',
     note: 'OpenAI-compatible chat API; provider balance and quotas apply.'
@@ -46,19 +46,19 @@ const PROVIDERS = [
     note: 'Low-latency hosted inference; active models and free quotas can change.'
   },
   {
-    id: 'cohere', name: 'Cohere', model: 'command-a-plus-05-2026',
+    id: 'cohere', name: 'Cohere', model: 'command-a-03-2025',
     keyUrl: 'https://dashboard.cohere.com/api-keys', docsUrl: 'https://docs.cohere.com/v2/reference/chat',
     pricingUrl: 'https://cohere.com/pricing',
     note: 'Cohere v2 Chat API.'
   },
   {
-    id: 'openrouter', name: 'OpenRouter', model: 'google/gemini-3.8-flash',
+    id: 'openrouter', name: 'OpenRouter', model: 'google/gemini-2.5-flash',
     keyUrl: 'https://openrouter.ai/keys', docsUrl: 'https://openrouter.ai/developers',
     pricingUrl: 'https://openrouter.ai/pricing',
     note: 'One API for models from many upstream providers; the model ID includes its provider.'
   },
   {
-    id: 'together', name: 'Together AI', model: 'Qwen/Qwen3.5-9B',
+    id: 'together', name: 'Together AI', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
     keyUrl: 'https://api.together.ai/settings/api-keys', docsUrl: 'https://docs.together.ai/reference/chat-completions',
     pricingUrl: 'https://www.together.ai/pricing',
     note: 'Open-model inference; confirm model availability in the current catalog.'
@@ -156,7 +156,7 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
         body: JSON.stringify({ provider: providerId, model: model.trim(), datasetName, fields, rows, analysisMode, maxOutputTokens })
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result?.error || 'Provider request failed. Check the key, model ID, quota and account access.');
+      if (!response.ok) throw new Error(result?.error || 'Provider request failed. Check the API key, model ID, account quota/billing, or provider status.');
       if (typeof result?.answer !== 'string' || !result.answer.trim()) throw new Error('The provider returned no text.');
       setAnswer(result.answer);
       setNotice('Response received from ' + provider.name + ' · ' + (result.model || model));
