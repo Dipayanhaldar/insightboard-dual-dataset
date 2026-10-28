@@ -33,8 +33,6 @@ async function errorFromResponse(response) {
 
 export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], datasetName = '', sourceIsUploaded = false, analytics = {} }) {
   const [availability, setAvailability] = useState('checking');
-  const [serviceMode, setServiceMode] = useState('personal');
-  const [siteStatus, setSiteStatus] = useState({ loading: true, available: false, limitPerIpPerUtcDay: 10, globalDailyLimit: 25 });
   const [keyDraft, setKeyDraft] = useState('');
   const [gnaniKey, setGnaniKey] = useState(() => {
     try { return sessionStorage.getItem('insightboard-gnani-byok-key') || ''; } catch { return ''; }
@@ -59,10 +57,6 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
       .then(response => response.ok ? response.json() : Promise.reject(new Error('Voice status is unavailable.')))
       .then(data => { if (active) setAvailability(data.available && data.requiresUserKey ? 'ready' : 'setup'); })
       .catch(() => { if (active) setAvailability('offline'); });
-    fetch('/api/voice/site-status', { headers: { Accept: 'application/json' } })
-      .then(response => response.ok ? response.json() : Promise.reject(new Error('Site voice status is unavailable.')))
-      .then(data => { if (active) setSiteStatus({ loading: false, ...data }); })
-      .catch(() => { if (active) setSiteStatus({ loading: false, available: false, limitPerIpPerUtcDay: 10, globalDailyLimit: 25 }); });
     return () => { active = false; };
   }, []);
 
@@ -81,45 +75,15 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     void loadLocalizedSummary(ttsLanguage);
   }, [rows, fields, datasetName, sourceIsUploaded]);
 
-  async function loadLocalizedSummary(languageCode, targetMode = serviceMode) {
+  async function loadLocalizedSummary(languageCode) {
     if (!sourceIsUploaded || !analytics || !Array.isArray(rows) || !rows.length) {
       setTtsError('Upload a JSON or CSV dataset first. Demo datasets cannot be sent to Gnani.');
       return;
     }
     const languageMap = { 'en-IN':'en', 'hi-IN':'hi', 'te-IN':'te', 'ta-IN':'ta', 'kn-IN':'kn', 'ml-IN':'ml', 'mr-IN':'mr', 'bn-IN':'bn', 'gu-IN':'gu', 'pa-IN':'pa' };
-    setSummaryBusy(true);
-    setTtsError('');
-    setAudioUrl('');
-    try {
-      const response = await fetch('/api/ai/summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ snapshot: analytics, language: languageMap[languageCode] || 'en' })
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Could not create a summary in the selected language.');
-      const summary = String(result.summary || '').trim();
-      if (!summary) throw new Error('The summary service returned no text. Try again.');
-      const capped = summary.slice(0, targetMode === 'site' ? 950 : 3800);
-      setLocalizedSummary(capped);
-      setText(capped);
-      setSummaryNotice('');
-    } catch (error) {
-      const detail = error?.message || 'The Gemini summary service is unavailable.';
-      const fallback = buildLocalDemoSummary(analytics, languageMap[languageCode] || 'en');
-      const capped = fallback.slice(0, targetMode === 'site' ? 950 : 3800);
-      setLocalizedSummary(capped);
-      setText(capped);
-      setSummaryNotice('Gemini summary unavailable: ' + detail + ' A local rule-based demo summary is shown instead; no AI response was generated.');
-    } finally {
-      setSummaryBusy(false);
-    }
-  }
-
-  function changeServiceMode(nextMode) {
-    setServiceMode(nextMode);
-    setAudioUrl('');
-    if (sourceIsUploaded) void loadLocalizedSummary(ttsLanguage, nextMode);
+    setSummaryBusy(true); setTtsError(''); setAudioUrl('');
+    try { const capped = buildLocalDemoSummary(analytics, languageMap[languageCode] || 'en').slice(0, 3800); setLocalizedSummary(capped); setText(capped); setSummaryNotice('Local rule-based summary; no AI provider was called and no dataset was sent for summarization.'); }
+    finally { setSummaryBusy(false); }
   }
 
   function useGnaniKey() {
@@ -167,18 +131,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
   async function generateSpeech(event) {
     event.preventDefault();
     setTtsError('');
-    if (serviceMode === 'personal' && !authToken) {
-      setTtsError('Sign in or create an InsightBoard account above to use personal-key voice tools. Gnani will summarize uploaded data to a maximum of 1,000 characters for speech.');
-      return;
-    }
-    if (serviceMode === 'personal' && !gnaniKey) {
-      setTtsError('Add your own Gnani API key in the Voice Studio key panel first.');
-      return;
-    }
-    if (serviceMode === 'site' && text.trim().length > 1000) {
-      setTtsError("Site-key speech is limited to 1,000 characters. Personal BYOK supports up to 4,000 characters per request, subject to Gnani\'s current provider policy, account limits, and key quota.");
-      return;
-    }
+    if (!gnaniKey) { setTtsError('Add your own Gnani API key in the Voice Studio key panel first.'); return; }
     if (!text.trim()) {
       setTtsError('Select an output language to generate a matching-language summary, then generate speech.');
       return;
@@ -187,12 +140,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     setAudioUrl('');
     try {
       const headers = { 'Content-Type': 'application/json' };
-      let endpoint = '/api/voice/site-tts';
-      if (serviceMode === 'personal') {
-        endpoint = '/api/voice/tts';
-        headers.Authorization = 'Bearer ' + authToken;
-        headers['X-Gnani-Api-Key'] = gnaniKey;
-      }
+      const endpoint = '/api/voice/tts'; headers['X-Gnani-Api-Key'] = gnaniKey;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers,
@@ -211,8 +159,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     }
   }
 
-  const accountLocked = serviceMode === 'personal' && !authToken;
-  const providerUnavailable = serviceMode === 'site' ? !siteStatus.available : availability !== 'ready';
+  const providerUnavailable = availability !== 'ready';
 
   return (
     <article className="v2-card gnani-studio" aria-labelledby="gnani-title">
@@ -222,21 +169,11 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
           <span className="v2-overline">GNANI VOICE AI</span>
           <h3 id="gnani-title">Voice Studio</h3>
         </div>
-        <span className={'gnani-status ' + (serviceMode === 'site' ? (siteStatus.available ? 'ready' : 'setup') : availability)}>
-          {serviceMode === 'site'
-            ? (siteStatus.loading ? 'CHECKING SITE KEY' : siteStatus.available ? 'SITE KEY · 10/IP/DAY' : 'SITE KEY NOT READY')
-            : availability === 'checking' ? 'CHECKING' : availability === 'ready' ? 'BYO KEY MODE' : availability === 'setup' ? 'API SETUP NEEDED' : 'API OFFLINE'}
-        </span>
+        <span className={'gnani-status ' + availability}>{availability === 'checking' ? 'CHECKING' : availability === 'ready' ? 'BYO KEY MODE' : availability === 'setup' ? 'API SETUP NEEDED' : 'API OFFLINE'}</span>
       </div>
-      <p className="v2-muted gnani-intro">Read your uploaded JSON/CSV dataset aloud in a language you select.</p>
+      <p className="v2-muted gnani-intro">Create speech from a local summary of your uploaded JSON/CSV dataset using your own Gnani API key.</p>
 
-      <div className="gnani-service-modes" role="group" aria-label="Gnani billing mode">
-        <button type="button" className={serviceMode === 'personal' ? 'active' : ''} onClick={() => changeServiceMode('personal')}><KeyRound size={14} /> Personal key (BYOK)</button>
-        <button type="button" className={serviceMode === 'site' ? 'active site-mode' : 'site-mode'} onClick={() => changeServiceMode('site')}><ShieldCheck size={14} /> Site key · 10/IP/day</button>
-      </div>
-      {serviceMode === 'site' && <div className="gnani-site-limit-note"><ShieldCheck size={15} /><span><strong>Limited public access</strong><small>Up to 10 site-key requests per public IP per UTC day, . The whole website is capped at {siteStatus.globalDailyLimit || 25} site-key requests per UTC day. Speech text is limited to 1,000 characters and speech uploads to 6 MB. Personal BYOK can support up to 4,000 characters per request subject to provider policy and your quota. The cap is an abuse guard, not a guarantee of zero billing.</small></span></div>}
-
-      {serviceMode === 'personal' && <div className="gnani-key-panel">
+      <div className="gnani-key-panel">
         <div className="gnani-key-heading"><KeyRound size={16} /><strong>Bring your own Gnani API key</strong><span>{gnaniKey ? 'KEY SET' : 'KEY REQUIRED'}</span></div>
         <p>Use a paid or otherwise eligible key from your own Gnani account. Site-provided keys are limited to 1,000 characters; personal BYOK supports up to 4,000 characters per request under the current integration, only where allowed by Gnani's provider policy and your account quota. Your key's plan may impose a lower limit or additional charges.</p>
         <label className="v2-field gnani-key-field">
@@ -256,19 +193,19 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
           <button type="button" className="v2-button secondary" onClick={forgetGnaniKey}>Forget key</button>
         </div>
         {keyNotice && <p className="gnani-key-notice" role="status">{keyNotice}</p>}
-      </div>}
+      </div>
 
         <form onSubmit={generateSpeech} className="gnani-form">
           <label className="v2-field"><span><Languages size={13} /> Language</span><select value={ttsLanguage} onChange={event => updateLanguage(event.target.value)}>{TTS_LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
           <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
-          <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / {serviceMode === 'site' ? '1,000' : '4,000'} characters</small></span><textarea maxLength={serviceMode === 'site' ? 1000 : 4000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? "Gnani summarizes your uploaded dataset in your selected speech language. Site-key mode is limited to 1,000 characters; personal BYOK can use up to 4,000 characters per speech request, subject to Gnani's current provider limits and your account/key quota. The original dataset is not changed." : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
+          <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / {'4,000'} characters</small></span><textarea maxLength={4000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? "Gnani summarizes your uploaded dataset in your selected speech language. Speech requests can contain up to 4,000 characters, subject to Gnani's current provider limits and your account/key quota. The original dataset is not changed." : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
           <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
-          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || accountLocked || providerUnavailable || !sourceIsUploaded || (serviceMode === 'personal' && (!gnaniKey || !authToken)) || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate Gnani speech'}</button>
+          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || providerUnavailable || !sourceIsUploaded || !gnaniKey || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate Gnani speech'}</button>
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
           {audioUrl && <div className="gnani-audio-result"><div><CheckCircle2 size={16} /><strong>Speech generated</strong><span>MP3 audio · available for this session</span></div><audio controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio><a className="v2-button secondary gnani-download" href={audioUrl} download="gnani-timbre-speech.mp3"><Download size={14} /> Download MP3</a></div>}
         </form>
 
-      <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>{serviceMode === 'site' ? 'Site key limits and data use' : 'BYOK privacy and billing'}</strong><small>{serviceMode === 'site' ? 'This mode sends requests through the site owner’s Gnani API key. It is limited to 10 requests per IP per UTC day and 25 requests site-wide per UTC day, with smaller text/audio limits. Requests and text/audio are sent to Gnani for processing. Do not submit confidential data.' : 'Your key is kept in this browser session and sent over HTTPS only when you request speech. The server uses it for that request only; InsightBoard does not save or log the key. Your Gnani account is responsible for usage associated with your key. Text/audio is sent to Gnani for processing; generated audio is not saved to InsightBoard’s database.'}</small></span></div>
+      <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>BYOK privacy and billing</strong><small>Your key is kept in this browser session and sent over HTTPS only when you request speech. InsightBoard does not intentionally save or log the key. Your provider account is responsible for usage and charges. Text/audio is sent to Gnani for processing; generated audio is not saved to InsightBoard's database. The summary is generated locally with a rule-based helper.</small></span></div>
       <p className="gnani-footnote"><a href="https://docs.gnani.ai/api/introduction/quick-start" target="_blank" rel="noreferrer">Gnani API quick start</a> · <a href="https://docs.gnani.ai/api/TTS/tts-inference" target="_blank" rel="noreferrer">TTS docs</a> · Text-to-speech is generated from the active uploaded dataset summary.</p>
     </article>
   );
