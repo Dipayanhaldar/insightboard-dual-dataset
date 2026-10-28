@@ -7,7 +7,7 @@ InsightBoard is a React + Vite data exploration dashboard with an optional V2 ba
 - Import JSON arrays or objects containing records/data, plus CSV files. Imported records replace the currently active dataset.
 - Dynamic categorical filters, KPI cards, six chart panels, and searchable, sortable, paginated records table.
 - Light/dark themes; CSV, Excel and PDF exports; preset logo assets and Metro announcement audio.
-- Stage 2 Voice Studio: Gnani Prisma v2.5 speech-to-text and Timbre v2.5 text-to-speech, with personal BYOK plus a separately capped site-managed option.
+- Stage 2 Voice Studio: Gnani Timbre v2.5 text-to-speech using personal Bring Your Own Key (BYOK). Site-managed voice keys are not used; dataset summaries in Voice Studio are local and rule-based.
 - AI API Provider Hub: personal-key text/chat generation for OpenAI, Anthropic Claude, Google Gemini, xAI Grok, Mistral AI, DeepSeek, Groq, Cohere, OpenRouter and Together AI.
 
 ## V2 backend (feature branch only)
@@ -18,7 +18,7 @@ The feature/insightboard-v2.0.1.1 branch adds Node.js + Express, MongoDB account
 - Gemini remains browser-side Bring Your Own Key; never commit your key or share it with other users.
 - Hosting and Atlas resources are not provisioned automatically by this repository.
 
-**Gnani has two separate modes.** Personal BYOK uses each visitor's own key. Optional site-managed mode uses `GNANI_API_KEY` from Render and is limited to 10 requests per public IP per UTC day plus 25 total site requests per UTC day by default; limits are stored in MongoDB and the route fails closed if quota storage is unavailable. Site mode still incurs usage against the owner's Gnani account, so set provider-side budget controls too. Never commit credentials.
+**Gnani Voice Studio is BYOK-only.** Each visitor supplies their own Gnani API key; the TTS endpoint accepts that key per request and does not fall back to a Render-managed Gnani key. Voice generation does not require an InsightBoard sign-in. Keys are not intentionally persisted by InsightBoard; avoid using keys on shared/public devices. Provider usage and charges belong to the key owner. Local browser speech preview, where available, is device/browser-dependent and is not a guarantee of offline playback.
 
 **The AI API Provider Hub uses BYOK.** Provider keys are held in browser session storage and forwarded to the selected provider for a request. InsightBoard does not store those keys in MongoDB. The hub supports text/chat calls only; it is not a complete integration of every provider's audio, image, video, embedding or fine-tuning APIs. Model IDs, availability and pricing can change; see the links in the hub and setup guide.
 
