@@ -5,7 +5,6 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { createHmac } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -18,9 +17,6 @@ const TOKEN_LIFETIME = process.env.JWT_EXPIRES_IN || '8h';
 const MAX_REPORTS = Math.min(100, Math.max(1, Number(process.env.MAX_REPORTS_PER_USER) || 20));
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
-// Optional site-managed Gnani key for a strictly rate-limited public mode; BYOK routes do not use it.
-const GNANI_SITE_API_KEY = process.env.GNANI_API_KEY || '';
-const GNANI_SITE_DAILY_GLOBAL_LIMIT = Math.min(1000, Math.max(10, Number(process.env.GNANI_SITE_DAILY_GLOBAL_LIMIT) || 25));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDirectory = path.resolve(__dirname, '../dist');
 
@@ -95,17 +91,8 @@ const reportSchema = new mongoose.Schema({
   summary: { type: String, default: '', maxlength: 6000 }
 }, { timestamps: true, minimize: false });
 reportSchema.index({ userId: 1, createdAt: -1 });
-const siteVoiceUsageSchema = new mongoose.Schema({
-  bucketKey: { type: String, required: true },
-  dayStart: { type: Date, required: true },
-  count: { type: Number, default: 0, min: 0 },
-  expiresAt: { type: Date, required: true }
-}, { versionKey: false });
-siteVoiceUsageSchema.index({ bucketKey: 1, dayStart: 1 }, { unique: true });
-siteVoiceUsageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 const Report = mongoose.models.Report || mongoose.model('Report', reportSchema);
-const SiteVoiceUsage = mongoose.models.SiteVoiceUsage || mongoose.model('SiteVoiceUsage', siteVoiceUsageSchema);
 
 const asyncRoute = handler => (req, res, next) =>
   Promise.resolve(handler(req, res, next)).catch(next);
@@ -487,7 +474,7 @@ app.get('/api/voice/status', (_req, res) => {
   });
 });
 
-app.post('/api/voice/tts', voiceLimiter, requireAuth, asyncRoute(async (req, res) => {
+app.post('/api/voice/tts', voiceLimiter, asyncRoute(async (req, res) => {
   const GNANI_API_KEY = readGnaniApiKey(req, res);
   if (!GNANI_API_KEY) return;
   const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
@@ -539,124 +526,6 @@ app.post('/api/voice/tts', voiceLimiter, requireAuth, asyncRoute(async (req, res
 
 // Site-managed Gnani speech mode. This key is deliberately separate from the personal-key BYOK routes above.
 // Limits are stored in MongoDB so normal app restarts do not reset the per-IP daily allowance.
-function utcDayStart() {
-  const day = new Date();
-  day.setUTCHours(0, 0, 0, 0);
-  return day;
-}
-
-async function incrementSiteVoiceBucket(bucketKey, dayStart, limit) {
-  try {
-    await SiteVoiceUsage.updateOne(
-      { bucketKey, dayStart },
-      { $setOnInsert: { count: 0, expiresAt: new Date(dayStart.getTime() + 48 * 60 * 60 * 1000) } },
-      { upsert: true }
-    );
-  } catch (error) {
-    // Parallel first requests can race to create the same unique bucket.
-    if (error?.code !== 11000) throw error;
-  }
-  const updated = await SiteVoiceUsage.findOneAndUpdate(
-    { bucketKey, dayStart, count: { $lt: limit } },
-    { $inc: { count: 1 } },
-    { new: true }
-  ).lean();
-  return updated ? { allowed: true, count: updated.count, remaining: Math.max(0, limit - updated.count) } : { allowed: false, count: limit, remaining: 0 };
-}
-
-const siteVoiceLimit = asyncRoute(async (req, res, next) => {
-  if (!GNANI_SITE_API_KEY) {
-    return res.status(503).json({ error: 'Site-powered Gnani is not configured. Use your personal Gnani key or contact the site owner.' });
-  }
-  if (!databaseReady()) {
-    // Fail closed: never permit unmetered shared-key calls when the persistent limiter is unavailable.
-    return res.status(503).json({ error: 'Site voice quota storage is unavailable. Use your personal Gnani key or try later.' });
-  }
-  const ip = safeText(req.ip || req.socket?.remoteAddress || '', 128);
-  if (!ip) return res.status(503).json({ error: 'Could not establish a client IP for site voice protection.' });
-  const dayStart = utcDayStart();
-  const secret = JWT_SECRET || GNANI_SITE_API_KEY;
-  const ipBucket = 'ip:' + createHmac('sha256', secret).update(ip).digest('hex');
-  let perIp;
-  let global;
-  try {
-    perIp = await incrementSiteVoiceBucket(ipBucket, dayStart, 10);
-    if (!perIp.allowed) {
-      res.set('X-Site-Voice-Limit', '10');
-      res.set('X-Site-Voice-Remaining', '0');
-      return res.status(429).json({ error: 'This public IP has used its 10 site-powered Gnani requests for today. Try again after the daily reset, or use your own Gnani key.' });
-    }
-    global = await incrementSiteVoiceBucket('global-site-voice', dayStart, GNANI_SITE_DAILY_GLOBAL_LIMIT);
-  } catch (error) {
-    console.error('Persistent site voice quota check failed:', error?.name || 'Error');
-    return res.status(503).json({ error: 'Site voice quota storage failed closed. Use your personal Gnani key or try later.' });
-  }
-  if (!global.allowed) {
-    res.set('X-Site-Voice-Limit', '10');
-    res.set('X-Site-Voice-Remaining', String(perIp.remaining));
-    return res.status(429).json({ error: 'The site-wide Gnani daily allowance has been reached. Try tomorrow or use your own Gnani key.' });
-  }
-  res.set('X-Site-Voice-Limit', '10');
-  res.set('X-Site-Voice-Remaining', String(perIp.remaining));
-  return next();
-});
-
-app.get('/api/voice/site-status', (_req, res) => {
-  res.set('Cache-Control', 'no-store');
-  return res.json({
-    available: Boolean(GNANI_SITE_API_KEY),
-    mode: 'site-managed-with-limits',
-    limitPerIpPerUtcDay: 10,
-    globalDailyLimit: GNANI_SITE_DAILY_GLOBAL_LIMIT,
-    requiresSignIn: false,
-    dataSentToGnani: true
-  });
-});
-
-app.post('/api/voice/site-tts', siteVoiceLimit, asyncRoute(async (req, res) => {
-  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
-  const voice = safeText(req.body?.voice, 40);
-  const language = safeText(req.body?.language, 16);
-  const speed = Number(req.body?.speed ?? 1);
-  if (!text) return res.status(400).json({ error: 'Enter the text you want to turn into speech.' });
-  if (text.length > 1000) return res.status(400).json({ error: 'Site-powered speech is limited to 1,000 characters per request. Use your own Gnani key for longer text.' });
-  if (!GNANI_TTS_LANGUAGES.has(language)) return res.status(400).json({ error: 'Select a supported TTS language.' });
-  if (!Object.hasOwn(GNANI_VOICES, voice) || GNANI_VOICES[voice] !== language) {
-    return res.status(400).json({ error: 'Select a voice designed for the selected language.' });
-  }
-  if (!Number.isFinite(speed) || speed < 0.85 || speed > 1.15) {
-    return res.status(400).json({ error: 'Speech speed must be between 0.85 and 1.15.' });
-  }
-  let response;
-  try {
-    response = await fetch('https://api.vachana.ai/api/v1/tts/inference', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key-ID': GNANI_SITE_API_KEY },
-      body: JSON.stringify({
-        text, model: 'timbre-v2.5', voice, language, speed,
-        audio_config: { container: 'mp3', bitrate: '128k', sample_rate: 24000, num_channels: 1 }
-      }),
-      signal: AbortSignal.timeout(60000)
-    });
-  } catch (error) {
-    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') return res.status(504).json({ error: 'Gnani took too long to generate speech. Please try again.' });
-    return res.status(502).json({ error: 'Could not reach Gnani. Please try again later.' });
-  }
-  if (!response.ok) {
-    console.warn('Site Gnani TTS returned HTTP', response.status);
-    const detail = await readGnaniProviderDetail(response);
-    if (response.status === 401 || response.status === 403) return res.status(502).json({ error: gnaniErrorMessage(response.status, detail) + ' The site owner must verify GNANI_API_KEY in Render.' });
-    if (response.status === 429) return res.status(429).json({ error: gnaniErrorMessage(response.status, detail) + ' You can switch to your own key or try after quota reset.' });
-    return res.status(502).json({ error: gnaniErrorMessage(response.status, detail) });
-  }
-  const audio = Buffer.from(await response.arrayBuffer());
-  if (!audio.length) return res.status(502).json({ error: 'Gnani returned an empty audio file.' });
-  res.set('Content-Type', 'audio/mpeg');
-  res.set('Content-Disposition', 'inline; filename="gnani-site-tts.mp3"');
-  res.set('Cache-Control', 'no-store');
-  return res.status(200).send(audio);
-}));
-
 app.post('/api/auth/register', authLimiter, requireDatabase, asyncRoute(async (req, res) => {
   const email = safeText(req.body?.email, 254).toLowerCase();
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
