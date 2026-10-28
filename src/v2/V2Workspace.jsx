@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, History, RefreshCw, Save, Sparkles, Trash2, ShieldCheck, LogIn, UserPlus, LogOut, Database, KeyRound, ArrowUpRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, History, RefreshCw, Save, Sparkles, Trash2, ShieldCheck, LogIn, UserPlus, LogOut, Database, KeyRound, ArrowUpRight, Github, BookOpen, ExternalLink } from 'lucide-react';
 import './V2Workspace.css';
 import GnaniVoiceStudio from './GnaniVoiceStudio.jsx';
 import AIProviderHub from './AIProviderHub.jsx';
@@ -425,5 +425,23 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
         {reportsBusy&&!history.length?<p className="v2-note">Loading saved reports…</p>:history.length?<div className="v2-reports">{history.map(item=><div className="v2-report-row" key={item.id}><div><strong>{item.title}</strong><small>{item.datasetName} · {Number(item.recordCount||0).toLocaleString()} records · {new Date(item.createdAt).toLocaleString()}</small>{item.summary&&<p>{item.summary.slice(0,220)}{item.summary.length>220?'…':''}</p>}</div><div className="v2-report-actions"><button className="v2-delete" title="Download aggregate snapshot" aria-label="Download aggregate snapshot" onClick={()=>exportSnapshot(item)}><Save size={14}/></button><button className="v2-delete" title={copy.delete} aria-label={copy.delete} onClick={()=>void deleteSnapshot(item.id)}><Trash2 size={14}/></button></div></div>)}</div>:<p className="v2-note">{copy.noHistory}</p>}
       </div>}
     </article>
+    <footer className="v2-project-footer" aria-label="Project resources">
+      <div className="v2-project-footer-copy">
+        <span className="v2-overline">INSIGHTBOARD · PROJECT RESOURCES</span>
+        <strong>Explore the project and its documentation</strong>
+        <small>Review the source code or open the project dossier for architecture, workflow and implementation notes.</small>
+      </div>
+      <div className="v2-project-footer-actions">
+        <a className="v2-project-link v2-project-link-primary" href="https://github.com/Dipayanhaldar/insightboard-dual-dataset" target="_blank" rel="noopener noreferrer">
+          <Github size={17} aria-hidden="true" /><span>View on GitHub</span><ExternalLink size={13} aria-hidden="true" />
+        </a>
+        <span className="v2-project-dossier-group">
+          <a className="v2-project-link v2-project-link-secondary" href="https://github.com/Dipayanhaldar/insightboard-dual-dataset" target="_blank" rel="noopener noreferrer" aria-label="Open InsightBoard GitHub repository" title="Open GitHub repository">
+            <Github size={17} aria-hidden="true" />
+          </a>
+          <span className="v2-project-dossier-pending"><BookOpen size={16} aria-hidden="true" /><span><strong>Project dossier · Notion</strong><small>Public dossier link pending</small></span></span>
+        </span>
+      </div>
+    </footer>
   </section>;
 }
