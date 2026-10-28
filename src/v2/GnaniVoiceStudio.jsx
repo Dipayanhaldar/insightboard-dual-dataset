@@ -128,6 +128,30 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     if (sourceIsUploaded) void loadLocalizedSummary(nextLanguage);
   }
 
+  function playLocalPreview() {
+    setTtsError('');
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
+      setTtsError('Local browser speech is not supported in this browser. Use your own provider key for cloud speech.');
+      return;
+    }
+    const previewText = String(text || '').trim().slice(0, 500);
+    if (!previewText) {
+      setTtsError('Upload a dataset and wait for its local summary before playing a preview.');
+      return;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(previewText);
+      const langMap = { 'en-IN':'en-IN', 'hi-IN':'hi-IN', 'te-IN':'te-IN', 'ta-IN':'ta-IN', 'kn-IN':'kn-IN', 'ml-IN':'ml-IN', 'mr-IN':'mr-IN', 'bn-IN':'bn-IN', 'gu-IN':'gu-IN', 'pa-IN':'pa-IN' };
+      utterance.lang = langMap[ttsLanguage] || ttsLanguage;
+      utterance.rate = Number(speed);
+      utterance.onerror = () => setTtsError('The browser could not play this local voice. Check installed voices and language support, or use your own provider key.');
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setTtsError('The browser could not start local speech. Check browser/device voice support.');
+    }
+  }
+
   async function generateSpeech(event) {
     event.preventDefault();
     setTtsError('');
@@ -171,7 +195,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
         </div>
         <span className={'gnani-status ' + availability}>{availability === 'checking' ? 'CHECKING' : availability === 'ready' ? 'BYO KEY MODE' : availability === 'setup' ? 'API SETUP NEEDED' : 'API OFFLINE'}</span>
       </div>
-      <p className="v2-muted gnani-intro">Create speech from a local summary of your uploaded JSON/CSV dataset using your own Gnani API key.</p>
+      <p className="v2-muted gnani-intro">Preview with your device's browser voice, or generate cloud speech using your own Gnani API key. Browser preview depends on installed voices and may not work offline.</p>
 
       <div className="gnani-key-panel">
         <div className="gnani-key-heading"><KeyRound size={16} /><strong>Bring your own Gnani API key</strong><span>{gnaniKey ? 'KEY SET' : 'KEY REQUIRED'}</span></div>
@@ -200,6 +224,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
           <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
           <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / {'4,000'} characters</small></span><textarea maxLength={4000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? "Gnani summarizes your uploaded dataset in your selected speech language. Speech requests can contain up to 4,000 characters, subject to Gnani's current provider limits and your account/key quota. The original dataset is not changed." : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
           <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
+          <button className="v2-button secondary" type="button" onClick={playLocalPreview} disabled={summaryBusy || !text.trim()}><Volume2 size={15} /> Local browser preview (no API key)</button>
           <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || providerUnavailable || !sourceIsUploaded || !gnaniKey || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate Gnani speech'}</button>
           {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
           {audioUrl && <div className="gnani-audio-result"><div><CheckCircle2 size={16} /><strong>Speech generated</strong><span>MP3 audio · available for this session</span></div><audio controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio><a className="v2-button secondary gnani-download" href={audioUrl} download="gnani-timbre-speech.mp3"><Download size={14} /> Download MP3</a></div>}
