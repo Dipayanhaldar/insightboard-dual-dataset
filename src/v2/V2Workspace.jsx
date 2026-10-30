@@ -439,7 +439,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
           <a className="v2-project-link v2-project-link-secondary" href="https://github.com/Dipayanhaldar/insightboard-dual-dataset" target="_blank" rel="noopener noreferrer" aria-label="Open InsightBoard GitHub repository" title="Open GitHub repository">
             <Github size={17} aria-hidden="true" />
           </a>
-          <span className="v2-project-dossier-pending"><BookOpen size={16} aria-hidden="true" /><span><strong>Project dossier · Notion</strong><small>Public dossier link pending</small></span></span>
+          <a className="v2-project-link v2-project-link-secondary" href="https://dipayanproject.notion.site/Insideboard-InsightBoard-Complete-Project-Dossier-V1-V2-1-406a0f05cdd280c09762fef99e5c5d53" target="_blank" rel="noopener noreferrer" aria-label="Open InsightBoard project dossier in Notion" title="Open project dossier in Notion"><BookOpen size={17} aria-hidden="true" /></a>
         </span>
       </div>
     </footer>
