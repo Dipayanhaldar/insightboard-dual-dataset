@@ -337,7 +337,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
   return <section className="v2-workspace" aria-labelledby="v2-title">
     <div className="v2-heading">
       <div><div className="v2-eyebrow"><Sparkles size={15}/> V2 LAB · VERSION 2.0.2 BETA</div><h2 id="v2-title">{copy.title}</h2><p>{copy.subtitle}</p></div>
-      <a className="v2-button secondary" href="https://dipayanproject.notion.site/Insideboard-InsightBoard-Complete-Project-Dossier-V1-V2-1-406a0f05cdd280c09762fef99e5c5d53" target="_blank" rel="noopener noreferrer">Project dossier <ArrowUpRight size={14}/></a>
+      <a className="v2-button secondary" href="https://dipayanproject.notion.site/Insideboard-InsightBoard-Complete-Project-Dossier-V1-V2-1-406a0f05cdd280c09762fef99e5c5d53?source=copy_link" target="_blank" rel="noopener noreferrer">Project dossier <ArrowUpRight size={14}/></a>
       <label className="v2-language"><span>UI</span><select value={uiLanguage} onChange={event=>setUiLanguage(event.target.value)} aria-label="Workspace language"><option value="en">English</option><option value="hi">हिन्दी</option><option value="te">తెలుగు</option></select></label>
     </div>
       <div className="v2-account-panel v2-account-hero">
@@ -439,7 +439,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
           <a className="v2-project-link v2-project-link-secondary" href="https://github.com/Dipayanhaldar/insightboard-dual-dataset" target="_blank" rel="noopener noreferrer" aria-label="Open InsightBoard GitHub repository" title="Open GitHub repository">
             <Github size={17} aria-hidden="true" />
           </a>
-          <a className="v2-project-link v2-project-link-secondary" href="https://dipayanproject.notion.site/Insideboard-InsightBoard-Complete-Project-Dossier-V1-V2-1-406a0f05cdd280c09762fef99e5c5d53" target="_blank" rel="noopener noreferrer" aria-label="Open InsightBoard project dossier in Notion" title="Open project dossier in Notion"><BookOpen size={17} aria-hidden="true" /></a>
+          <a className="v2-project-link v2-project-link-secondary" href="https://dipayanproject.notion.site/Insideboard-InsightBoard-Complete-Project-Dossier-V1-V2-1-406a0f05cdd280c09762fef99e5c5d53?source=copy_link" target="_blank" rel="noopener noreferrer" aria-label="Open InsightBoard project dossier in Notion" title="Open project dossier in Notion"><BookOpen size={17} aria-hidden="true" /></a>
         </span>
       </div>
     </footer>
