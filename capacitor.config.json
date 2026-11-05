@@ -1,0 +1,8 @@
+{
+  "appId": "com.dipayan.insightboard",
+  "appName": "InsightBoard",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
