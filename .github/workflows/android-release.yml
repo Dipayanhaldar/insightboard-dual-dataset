@@ -1,0 +1,153 @@
+name: InsightBoard Android Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: insightboard-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android-release:
+    name: Build and publish signed Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a release tag on main
+        shell: bash
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Release tags must point to a commit already merged into main."
+            exit 1
+          fi
+
+      - name: Validate release version
+        id: version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Use stable semantic tags such as v2.0.3."
+            exit 1
+          fi
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if [[ "$PACKAGE_VERSION" != "$VERSION" ]]; then
+            echo "::error::package.json version ($PACKAGE_VERSION) must match tag ($VERSION)."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
+          echo "version_code=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Verify production API and Capacitor CORS
+        shell: bash
+        run: |
+          HEALTH="$(curl --fail --silent --show-error https://insightboard-v2-bsiu.onrender.com/api/health)"
+          echo "$HEALTH" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("status")=="ok" and d.get("database") is True, "Production API/database health check failed"'
+          curl --fail --silent --show-error -D - -o /dev/null -X OPTIONS https://insightboard-v2-bsiu.onrender.com/api/health -H 'Origin: https://localhost' -H 'Access-Control-Request-Method: GET' | grep -qi '^access-control-allow-origin: https://localhost'
+
+      - name: Install dependencies and build web app
+        env:
+          VITE_API_BASE_URL: https://insightboard-v2-bsiu.onrender.com
+        run: |
+          npm install --include=dev
+          npm run check:server
+          npm run build
+
+      - name: Create and sync Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Set Android version metadata
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.version }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re
+          path = pathlib.Path("android/app/build.gradle")
+          source = path.read_text()
+          source, count_code = re.subn(r'versionCode\s+\d+', f'versionCode {os.environ["VERSION_CODE"]}', source, count=1)
+          source, count_name = re.subn(r'versionName\s+"[^"]+"', f'versionName "{os.environ["VERSION_NAME"]}"', source, count=1)
+          if count_code != 1 or count_name != 1:
+              raise SystemExit("Could not safely set Android versionCode/versionName in generated Gradle file.")
+          path.write_text(source)
+          PY
+
+      - name: Build release APK
+        run: |
+          cd android
+          ./gradlew --no-daemon assembleRelease
+
+      - name: Require Android signing secrets
+        shell: bash
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing GitHub Actions secret for Android signing: $name. See RELEASE_PROCESS.md."
+              exit 1
+            fi
+          done
+
+      - name: Sign APK
+        id: sign
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Prepare versioned APK
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SIGNED_APK: ${{ steps.sign.outputs.signedReleaseFile }}
+        run: |
+          test -f "$SIGNED_APK"
+          mkdir -p release-assets
+          cp "$SIGNED_APK" "release-assets/InsightBoard-${VERSION}.apk"
+          sha256sum "release-assets/InsightBoard-${VERSION}.apk" > "release-assets/InsightBoard-${VERSION}.apk.sha256"
+
+      - name: Publish GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          name: InsightBoard v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            release-assets/InsightBoard-${{ steps.version.outputs.version }}.apk
+            release-assets/InsightBoard-${{ steps.version.outputs.version }}.apk.sha256
