@@ -7,8 +7,8 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 import * as XLSX from 'xlsx';
-import './styles.css';
 import './dashboard-redesign.css';
+import './styles.css';
 import V2Workspace from './v2/V2Workspace.jsx';
 
 const COLORS = ['#377dff','#26b5a8','#f5a623','#8b7cf6','#f06d9b','#65a5e8','#7e9b62','#ed8064'];
