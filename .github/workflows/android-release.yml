@@ -64,7 +64,16 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Verify production API and Capacitor CORS
+        shell: bash
+        run: |
+          HEALTH="$(curl --fail --silent --show-error https://insightboard-v2-bsiu.onrender.com/api/health)"
+          echo "$HEALTH" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d.get("status")=="ok" and d.get("database") is True, "Production API/database health check failed"'
+          curl --fail --silent --show-error -D - -o /dev/null -X OPTIONS https://insightboard-v2-bsiu.onrender.com/api/health -H 'Origin: https://localhost' -H 'Access-Control-Request-Method: GET' | grep -qi '^access-control-allow-origin: https://localhost'
+
       - name: Install dependencies and build web app
+        env:
+          VITE_API_BASE_URL: https://insightboard-v2-bsiu.onrender.com
         run: |
           npm install --include=dev
           npm run check:server
