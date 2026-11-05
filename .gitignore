@@ -16,3 +16,9 @@ server/.env.*
 !.env.example
 node_modules/
 dist/
+
+# Capacitor-generated Android project and signing material
+android/
+.gradle/
+*.jks
+*.keystore
