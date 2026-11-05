@@ -22,6 +22,24 @@ const distDirectory = path.resolve(__dirname, '../dist');
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+
+// Capacitor's bundled Android WebView calls the existing Render API cross-origin.
+// Keep the allowlist narrow; normal browser deployments remain same-origin.
+const capacitorOrigins = new Set(['https://localhost', 'capacitor://localhost']);
+app.use((req, res, next) => {
+  const origin = req.get('Origin');
+  if (origin && capacitorOrigins.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,X-Gnani-Api-Key');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
+  if (req.method === 'OPTIONS' && origin && capacitorOrigins.has(origin)) {
+    return res.sendStatus(204);
+  }
+  return next();
+});
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
