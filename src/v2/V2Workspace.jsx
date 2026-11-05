@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiFetch } from '../api.js';
 import { AlertTriangle, CheckCircle2, History, RefreshCw, Save, Sparkles, Trash2, ShieldCheck, LogIn, UserPlus, LogOut, Database, KeyRound, ArrowUpRight, Github, BookOpen, ExternalLink } from 'lucide-react';
 import './V2Workspace.css';
 import GnaniVoiceStudio from './GnaniVoiceStudio.jsx';
@@ -108,7 +109,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     if(!token){setHistory([]);return;}
     setReportsBusy(true);
     try {
-      const response=await fetch('/api/reports',{headers:{Authorization:`Bearer ${token}`}});
+      const response=await apiFetch('/api/reports',{headers:{Authorization:`Bearer ${token}`}});
       const result=await response.json().catch(()=>({}));
       if(response.status===401){
         try{sessionStorage.removeItem('insightboard-api-token');}catch{}
@@ -132,7 +133,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     const controller=new AbortController();
     const requestTimeout=setTimeout(()=>controller.abort(),60000);
     try {
-      const response=await fetch('/api/auth/'+(authMode==='register'?'register':'login'),{
+      const response=await apiFetch('/api/auth/'+(authMode==='register'?'register':'login'),{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({email:cleanEmail,password}),
@@ -166,7 +167,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
 
   useEffect(()=>{
     let alive=true;
-    fetch('/api/health').then(async response=>{
+    apiFetch('/api/health').then(async response=>{
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(data.error||'Database not ready');
       return data;
@@ -176,7 +177,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
   },[]);
   useEffect(()=>{
     let alive=true;
-    fetch('/api/ai/status').then(async response=>{
+    apiFetch('/api/ai/status').then(async response=>{
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(data.error||'AI status unavailable');
       return data;
@@ -191,7 +192,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     if(!authToken){setAccount(null);setHistory([]);return ()=>{alive=false;};}
     (async()=>{
       try {
-        const response=await fetch('/api/auth/me',{headers:{Authorization:`Bearer ${authToken}`}});
+        const response=await apiFetch('/api/auth/me',{headers:{Authorization:`Bearer ${authToken}`}});
         const data=await response.json().catch(()=>({}));
         if(response.status===401){
           try{sessionStorage.removeItem('insightboard-api-token');}catch{}
@@ -264,7 +265,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
         }
         result={summary:(result?.candidates?.[0]?.content?.parts||[]).map(part=>typeof part.text==='string'?part.text:'').join('\n').trim()};
       } else {
-        response=await fetch('/api/ai/summary',{
+        response=await apiFetch('/api/ai/summary',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({snapshot:analytics,language:summaryLanguage})
@@ -298,7 +299,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     };
     setReportSaveBusy(true);setMessage('');
     try {
-      const response=await fetch('/api/reports',{
+      const response=await apiFetch('/api/reports',{
         method:'POST',
         headers:{'Content-Type':'application/json',Authorization:`Bearer ${authToken}`},
         body:JSON.stringify(entry)
@@ -314,7 +315,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
   async function deleteSnapshot(id) {
     if(!authToken)return;
     try {
-      const response=await fetch('/api/reports/'+encodeURIComponent(id),{method:'DELETE',headers:{Authorization:`Bearer ${authToken}`}});
+      const response=await apiFetch('/api/reports/'+encodeURIComponent(id),{method:'DELETE',headers:{Authorization:`Bearer ${authToken}`}});
       const result=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(result.error||'Could not delete the report.');
       await fetchReports(authToken);setMessage('Saved report deleted from your account.');
@@ -325,7 +326,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     if(!authToken||!history.length)return;
     if(!window.confirm('Delete all saved reports from this account? This cannot be undone.'))return;
     try {
-      const response=await fetch('/api/reports',{method:'DELETE',headers:{Authorization:`Bearer ${authToken}`}});
+      const response=await apiFetch('/api/reports',{method:'DELETE',headers:{Authorization:`Bearer ${authToken}`}});
       const result=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(result.error||'Could not clear report history.');
       setHistory([]);setMessage(copy.cleared);

@@ -1,7 +1,7 @@
 {
   "name": "insightboard-schema-aware",
   "private": true,
-  "version": "2.0.2-beta.1",
+  "version": "2.0.3",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -9,7 +9,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "start": "node server/index.js",
     "dev:api": "node --watch server/index.js",
-    "check:server": "node --check server/index.js"
+    "check:server": "node --check server/index.js",
+    "cap:sync": "cap sync android",
+    "cap:open": "cap open android"
   },
   "dependencies": {
     "jspdf": "^3.0.1",
@@ -26,11 +28,14 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.9.5"
+    "mongoose": "^8.9.5",
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.7"
+    "vite": "^6.0.7",
+    "@capacitor/cli": "8.6.0"
   },
   "description": "InsightBoard V2 with Node.js/Express API, MongoDB-backed account reports and browser-side analytics",
   "engines": {

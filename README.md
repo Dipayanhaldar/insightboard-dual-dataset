@@ -22,6 +22,18 @@ The feature/insightboard-v2.0.1.1 branch adds Node.js + Express, MongoDB account
 
 **The AI API Provider Hub uses BYOK.** Provider keys are held in browser session storage and forwarded to the selected provider for a request. InsightBoard does not store those keys in MongoDB. The hub supports text/chat calls only; it is not a complete integration of every provider's audio, image, video, embedding or fine-tuning APIs. Model IDs, availability and pricing can change; see the links in the hub and setup guide.
 
+
+## Android app and GitHub releases
+
+The project includes Capacitor Android packaging. The Android app bundles the Vite frontend and calls the existing Express API on Render using `VITE_API_BASE_URL`; MongoDB remains on the configured MongoDB Atlas connection. The native app does not host a second backend or database.
+
+- App ID: `com.dipayan.insightboard`
+- Capacitor web output: `dist`
+- Android debug build is checked by GitHub Actions on feature-branch pushes.
+- Every stable version tag (`vMAJOR.MINOR.PATCH`) triggers a signed APK build and publishes the APK plus SHA-256 checksum to GitHub Releases.
+- Configure the four Android signing secrets before the first release. See [ANDROID_RELEASE_AUTOMATION.md](./ANDROID_RELEASE_AUTOMATION.md).
+- The release workflow verifies that production Render API/database health and Android CORS are ready. It never deploys Render.
+
 ## Run the frontend locally
 1. Install Node.js 22 or newer.
 2. Run npm install.

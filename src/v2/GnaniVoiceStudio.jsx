@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { apiFetch } from '../api.js';
 import {
   AlertTriangle, CheckCircle2, Download, Headphones, KeyRound,
   Languages, RefreshCw, ShieldCheck, Volume2, Wand2
@@ -53,7 +54,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
 
   useEffect(() => {
     let active = true;
-    fetch('/api/voice/status', { headers: { Accept: 'application/json' } })
+    apiFetch('/api/voice/status', { headers: { Accept: 'application/json' } })
       .then(response => response.ok ? response.json() : Promise.reject(new Error('Voice status is unavailable.')))
       .then(data => { if (active) setAvailability(data.available && data.requiresUserKey ? 'ready' : 'setup'); })
       .catch(() => { if (active) setAvailability('offline'); });
@@ -165,7 +166,7 @@ export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], da
     try {
       const headers = { 'Content-Type': 'application/json' };
       const endpoint = '/api/voice/tts'; headers['X-Gnani-Api-Key'] = gnaniKey;
-      const response = await fetch(endpoint, {
+      const response = await apiFetch(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify({ text: text.trim(), language: ttsLanguage, voice: voice, speed: Number(speed) })

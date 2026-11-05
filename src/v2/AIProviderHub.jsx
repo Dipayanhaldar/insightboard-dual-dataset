@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { apiFetch } from '../api.js';
 import { AlertTriangle, ArrowUpRight, CheckCircle2, Cpu, KeyRound, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import './AIProviderHub.css';
 
@@ -147,7 +148,7 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
 
     setBusy(true);
     try {
-      const response = await fetch('/api/ai/provider', {
+      const response = await apiFetch('/api/ai/provider', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
