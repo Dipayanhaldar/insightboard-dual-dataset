@@ -11,7 +11,9 @@ This file converts the product blueprint into reviewable work.
 - [x] Add `/api/health/live` for process liveness without changing the legacy `/api/health` contract.
 - [x] Add `/api/health/ready` with HTTP 503 while MongoDB is unavailable.
 - [x] Add `/api/version` for release/version checks; commit SHA is populated when the host exposes a supported commit environment variable.
-- [ ] Add automated tests for probe status codes and response contracts.
+- [x] Add automated tests for probe status codes and response contracts.
+- [x] Export the Express app without opening a listener on import, enabling test and adapter reuse.
+- [x] Exempt infrastructure probes from the general API rate limiter so health checks are not blocked by user traffic.
 
 ## Epic 1 — Conversation API
 - [ ] Define validated request/response schemas.
