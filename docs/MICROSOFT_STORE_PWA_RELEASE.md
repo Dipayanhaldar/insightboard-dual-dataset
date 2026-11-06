@@ -20,7 +20,7 @@ Proposed Microsoft Store display name: **InsightBoard VDB By Dipayan**
 
 The Store package is designed as an online-first PWA with a useful offline mode after the first successful online launch:
 
-- The bundled dashboard sample, client-side filtering/charts, CSV/JSON file import and supported exports run in the browser and can work offline once the app shell and bundles have been cached.
+- Client-side filtering/charts, CSV/JSON file import and supported exports run in the browser and can work offline once the app shell and bundles have been cached.
 - Imported file rows are held in the active app session; do not claim that imported datasets persist after the app is closed unless a separate persistence feature is implemented and tested.
 - External Blackcoffer dataset loading requires internet access.
 - Account registration/sign-in, MongoDB saved reports, cloud sync, AI providers and voice providers require internet access and their respective backend/provider services.
