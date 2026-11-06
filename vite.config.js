@@ -7,7 +7,8 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version || 'dev')
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    manifest: 'asset-manifest.json'
   },
   server: {
     proxy: {
