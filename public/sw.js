@@ -18,16 +18,14 @@ self.addEventListener('install', event => {
     await cache.put(APP_SHELL_URL, shellResponse.clone());
     await cache.addAll(PRECACHE_URLS);
 
-    // Vite emits the complete production asset graph. Pre-cache JS/CSS entry
-    // files and lazy chunks so the first successful online launch is enough
-    // to make the app shell usable offline after installation completes.
+    // Pre-cache all production JS/CSS bundles, including lazy chunks.
     const manifestResponse = await fetch(ASSET_MANIFEST_URL, { cache: 'no-store' });
     if (!manifestResponse.ok) throw new Error('Unable to fetch the production asset manifest');
     const assetManifest = await manifestResponse.json();
     const assets = [...new Set(Object.values(assetManifest).flatMap(entry => [
       entry.file,
       ...(entry.css || [])
-    ]).filter(file => typeof file === 'string' && /\\.(?:js|css)$/.test(file))
+    ]).filter(file => typeof file === 'string' && /\.(?:js|css)$/.test(file))
       .map(file => file.startsWith('/') ? file : '/' + file))];
     if (assets.length) await cache.addAll(assets);
     await self.skipWaiting();
