@@ -195,6 +195,37 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// Infrastructure probes: keep the legacy /api/health response unchanged.
+// Liveness answers whether this process is running; readiness answers whether
+// it can safely receive requests that depend on MongoDB.
+app.get('/api/health/live', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.status(200).json({ status: 'alive', service: 'InsightBoard V2 API' });
+});
+
+app.get('/api/health/ready', (_req, res) => {
+  const ready = databaseReady();
+  res.set('Cache-Control', 'no-store');
+  return res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    database: ready,
+    service: 'InsightBoard V2 API'
+  });
+});
+
+// Used by deployment smoke tests to verify both origins run the same release.
+app.get('/api/version', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json({
+    service: 'InsightBoard V2 API',
+    version: process.env.npm_package_version || 'unknown',
+    commit: process.env.GIT_COMMIT_SHA
+      || process.env.RENDER_GIT_COMMIT
+      || process.env.VERCEL_GIT_COMMIT_SHA
+      || null
+  });
+});
+
 app.get('/api/ai/status', (_req, res) => {
   res.json({ available: Boolean(GEMINI_API_KEY), model: GEMINI_MODEL });
 });
