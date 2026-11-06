@@ -1,6 +1,6 @@
-const CACHE_NAME = 'insightboard-shell-v1';
+const CACHE_NAME = 'insightboard-shell-v2';
 const OFFLINE_URL = '/offline.html';
-const PRECACHE_URLS = [OFFLINE_URL, '/manifest.webmanifest', '/icons/insightboard.svg'];
+const PRECACHE_URLS = [OFFLINE_URL, '/manifest.webmanifest', '/icons/insightboard.svg', '/icons/insightboard-192.png', '/icons/insightboard-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
