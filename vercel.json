@@ -4,5 +4,12 @@
     "deploymentEnabled": {
       "feature/insightboard-v2.0.1.1": false
     }
+  },
+  "framework": "express",
+  "buildCommand": "npm run build:vercel",
+  "functions": {
+    "index.js": {
+      "includeFiles": "public/index.html"
+    }
   }
 }
