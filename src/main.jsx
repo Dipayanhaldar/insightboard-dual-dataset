@@ -11,6 +11,7 @@ import './dashboard-redesign.css';
 import './styles.css';
 import V2Workspace from './v2/V2Workspace.jsx';
 import DatasetCompare from './v2/DatasetCompare.jsx';
+import ReleaseCenter from './v2/ReleaseCenter.jsx';
 
 const COLORS = ['#377dff','#26b5a8','#f5a623','#8b7cf6','#f06d9b','#65a5e8','#7e9b62','#ed8064'];
 const BLACKCOFFER_URL = 'https://raw.githubusercontent.com/rockyhans/blackcoffer_submission/main/backend/jsondata.json';
@@ -108,7 +109,7 @@ function App(){
    <section className="table-panel"><div className="table-head"><div><h2>Imported records</h2><p>Table columns come directly from the current file.</p></div><div className="table-tools"><span className="small-muted">Rows</span><select value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(1)}}><option value={10}>10</option><option value={25}>25</option><option value={50}>50</option></select><button className="btn btn-light compact" onClick={exportExcel}><FileSpreadsheet size={15}/> Excel</button><button className="btn btn-light compact" onClick={exportCSV}><Download size={15}/> CSV</button></div></div>
     <div className="table-scroll"><table><thead><tr>{fields.slice(0,12).map(key=><th key={key}><button className="sort-btn" onClick={()=>setSort(p=>({key,dir:p.key===key&&p.dir==='asc'?'desc':'asc'}))}>{nice(key)}{sort.key===key?(sort.dir==='asc'?' ↑':' ↓'):''}</button></th>)}</tr></thead><tbody>{pageRows.map((r,i)=><tr key={r._insightboard_id??i}>{fields.slice(0,12).map(key=><td key={key} className={key===fields[0]?'title-cell':''} title={String(r[key]??'')}>{r[key]===null||r[key]===undefined?'—':typeof r[key]==='object'?JSON.stringify(r[key]):String(r[key])}</td>)}</tr>)}</tbody></table></div>
     <div className="table-foot"><span>Showing {filtered.length?((page-1)*pageSize+1):0}–{Math.min(page*pageSize,filtered.length)} of {filtered.length.toLocaleString()} records</span><div className="pagination"><button disabled={page<=1} onClick={()=>setPage(p=>p-1)}>Previous</button><span>Page {page} of {pageCount}</span><button disabled={page>=pageCount} onClick={()=>setPage(p=>p+1)}>Next</button></div></div>
-   </section><footer>InsightBoard <span>·</span> Schema-aware data visualization <span>·</span> {new Date().getFullYear()}</footer></div></main></div>
+   </section><footer className="app-footer"><span>InsightBoard · Schema-aware data visualization · {new Date().getFullYear()}</span><ReleaseCenter /></footer></div></main></div>
 }
 function Kpi({icon,label,value,sub,color}){return <div className="kpi-card"><div className={`kpi-icon ${color}`}>{icon}</div><div className="kpi-label">{label}</div><div className="kpi-value">{value}</div><div className="kpi-sub">{sub}</div></div>}
 function ChartCard({title,subtitle,children}){return <div className="chart-card"><div className="chart-card-head"><div><h3>{title}</h3><p>{subtitle}</p></div><button className="chart-menu" title="Chart visualization"><BarChart3 size={17}/></button></div><div className="chart-body">{children}</div></div>}
