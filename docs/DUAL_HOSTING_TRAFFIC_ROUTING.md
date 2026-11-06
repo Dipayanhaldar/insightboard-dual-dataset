@@ -1,6 +1,6 @@
 # Dual Hosting, Traffic Distribution and Failover
 
-Status: architecture decision for future implementation
+Status: architecture decision; first health/version probe endpoints implemented on the feature branch
 Scope: preserve the current InsightBoard experience and add hosting resilience without removing existing features.
 
 ## 1. Product compatibility rule
@@ -168,4 +168,4 @@ The dual-hosting feature is not complete until:
 
 ## 12. Current state
 
-This document is a design and implementation requirement only. No DNS, Cloudflare Load Balancer, Vercel project, Render service, production environment variables, traffic weights or production routing have been changed. The existing production deployment remains untouched.
+This document remains the architecture requirement; no dual-origin hosting or traffic routing has been enabled. The feature branch now adds `/api/health/live`, `/api/health/ready`, and `/api/version` while preserving the legacy `/api/health` route. Readiness currently checks MongoDB connectivity only; additional critical dependencies must be added to the readiness contract when introduced. No DNS, Cloudflare Load Balancer, Vercel project, Render service, production environment variables, traffic weights or production routing have been changed. The existing production deployment remains untouched.
