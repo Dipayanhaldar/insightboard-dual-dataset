@@ -103,7 +103,7 @@ const MONGODB_URI = process.env.MONGODB_URI || '';
 const DATABASE_OPTIONS = {
   dbName: process.env.MONGODB_DATABASE || 'insightboard_v2',
   authSource: process.env.MONGODB_AUTH_SOURCE || 'admin',
-  serverSelectionTimeoutMS: Number(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS) || 8000
+  serverSelectionTimeoutMS: Number(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS) || 5000
 };
 let databaseConnectionPromise = null;
 let databaseRetryAfter = 0;
