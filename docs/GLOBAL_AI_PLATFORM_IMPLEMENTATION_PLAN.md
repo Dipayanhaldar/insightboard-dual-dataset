@@ -65,3 +65,14 @@ This file converts the product blueprint into reviewable work.
 - [ ] Provider pricing and budget verified.
 - [ ] Android app listing assets and compliance declarations.
 - [ ] Production promotion PR reviewed and approved.
+
+## Epic 7 — Hosting portability foundation
+- [x] Export the existing Express application from a Vercel-recognized root entrypoint.
+- [x] Configure the Vercel Express framework and include the SPA entry document in the function bundle.
+- [x] Build Vite assets into Vercel's `public/` CDN directory.
+- [x] Preserve the Render `dist/` build and Express static serving path.
+- [x] Add on-demand MongoDB connection reuse for serverless requests.
+- [x] Validate both build modes in GitHub Actions.
+- [ ] Verify a Vercel preview deployment serves SPA routes, static assets and API endpoints correctly.
+- [ ] Verify the same release commit on Render staging.
+- [ ] Complete shared storage, distributed rate limits and full-origin parity tests.
