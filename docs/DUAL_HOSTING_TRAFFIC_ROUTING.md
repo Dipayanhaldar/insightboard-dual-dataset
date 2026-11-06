@@ -98,13 +98,13 @@ The current app is Vite + Express and Render starts it as a single Node service.
 
 Before dual-origin load balancing:
 1. Separate API route logic from the Express transport adapter.
-2. Create a Vercel-compatible serverless/function adapter for the same API handlers, or choose a portable deployment mode that can run the complete app on both providers.
-3. Keep streaming behavior compatible on both platforms and verify timeouts/connection limits.
-4. Move uploads and generated files to shared object storage.
-5. Move rate limiting and usage counters to shared storage.
-6. Add `/api/health/live` and `/api/health/ready`; readiness must verify dependencies needed to serve traffic.
-7. Add a release/version endpoint such as `/api/version` returning commit SHA and build ID.
-8. Verify both origins return the same API contract and feature set.
+2. Export the same Express app from a Vercel-recognized root entrypoint and configure the Vercel Express runtime.
+3. Build Vite assets into Vercel's `public/` CDN directory while retaining Render's `dist/` output.
+4. Keep streaming behavior compatible on both platforms and verify timeouts/connection limits.
+5. Move uploads and generated files to shared object storage.
+6. Move rate limiting and usage counters to shared storage.
+7. Add `/api/health/live` and `/api/health/ready`; readiness must verify dependencies needed to serve traffic.
+8. Add a release/version endpoint such as `/api/version` returning commit SHA and build ID.
 
 Do not add a load balancer until these portability and parity checks pass.
 
@@ -168,4 +168,4 @@ The dual-hosting feature is not complete until:
 
 ## 12. Current state
 
-This document remains the architecture requirement; no dual-origin hosting or traffic routing has been enabled. The feature branch now adds `/api/health/live`, `/api/health/ready`, and `/api/version` while preserving the legacy `/api/health` route. The Express app is exported without starting a listener on import, and infrastructure probes bypass the general API rate limiter. MongoDB connections are now created on demand for readiness checks and database-backed routes, with one in-flight connection attempt per warm process and a short retry cooldown after failures. Standalone Render-style startup still initiates the same shared connection routine. Automated Node tests cover liveness, disconnected-database readiness, the legacy health response and version metadata; CI runs these tests. Readiness currently checks MongoDB connectivity only; additional critical dependencies must be added to the readiness contract when introduced. This is preparation for adapter reuse, not yet a Vercel serverless adapter or a production-ready dual-host deployment. No DNS, Cloudflare Load Balancer, Vercel project, Render service, production environment variables, traffic weights or production routing have been changed. The existing production deployment remains untouched.
+This document remains the architecture requirement; no dual-origin hosting or traffic routing has been enabled. The feature branch now adds `/api/health/live`, `/api/health/ready`, and `/api/version` while preserving the legacy `/api/health` route. The Express app is exported without starting a listener on import, and infrastructure probes bypass the general API rate limiter. MongoDB connections are now created on demand for readiness checks and database-backed routes, with one in-flight connection attempt per warm process and a short retry cooldown after failures. Standalone Render-style startup still initiates the same shared connection routine. Automated Node tests cover liveness, disconnected-database readiness, the legacy health response and version metadata; CI runs these tests. Readiness currently checks MongoDB connectivity only; additional critical dependencies must be added to the readiness contract when introduced. This branch now also includes a root-level Express entrypoint for Vercel, Vercel Express framework configuration, and a dedicated Vercel build that writes frontend assets to `public/` for Vercel's CDN. Render's normal build continues to write `dist/` and use Express static middleware. On Vercel, Express static middleware is disabled and the SPA entry document is served from the included `public/index.html`; Vercel serves public assets from its CDN. The Vercel function reuses the same Express app and on-demand MongoDB connection routine. CI is configured to run both Render and Vercel frontend builds. This is code-level portability preparation, not yet proof of a successful deployment in the connected Vercel project or a production-ready dual-host deployment. No DNS, Cloudflare Load Balancer, Vercel project, Render service, production environment variables, traffic weights or production routing have been changed. The existing production deployment remains untouched.
