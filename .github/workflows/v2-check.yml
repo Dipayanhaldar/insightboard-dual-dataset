@@ -21,3 +21,5 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run build:vercel
+      - name: Verify Vercel SPA entry document
+        run: node -e "if (!require('node:fs').existsSync('public/index.html')) process.exit(1)"
