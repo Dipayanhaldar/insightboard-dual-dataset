@@ -29,7 +29,7 @@ The Store package is designed as an online-first PWA with a useful offline mode 
 
 ## Important limitations
 
-- The offline mode requires one successful online launch to cache the app shell and hashed JS/CSS bundles.
+- The offline mode requires one successful online launch. The service worker pre-caches the production JavaScript/CSS asset graph during installation; wait for service-worker installation to complete before disconnecting.
 - No Windows MSIX bundle has been generated or signed in this repository.
 - The proposed display name is not reserved until it is successfully reserved in Partner Center.
 - The privacy notice must be reviewed against the final production data flows and populated with a real, monitored support contact before submission.
