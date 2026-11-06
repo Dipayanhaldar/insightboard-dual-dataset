@@ -307,3 +307,6 @@ html[data-theme="dark"] .dataset-brand{background:rgba(255,255,255,.075)}
  .topbar{background:rgba(8,13,34,.82)}
 }
 @media(prefers-reduced-motion:reduce){.app-shell:after{animation:none}}
+
+/* Keep workspace anchor navigation visually consistent with sidebar items. */
+.sidebar a.nav-item{text-decoration:none}
