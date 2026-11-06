@@ -110,3 +110,13 @@ Avoid vanity metrics such as raw page views without activation or retention cont
 6. CI build and automated tests pass.
 7. Render staging is smoke-tested before any production promotion.
 8. Production main, the Stage 2 branch and existing production services remain untouched until separately approved.
+
+
+## Infrastructure readiness — balanced, free-first
+- [x] Add configurable bounded MongoDB pool settings with conservative defaults.
+- [x] Add API request correlation IDs and privacy-conscious request metadata logs.
+- [x] Add graceful shutdown handling for Render process termination.
+- [x] Document the staged scaling architecture, current free-tier limits and no-paid-resource policy in [SCALABLE_INFRASTRUCTURE_PLAN.md](SCALABLE_INFRASTRUCTURE_PLAN.md).
+- [ ] Complete staging database/auth configuration and user-journey smoke tests.
+- [ ] Complete cross-user authorization tests before public multi-user promotion.
+- [ ] Implement shared rate limiting and shared storage only when a free, reliable option is selected or paid-resource approval is explicitly granted.
