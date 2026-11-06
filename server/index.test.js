@@ -30,6 +30,7 @@ test('liveness probe is available without a database connection', async () => {
   assert.equal(body.status, 'alive');
   assert.equal(body.service, 'InsightBoard V2 API');
   assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.match(response.headers.get('x-request-id') || '', /^[0-9a-f-]{36}$/i);
 });
 
 test('readiness probe returns 503 while MongoDB is disconnected', async () => {
