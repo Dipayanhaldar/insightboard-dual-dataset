@@ -67,6 +67,8 @@ This file converts the product blueprint into reviewable work.
 - [ ] Production promotion PR reviewed and approved.
 
 ## Epic 7 — Render-first deployment foundation
+- [x] Add bounded MongoDB pool configuration, request IDs, privacy-conscious API request logs and graceful process shutdown.
+- [x] Document balanced free-first scaling stages and hard no-paid-resource guardrails in `docs/SCALABLE_INFRASTRUCTURE_PLAN.md`.
 - [x] Keep Render as the active deployment target for this release train.
 - [x] Preserve the existing Render dist build and Express static-serving path.
 - [x] Add on-demand MongoDB connection reuse and liveness/readiness/version probes.
