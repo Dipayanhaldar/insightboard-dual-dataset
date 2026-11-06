@@ -49,3 +49,6 @@ jobs:
 
       - name: Build frontend for Render
         run: npm run build
+
+      - name: Verify offline production asset cache
+        run: npm run check:pwa:build
