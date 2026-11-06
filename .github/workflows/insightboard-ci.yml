@@ -36,6 +36,11 @@ jobs:
       - name: Install dependencies
         run: npm install --include=dev
 
+      - name: Validate PWA package prerequisites
+        run: |
+          node --check public/sw.js
+          node scripts/validate-pwa.mjs
+
       - name: Check server syntax
         run: npm run check:server
 
