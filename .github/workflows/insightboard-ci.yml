@@ -41,5 +41,8 @@ jobs:
       - name: Run API tests
         run: npm test
 
-      - name: Build frontend
+      - name: Build frontend for Render
         run: npm run build
+
+      - name: Build frontend for Vercel CDN
+        run: npm run build:vercel
