@@ -97,15 +97,48 @@ const Report = mongoose.models.Report || mongoose.model('Report', reportSchema);
 const asyncRoute = handler => (req, res, next) =>
   Promise.resolve(handler(req, res, next)).catch(next);
 
+const MONGODB_URI = process.env.MONGODB_URI || '';
+const DATABASE_OPTIONS = {
+  dbName: process.env.MONGODB_DATABASE || 'insightboard_v2',
+  authSource: process.env.MONGODB_AUTH_SOURCE || 'admin',
+  serverSelectionTimeoutMS: Number(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS) || 8000
+};
+let databaseConnectionPromise = null;
+let databaseRetryAfter = 0;
+
 function databaseReady() {
   return mongoose.connection.readyState === 1;
 }
-function requireDatabase(req, res, next) {
+
+// Reuse one connection attempt per warm process. A short cooldown prevents
+// repeated requests from creating a connection storm while MongoDB is down.
+async function ensureDatabaseConnection() {
+  if (databaseReady()) return true;
+  if (!MONGODB_URI) return false;
+  if (databaseConnectionPromise) return databaseConnectionPromise;
+  if (Date.now() < databaseRetryAfter) return false;
+
+  databaseConnectionPromise = mongoose.connect(MONGODB_URI, DATABASE_OPTIONS)
+    .then(() => databaseReady())
+    .catch(error => {
+      console.error('MongoDB connection failed:', error.message);
+      return false;
+    })
+    .finally(() => {
+      databaseConnectionPromise = null;
+      if (!databaseReady()) databaseRetryAfter = Date.now() + 5000;
+    });
+
+  return databaseConnectionPromise;
+}
+
+const requireDatabase = asyncRoute(async (_req, res, next) => {
+  if (!databaseReady()) await ensureDatabaseConnection();
   if (!databaseReady()) {
     return res.status(503).json({ error: 'The database is not connected yet. Please retry shortly.' });
   }
   next();
-}
+});
 function safeText(value, maximum = 120) {
   return typeof value === 'string' ? value.trim().slice(0, maximum) : '';
 }
@@ -203,7 +236,8 @@ app.get('/api/health/live', (_req, res) => {
   return res.status(200).json({ status: 'alive', service: 'InsightBoard V2 API' });
 });
 
-app.get('/api/health/ready', (_req, res) => {
+app.get('/api/health/ready', asyncRoute(async (_req, res) => {
+  if (!databaseReady()) await ensureDatabaseConnection();
   const ready = databaseReady();
   res.set('Cache-Control', 'no-store');
   return res.status(ready ? 200 : 503).json({
@@ -211,7 +245,7 @@ app.get('/api/health/ready', (_req, res) => {
     database: ready,
     service: 'InsightBoard V2 API'
   });
-});
+}));
 
 // Used by deployment smoke tests to verify both origins run the same release.
 app.get('/api/version', (_req, res) => {
@@ -661,13 +695,10 @@ const isDirectExecution = process.argv[1]
   && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 
 if (isDirectExecution) {
-  if (process.env.MONGODB_URI) {
-    mongoose.connect(process.env.MONGODB_URI, {
-      dbName: process.env.MONGODB_DATABASE || 'insightboard_v2',
-      authSource: process.env.MONGODB_AUTH_SOURCE || 'admin',
-      serverSelectionTimeoutMS: 15000
-    }).then(() => console.log('MongoDB connected.'))
-      .catch(error => console.error('MongoDB connection failed:', error.message));
+  if (MONGODB_URI) {
+    ensureDatabaseConnection().then(ready => {
+      if (ready) console.log('MongoDB connected.');
+    });
   } else {
     console.warn('MONGODB_URI is not set; API account/report routes will remain unavailable.');
   }
