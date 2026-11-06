@@ -10,16 +10,26 @@ Proposed Microsoft Store display name: **InsightBoard VDB By Dipayan**
 - Standalone display mode
 - Theme and background colors
 - Raster PNG app icons at 192x192 and 512x512, plus scalable SVG fallback
-- Service worker with a network-first navigation strategy and offline fallback
+- Service worker pre-caches the app shell, offline page, manifest and icons
+- Vite JS/CSS/media bundles are cached after first successful online use
+- Offline navigation falls back to the cached app shell, then the dedicated offline page
 - API requests are deliberately excluded from service-worker caching
-- Static assets under `/assets/` and `/icons/` use cache-first with network fill
 - Privacy notice: `/privacy.html`
+
+## Offline capability and boundaries
+
+The Store package is designed as an online-first PWA with a useful offline mode after the first successful online launch:
+
+- The bundled dashboard sample, client-side filtering/charts, CSV/JSON file import and supported exports run in the browser and can work offline once the app shell and bundles have been cached.
+- Imported file rows are held in the active app session; do not claim that imported datasets persist after the app is closed unless a separate persistence feature is implemented and tested.
+- External Blackcoffer dataset loading requires internet access.
+- Account registration/sign-in, MongoDB saved reports, cloud sync, AI providers and voice providers require internet access and their respective backend/provider services.
+- Service-worker caching is limited to same-origin app assets and navigation shell. API/authentication/private report responses are never cached.
+- Offline capability is not a substitute for a healthy production API. Cloud features must display a clear unavailable state rather than silently failing.
 
 ## Important limitations
 
-- The offline page is a connectivity fallback, not offline analytics. Account, database, AI-provider and saved-report operations require the hosted service and/or their external providers.
-- The service worker does not cache API responses, authentication responses, user datasets or private reports.
-- The manifest currently uses a scalable SVG icon. Before generating a Store package, run PWA Builder's report card and add raster PNG icons (at minimum 192x192 and 512x512, plus maskable artwork) if its current Windows packaging validation requires them.
+- The offline mode requires one successful online launch to cache the app shell and hashed JS/CSS bundles.
 - No Windows MSIX bundle has been generated or signed in this repository.
 - The proposed display name is not reserved until it is successfully reserved in Partner Center.
 - The privacy notice must be reviewed against the final production data flows and populated with a real, monitored support contact before submission.
@@ -28,19 +38,18 @@ Proposed Microsoft Store display name: **InsightBoard VDB By Dipayan**
 
 1. Confirm the Partner Center developer account and reserve the unique product name.
 2. Obtain the exact Package ID, Publisher ID and Publisher display name from Partner Center > Product identity.
-3. Configure and smoke-test the feature-branch staging backend, including MongoDB and JWT settings. Never place secrets in source control.
+3. Configure and smoke-test the intended production backend. The staging MongoDB authentication issue must not be hidden or represented as fixed by offline mode.
 4. Run PWA Builder against the intended public HTTPS origin and resolve all required report-card action items.
 5. Generate the Windows MSIX bundle and classic AppX bundle using the exact Partner Center identity values.
-6. Install and test the generated package on a clean supported Windows environment. Verify launch, navigation, sign-in, imports, exports, saved reports, AI BYOK flows, links, and offline fallback.
+6. Install and test the generated package on a clean supported Windows environment. Verify first online launch, offline relaunch, local CSV/JSON import, charts, filters, exports, online-only feature messaging, sign-in and cloud features after reconnecting.
 7. Complete Store listing assets, category, pricing (free), markets, age rating, privacy URL and support contact.
-8. Submit through Partner Center. Microsoft states certification can take up to three business days.
+8. Submit through Partner Center only after the publisher reviews the final package and listing and explicitly authorizes submission.
 
 ## Protected environments
 
 - Work only on `feature/global-ai-platform-foundation` until explicitly approved.
 - Do not merge PR #12, modify `main`, alter the production Render service, or modify Stage 2 as part of this preparation.
 - Do not package the staging URL as the public Store app. The final package must point at the approved production origin after production readiness and release approval.
-
 
 ## Continuous release and version policy
 
@@ -76,7 +85,6 @@ For a Windows package release:
 3. Generate and install-test both package formats as required by the current Store flow.
 4. Submit the new package through Partner Center only after user approval.
 
-
 ## Package audit — uploaded candidate (7 November 2026)
 
 The uploaded `InsightBoard.zip` was inspected as an archive. It contains:
@@ -87,9 +95,9 @@ The uploaded `InsightBoard.zip` was inspected as an archive. It contains:
 
 **Critical rejection for public release:** the package manifest embeds `https://insightboard-staging-dipayan.onrender.com/` as its fallback/start URL and registers that staging host for URI handling. Do not submit or distribute this package as the public Store app.
 
-**Additional package issue:** the modern MSIX bundle is version `1.0.1.0`, while the classic AppX bundle is `1.0.0.0`. Regenerate the package set together from one PWA Builder run after the final production origin and manifest are live. Do not mix files from separate package generations.
+**Additional package issue:** the modern MSIX bundle is version `1.0.1.0`, while the classic AppX bundle is version `1.0.0.0`. Regenerate the package set together from one PWA Builder run after the final production origin and manifest are live. Do not mix files from separate package generations.
 
-The package identity and publisher match the Partner Center identity previously supplied by the publisher. Keep these values unchanged. The display name inside the package is currently `InsightBoard`; align the final package display name and web manifest with the reserved Partner Center product name `InsightBoard VDB` before generating the final package.
+The package identity and publisher match the Partner Center identity previously supplied. Keep these values unchanged. The display name inside the package is currently `InsightBoard`; align the final package display name and web manifest with the reserved Partner Center product name `InsightBoard VDB` before generating the final package.
 
 ## Current production-origin blocker
 
