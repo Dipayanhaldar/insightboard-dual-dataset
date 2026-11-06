@@ -11,12 +11,12 @@ const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const assetFiles = [...new Set(Object.values(manifest).flatMap(entry => [
   entry.file,
   ...(entry.css || [])
-]).filter(file => typeof file === 'string' && /\\.(?:js|css)$/.test(file)))];
+]).filter(file => typeof file === 'string' && /\.(?:js|css)$/.test(file)))];
 
-if (!assetFiles.some(file => /\\.js$/.test(file))) {
+if (!assetFiles.some(file => /\.js$/.test(file))) {
   throw new Error('Production asset manifest does not contain a JavaScript bundle.');
 }
-if (!assetFiles.some(file => /\\.css$/.test(file))) {
+if (!assetFiles.some(file => /\.css$/.test(file))) {
   throw new Error('Production asset manifest does not contain a CSS bundle.');
 }
 
