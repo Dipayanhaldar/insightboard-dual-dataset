@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, CheckCircle2, RefreshCw, X, ExternalLink, MonitorDown } from 'lucide-react';
 import './ReleaseCenter.css';
 
+const CLIENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown';
+
 const FALLBACK = {
   websiteVersion: 'unknown',
   apiVersion: 'unknown',
@@ -52,7 +54,7 @@ export default function ReleaseCenter() {
 
   useEffect(() => { void checkForUpdates(); }, [checkForUpdates]);
 
-  const currentWebsiteVersion = runtime?.version || release.websiteVersion;
+  const currentWebsiteVersion = CLIENT_VERSION;
   const updateAvailable = useMemo(
     () => currentWebsiteVersion !== 'unknown' && release.websiteVersion !== 'unknown'
       && compareVersions(release.websiteVersion, currentWebsiteVersion) > 0,
@@ -73,7 +75,7 @@ export default function ReleaseCenter() {
         </header>
         <div className="release-version-grid">
           <div><span>Website</span><strong>{currentWebsiteVersion}</strong><small>{updateAvailable ? 'New version available' : 'Current runtime'}</small></div>
-          <div><span>API</span><strong>{runtime?.version || release.apiVersion}</strong><small>{runtime?.commit ? `Build ${runtime.commit.slice(0, 7)}` : 'Build identifier unavailable'}</small></div>
+          <div><span>API</span><strong>{runtime?.apiVersion || runtime?.version || release.apiVersion}</strong><small>{runtime?.commit ? `Build ${runtime.commit.slice(0, 7)}` : 'Build identifier unavailable'}</small></div>
           <div><span>Windows Store package</span><strong>{release.windowsPackageVersion}</strong><small>Package version tracked separately</small></div>
         </div>
         {updateAvailable && <div className="release-update-callout">
