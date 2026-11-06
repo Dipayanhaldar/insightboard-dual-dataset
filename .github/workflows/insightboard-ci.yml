@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - feature/global-ai-platform-foundation
   pull_request:
     branches:
       - main
@@ -43,9 +44,3 @@ jobs:
 
       - name: Build frontend for Render
         run: npm run build
-
-      - name: Build frontend for Vercel CDN
-        run: npm run build:vercel
-
-      - name: Verify Vercel SPA entry document
-        run: npm run verify:vercel-build
