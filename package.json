@@ -9,9 +9,10 @@
     "preview": "vite preview --host 0.0.0.0",
     "start": "node server/index.js",
     "dev:api": "node --watch server/index.js",
-    "check:server": "node --check server/index.js && node --check index.js && node --check scripts/build-vercel.mjs",
+    "check:server": "node --check server/index.js && node --check index.js && node --check scripts/build-vercel.mjs && node --check scripts/verify-vercel-output.mjs",
     "test": "node --test server/*.test.js",
-    "build:vercel": "node scripts/build-vercel.mjs"
+    "build:vercel": "node scripts/build-vercel.mjs",
+    "verify:vercel-build": "node scripts/verify-vercel-output.mjs"
   },
   "dependencies": {
     "jspdf": "^3.0.1",
