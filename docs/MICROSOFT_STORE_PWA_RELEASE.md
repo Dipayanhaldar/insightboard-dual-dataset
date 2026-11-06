@@ -9,7 +9,7 @@ Proposed Microsoft Store display name: **InsightBoard VDB By Dipayan**
 - Start URL and scope: same-origin root
 - Standalone display mode
 - Theme and background colors
-- Scalable SVG app icon
+- Raster PNG app icons at 192x192 and 512x512, plus scalable SVG fallback
 - Service worker with a network-first navigation strategy and offline fallback
 - API requests are deliberately excluded from service-worker caching
 - Static assets under `/assets/` and `/icons/` use cache-first with network fill
