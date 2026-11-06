@@ -1,6 +1,14 @@
-const CACHE_NAME = 'insightboard-shell-v2';
+const CACHE_NAME = 'insightboard-shell-v3';
 const OFFLINE_URL = '/offline.html';
-const PRECACHE_URLS = [OFFLINE_URL, '/manifest.webmanifest', '/icons/insightboard.svg', '/icons/insightboard-192.png', '/icons/insightboard-512.png'];
+const APP_SHELL_URL = '/';
+const PRECACHE_URLS = [
+  APP_SHELL_URL,
+  OFFLINE_URL,
+  '/manifest.webmanifest',
+  '/icons/insightboard.svg',
+  '/icons/insightboard-192.png',
+  '/icons/insightboard-512.png'
+];
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -23,30 +31,43 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
 
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+  // Never cache authentication, database, account or other API responses.
   if (url.pathname.startsWith('/api/')) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).catch(async () => {
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        if (response && response.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          // Keep a canonical app-shell copy for a fresh offline launch.
+          await cache.put(APP_SHELL_URL, response.clone());
+          if (url.pathname !== '/') await cache.put(request, response.clone());
+        }
+        return response;
+      } catch {
         const cachedPage = await caches.match(request);
-        return cachedPage || caches.match(OFFLINE_URL);
-      })
-    );
+        return cachedPage || await caches.match(APP_SHELL_URL) || await caches.match(OFFLINE_URL);
+      }
+    })());
     return;
   }
 
+  // Vite's hashed JS/CSS bundles and local media are cached after first use.
   if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/')) {
-    event.respondWith(
-      caches.match(request).then(cached => {
-        const network = fetch(request).then(response => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-          }
-          return response;
-        }).catch(() => cached || Response.error());
-        return cached || network;
-      })
-    );
+    event.respondWith((async () => {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+      try {
+        const response = await fetch(request);
+        if (response && response.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(request, response.clone());
+        }
+        return response;
+      } catch {
+        return cached || Response.error();
+      }
+    })());
   }
 });
