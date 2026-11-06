@@ -66,13 +66,22 @@ This file converts the product blueprint into reviewable work.
 - [ ] Android app listing assets and compliance declarations.
 - [ ] Production promotion PR reviewed and approved.
 
-## Epic 7 — Hosting portability foundation
-- [x] Export the existing Express application from a Vercel-recognized root entrypoint.
-- [x] Configure the Vercel Express framework and include the SPA entry document in the function bundle.
-- [x] Build Vite assets into Vercel's `public/` CDN directory.
-- [x] Preserve the Render `dist/` build and Express static serving path.
-- [x] Add on-demand MongoDB connection reuse for serverless requests.
-- [x] Validate both build modes in GitHub Actions.
-- [ ] Verify a Vercel preview deployment serves SPA routes, static assets and API endpoints correctly.
-- [ ] Verify the same release commit on Render staging.
-- [ ] Complete shared storage, distributed rate limits and full-origin parity tests.
+## Epic 7 — Render-first deployment foundation
+- [x] Keep Render as the active deployment target for this release train.
+- [x] Preserve the existing Render dist build and Express static-serving path.
+- [x] Add on-demand MongoDB connection reuse and liveness/readiness/version probes.
+- [x] Run server syntax checks, API tests and frontend build in GitHub Actions.
+- [ ] Verify the current release commit with live Render staging smoke tests.
+- [ ] Add distributed rate limiting and shared session/usage state before horizontal scaling.
+- [ ] Design and test shared file storage before multi-instance file workflows.
+- [ ] Revisit multi-host deployment only after explicit routing, data-consistency and failover tests.
+
+## Epic 8 — Data intelligence product differentiation
+- [x] Add an independent second-dataset upload workflow without replacing the active dashboard dataset.
+- [x] Match exact shared fields and identify numeric fields comparable across both datasets.
+- [x] Compare row counts, schema overlap, numeric averages and exact category distributions.
+- [x] Export metric comparison results as CSV.
+- [ ] Add guided field mapping, join/append preview and reversible data cleaning.
+- [ ] Add profiling, outlier and statistical comparison methods with visible assumptions.
+- [ ] Add a report builder that saves reproducible analysis snapshots.
+- [ ] Add evidence-linked AI explanations after server-side quotas and privacy controls are ready.
