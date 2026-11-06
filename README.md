@@ -18,6 +18,12 @@ InsightBoard is a React + Vite data exploration dashboard with an optional V2 ba
 
 See [the product roadmap](docs/PRODUCT_ROADMAP.md) for the planned data preparation, report studio, AI analyst, Android and scale milestones.
 
+## Windows PWA preparation (feature branch only)
+- Installable PWA manifest, app icons, service worker and an explicit offline fallback are included for Microsoft Store packaging evaluation.
+- Privacy notice is published at `/privacy.html`; it must be reviewed against final production data flows and paired with a monitored support contact before Store submission.
+- The offline experience is only a connectivity fallback; account, saved-report, AI-provider and database features still require network access.
+- See [the Microsoft Store PWA release checklist](docs/MICROSOFT_STORE_PWA_RELEASE.md). No MSIX package has been generated or submitted yet.
+
 ## V2 backend (feature branch only)
 The feature/insightboard-v2.0.1.1 branch adds Node.js + Express, MongoDB account/report storage, and a Render deployment blueprint. It does not modify main.
 - User account and report APIs are served by the same Express service as the built React website.
