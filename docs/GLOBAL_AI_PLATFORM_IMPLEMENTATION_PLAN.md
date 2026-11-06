@@ -14,6 +14,7 @@ This file converts the product blueprint into reviewable work.
 - [x] Add automated tests for probe status codes and response contracts.
 - [x] Export the Express app without opening a listener on import, enabling test and adapter reuse.
 - [x] Exempt infrastructure probes from the general API rate limiter so health checks are not blocked by user traffic.
+- [x] Add a shared on-demand MongoDB connection routine for serverless requests and standalone server startup, with single-flight connection attempts and a retry cooldown.
 
 ## Epic 1 — Conversation API
 - [ ] Define validated request/response schemas.
