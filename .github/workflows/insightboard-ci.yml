@@ -38,5 +38,8 @@ jobs:
       - name: Check server syntax
         run: npm run check:server
 
+      - name: Run API tests
+        run: npm test
+
       - name: Build frontend
         run: npm run build
