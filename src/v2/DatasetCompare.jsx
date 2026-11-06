@@ -9,7 +9,7 @@ const isNumeric = (rows, field) => {
   return values.length > 0 && values.filter(value => Number.isFinite(Number(value))).length / values.length >= .7;
 };
 const average = (rows, field) => {
-  const values = rows.map(row => Number(row?.[field])).filter(Number.isFinite);
+  const values = rows.map(row => row?.[field]).filter(value => value !== null && value !== undefined && String(value).trim() !== '').map(Number).filter(Number.isFinite);
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 };
 const format = value => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
