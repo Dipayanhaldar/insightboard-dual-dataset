@@ -254,7 +254,8 @@ app.get('/api/version', (_req, res) => {
   res.set('Cache-Control', 'no-store');
   return res.json({
     service: 'InsightBoard V2 API',
-    version: process.env.npm_package_version || 'unknown',
+    version: process.env.API_VERSION || process.env.npm_package_version || 'unknown',
+    apiVersion: process.env.API_VERSION || process.env.npm_package_version || 'unknown',
     commit: process.env.GIT_COMMIT_SHA
       || process.env.RENDER_GIT_COMMIT
       || process.env.VERCEL_GIT_COMMIT_SHA
