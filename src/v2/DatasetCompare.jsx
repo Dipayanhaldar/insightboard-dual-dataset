@@ -46,8 +46,10 @@ export default function DatasetCompare({ rows, datasetName }) {
   const firstFields = useMemo(() => fieldsOf(rows), [rows]);
   const secondFields = useMemo(() => second ? fieldsOf(second.rows) : [], [second]);
   const shared = useMemo(() => firstFields.filter(field => secondFields.includes(field)), [firstFields, secondFields]);
-  const commonNumeric = useMemo(() => shared.filter(field => isNumeric(rows, field) && isNumeric(second?.rows || [], field)), [shared, rows, second]);
-  const commonCategories = useMemo(() => shared.filter(field => !commonNumeric.includes(field)), [shared, commonNumeric]);
+  const firstNumeric = useMemo(() => shared.filter(field => isNumeric(rows, field)), [shared, rows]);
+  const secondNumeric = useMemo(() => shared.filter(field => isNumeric(second?.rows || [], field)), [shared, second]);
+  const commonNumeric = useMemo(() => firstNumeric.filter(field => secondNumeric.includes(field)), [firstNumeric, secondNumeric]);
+  const commonCategories = useMemo(() => shared.filter(field => !firstNumeric.includes(field) && !secondNumeric.includes(field)), [shared, firstNumeric, secondNumeric]);
   const selectedMetric = commonNumeric.includes(metric) ? metric : commonNumeric[0] || '';
   const selectedCategory = commonCategories.includes(category) ? category : commonCategories[0] || '';
   const result = useMemo(() => {
