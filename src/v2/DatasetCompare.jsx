@@ -89,7 +89,7 @@ export default function DatasetCompare({ rows, datasetName }) {
     const url = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
     const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'insightboard-dataset-comparison.csv'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  return <section className="dataset-compare" aria-labelledby="dataset-compare-title">
+  return <section id="dataset-compare" className="dataset-compare" aria-labelledby="dataset-compare-title">
     <div className="dc-heading"><div><div className="dc-eyebrow"><GitCompareArrows size={14}/> COMPARATIVE INTELLIGENCE</div><h2 id="dataset-compare-title">Compare two datasets</h2><p>Keep your active dashboard intact while comparing a second file against it.</p></div>{second && <button className="dc-clear" onClick={() => { setSecond(null); setNotice('Comparison cleared. Active dataset unchanged.'); }}><X size={14}/> Clear comparison</button>}</div>
     <div className="dc-source-row">
       <div className="dc-source"><span className="dc-source-label">DATASET A · ACTIVE</span><strong>{datasetName || 'Current dataset'}</strong><small>{rows.length.toLocaleString()} rows · {firstFields.length} fields</small></div>
