@@ -10,7 +10,8 @@
     "start": "node server/index.js",
     "dev:api": "node --watch server/index.js",
     "check:server": "node --check server/index.js",
-    "test": "node --test server/*.test.js"
+    "test": "node --test server/*.test.js",
+    "check:pwa:build": "node scripts/validate-pwa-build.mjs"
   },
   "dependencies": {
     "jspdf": "^3.0.1",
