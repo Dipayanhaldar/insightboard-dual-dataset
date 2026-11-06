@@ -1,8 +1,8 @@
-const CACHE_NAME = 'insightboard-shell-v3';
+const CACHE_NAME = 'insightboard-shell-v4';
 const OFFLINE_URL = '/offline.html';
 const APP_SHELL_URL = '/';
+const ASSET_MANIFEST_URL = '/asset-manifest.json';
 const PRECACHE_URLS = [
-  APP_SHELL_URL,
   OFFLINE_URL,
   '/manifest.webmanifest',
   '/icons/insightboard.svg',
@@ -11,11 +11,27 @@ const PRECACHE_URLS = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const shellResponse = await fetch(APP_SHELL_URL, { cache: 'reload' });
+    if (!shellResponse.ok) throw new Error('Unable to fetch the InsightBoard app shell');
+    await cache.put(APP_SHELL_URL, shellResponse.clone());
+    await cache.addAll(PRECACHE_URLS);
+
+    // Vite emits the complete production asset graph. Pre-cache JS/CSS entry
+    // files and lazy chunks so the first successful online launch is enough
+    // to make the app shell usable offline after installation completes.
+    const manifestResponse = await fetch(ASSET_MANIFEST_URL, { cache: 'no-store' });
+    if (!manifestResponse.ok) throw new Error('Unable to fetch the production asset manifest');
+    const assetManifest = await manifestResponse.json();
+    const assets = [...new Set(Object.values(assetManifest).flatMap(entry => [
+      entry.file,
+      ...(entry.css || [])
+    ]).filter(file => typeof file === 'string' && /\\.(?:js|css)$/.test(file))
+      .map(file => file.startsWith('/') ? file : '/' + file))];
+    if (assets.length) await cache.addAll(assets);
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', event => {
@@ -40,7 +56,6 @@ self.addEventListener('fetch', event => {
         const response = await fetch(request);
         if (response && response.ok) {
           const cache = await caches.open(CACHE_NAME);
-          // Keep a canonical app-shell copy for a fresh offline launch.
           await cache.put(APP_SHELL_URL, response.clone());
           if (url.pathname !== '/') await cache.put(request, response.clone());
         }
@@ -53,7 +68,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Vite's hashed JS/CSS bundles and local media are cached after first use.
   if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/')) {
     event.respondWith((async () => {
       const cached = await caches.match(request);
