@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.env') });
 
@@ -44,7 +44,7 @@ app.use(express.json({ limit: '64kb' }));
 app.use('/api', rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 180,
-  skip: (req) => req.path === '/health' || req.path === '/ai/status',
+  skip: (req) => ['/health', '/health/live', '/health/ready', '/version', '/ai/status'].includes(req.path),
   standardHeaders: 'draft-7',
   legacyHeaders: false
 }));
@@ -652,17 +652,27 @@ app.use((error, _req, res, _next) => {
   return res.status(500).json({ error: 'Unexpected server error. Check the service logs.' });
 });
 
-if (process.env.MONGODB_URI) {
-  mongoose.connect(process.env.MONGODB_URI, {
-    dbName: process.env.MONGODB_DATABASE || 'insightboard_v2',
-    authSource: process.env.MONGODB_AUTH_SOURCE || 'admin',
-    serverSelectionTimeoutMS: 15000
-  }).then(() => console.log('MongoDB connected.'))
-    .catch(error => console.error('MongoDB connection failed:', error.message));
-} else {
-  console.warn('MONGODB_URI is not set; API account/report routes will remain unavailable.');
+export default app;
+
+// Keep imports side-effect free so the same Express application can be mounted
+// by tests and future serverless adapters. Only the standalone Node process
+// opens a listener and initiates its own database connection.
+const isDirectExecution = process.argv[1]
+  && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+
+if (isDirectExecution) {
+  if (process.env.MONGODB_URI) {
+    mongoose.connect(process.env.MONGODB_URI, {
+      dbName: process.env.MONGODB_DATABASE || 'insightboard_v2',
+      authSource: process.env.MONGODB_AUTH_SOURCE || 'admin',
+      serverSelectionTimeoutMS: 15000
+    }).then(() => console.log('MongoDB connected.'))
+      .catch(error => console.error('MongoDB connection failed:', error.message));
+  } else {
+    console.warn('MONGODB_URI is not set; API account/report routes will remain unavailable.');
+  }
+  if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    console.warn('JWT_SECRET is missing or shorter than 32 characters; account endpoints will be unavailable.');
+  }
+  app.listen(PORT, '0.0.0.0', () => console.log(`InsightBoard V2 server listening on port ${PORT}`));
 }
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  console.warn('JWT_SECRET is missing or shorter than 32 characters; account endpoints will be unavailable.');
-}
-app.listen(PORT, '0.0.0.0', () => console.log(`InsightBoard V2 server listening on port ${PORT}`));
