@@ -13,7 +13,11 @@ for (const size of ['192x192', '512x512']) {
   const iconPath = path.resolve('public', icon.src.replace(/^\//, ''));
   if (!fs.existsSync(iconPath)) throw new Error(`PWA icon file does not exist: ${icon.src}`);
 }
-for (const file of ['public/sw.js', 'public/offline.html', 'public/privacy.html']) {
+const releaseInfo = JSON.parse(fs.readFileSync(path.resolve('public/release-info.json'), 'utf8'));
+if (!releaseInfo.websiteVersion || !releaseInfo.apiVersion || !releaseInfo.windowsPackageVersion || !Array.isArray(releaseInfo.notes)) {
+  throw new Error('Release metadata must define website/API/Windows package versions and release notes');
+}
+for (const file of ['public/sw.js', 'public/offline.html', 'public/privacy.html', 'public/release-info.json']) {
   if (!fs.existsSync(path.resolve(file))) throw new Error(`PWA release file is missing: ${file}`);
 }
 console.log('PWA manifest, required icon sizes, service worker, offline page and privacy notice are present.');
