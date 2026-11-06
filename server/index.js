@@ -19,6 +19,8 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDirectory = path.resolve(__dirname, '../dist');
+const publicDirectory = path.resolve(__dirname, '../public');
+const isVercelRuntime = process.env.VERCEL === '1';
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
@@ -671,10 +673,13 @@ app.delete('/api/reports', requireDatabase, requireAuth, asyncRoute(async (req, 
 }));
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
-app.use(express.static(distDirectory, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
+if (!isVercelRuntime) {
+  app.use(express.static(distDirectory, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
+}
 app.get('*', (req, res, next) => {
   if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
-  res.sendFile(path.join(distDirectory, 'index.html'), error => {
+  const frontendIndex = path.join(isVercelRuntime ? publicDirectory : distDirectory, 'index.html');
+  res.sendFile(frontendIndex, error => {
     if (error) next(error);
   });
 });
