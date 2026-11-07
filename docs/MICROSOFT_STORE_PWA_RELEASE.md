@@ -34,13 +34,13 @@ The Store package is designed as an online-first PWA with a useful offline mode 
 - The offline mode requires one successful online launch. The service worker pre-caches the production JavaScript/CSS asset graph during installation; wait for service-worker installation to complete before disconnecting.
 - No Windows MSIX bundle has been generated or signed in this repository.
 - The product name shown in Partner Center is InsightBoard VDB; verify the reservation remains active before package generation.
-- The privacy notice must be reviewed against the final production data flows and populated with a real, monitored support contact before submission.
+- The privacy notice must be reviewed against the final VDB data flows and the support contact `Contact.dipayanhaldar@gmail.com` must be monitored before submission.
 
 ## Required release sequence
 
 1. Confirm the Partner Center developer account and reserve the unique product name.
 2. Obtain the exact Package ID, Publisher ID and Publisher display name from Partner Center > Product identity.
-3. Configure and smoke-test the intended production backend. The staging MongoDB authentication issue must not be hidden or represented as fixed by offline mode.
+3. Configure and smoke-test the Microsoft Store target service at `https://insightboard-staging-dipayan.onrender.com/`. This Render service is the designated VDB Store origin; its Render service label includes “staging”, but it is the approved Store target. Confirm the live API and MongoDB-backed features before packaging.
 4. Run PWA Builder against the intended public HTTPS origin and resolve all required report-card action items.
 5. Generate the Windows MSIX bundle and classic AppX bundle using the exact Partner Center identity values.
 6. Install and test the generated package on a clean supported Windows environment. Verify first online launch, offline relaunch, local CSV/JSON import, charts, filters, exports, online-only feature messaging, sign-in and cloud features after reconnecting.
@@ -51,7 +51,7 @@ The Store package is designed as an online-first PWA with a useful offline mode 
 
 - Work only on `feature/global-ai-platform-foundation` until explicitly approved.
 - Do not merge PR #12, modify `main`, alter the production Render service, or modify Stage 2 as part of this preparation.
-- Do not package the staging URL as the public Store app. The final package must point at the approved production origin after production readiness and release approval.
+- The designated Microsoft Store origin is `https://insightboard-staging-dipayan.onrender.com/`. Use this exact origin as the PWA Builder source URL for InsightBoard VDB. Do not use the BSIU college service or `insightboard-v2-bsiu.onrender.com`.
 
 ## Continuous release and version policy
 
@@ -95,7 +95,7 @@ The uploaded `InsightBoard.zip` was inspected as an archive. It contains:
 - `InsightBoard.classic.appxbundle` (version `1.0.0.0`).
 - `install.ps1` and `utils/pwainstaller.exe` (local installation helper).
 
-**Critical rejection for public release:** the package manifest embeds `https://insightboard-staging-dipayan.onrender.com/` as its fallback/start URL and registers that staging host for URI handling. Do not submit or distribute this package as the public Store app.
+**Origin assessment:** the package manifest embeds `https://insightboard-staging-dipayan.onrender.com/` as its fallback/start URL and registers that host for URI handling. This is the designated Microsoft Store origin for InsightBoard VDB, so the origin itself is correct. The package still requires a fresh, consistent generation because the modern MSIX and classic AppX versions differ.
 
 **Additional package issue:** the modern MSIX bundle is version `1.0.1.0`, while the classic AppX bundle is version `1.0.0.0`. Regenerate the package set together from one PWA Builder run after the final production origin and manifest are live. Do not mix files from separate package generations.
 
