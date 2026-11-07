@@ -3,7 +3,7 @@
 InsightBoard is a React + Vite data exploration dashboard with an optional V2 backend prototype.
 
 ## Current dashboard features
-- Built-in datasets: Blackcoffer Corporate Data and Hyderabad Metro Rail station-reference data.
+- Built-in dataset: Hyderabad Metro Rail station-reference data. Other datasets are user-imported; no third-party recruitment dataset is bundled or fetched.
 - Import JSON arrays or objects containing records/data, plus CSV files. Imported records replace the currently active dashboard dataset.
 - Dual-dataset comparison workspace: load a second CSV/JSON file without replacing the active dataset; compare shared schema, row counts, numeric averages and exact category counts; export metric comparisons.
 - Dynamic categorical filters, KPI cards, six chart panels, and searchable, sortable, paginated records table.
