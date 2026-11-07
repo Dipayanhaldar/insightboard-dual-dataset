@@ -1,4 +1,4 @@
-const CACHE_NAME = 'insightboard-shell-v5';
+const CACHE_NAME = 'insightboard-shell-v6';
 const OFFLINE_URL = '/offline.html';
 const APP_SHELL_URL = '/';
 const ASSET_MANIFEST_URL = '/asset-manifest.json';
@@ -82,4 +82,40 @@ self.addEventListener('fetch', event => {
       }
     })());
   }
+});
+
+
+// Display server-originated push messages. A real push subscription and
+// authenticated subscription-management API must be configured by the server.
+self.addEventListener('push', event => {
+  let payload = {};
+  try { payload = event.data ? event.data.json() : {}; } catch {
+    payload = { body: event.data ? event.data.text() : '' };
+  }
+  const title = typeof payload.title === 'string' && payload.title.trim()
+    ? payload.title.slice(0, 80) : 'InsightBoard';
+  const options = {
+    body: typeof payload.body === 'string' ? payload.body.slice(0, 240) : 'You have a new update.',
+    icon: '/icons/insightboard-192.png',
+    badge: '/icons/insightboard-192.png',
+    tag: typeof payload.tag === 'string' ? payload.tag.slice(0, 80) : 'insightboard-update',
+    data: { url: typeof payload.url === 'string' && payload.url.startsWith('/') ? payload.url : '/' },
+    renotify: false
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of windows) {
+      if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+        await client.navigate(targetUrl);
+        return client.focus();
+      }
+    }
+    return self.clients.openWindow(targetUrl);
+  })());
 });
