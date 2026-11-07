@@ -101,11 +101,11 @@ The uploaded `InsightBoard.zip` was inspected as an archive. It contains:
 
 The package identity and publisher match the Partner Center identity previously supplied. Keep these values unchanged. The display name inside the package is currently `InsightBoard`; align the final package display name and web manifest with the reserved Partner Center product name `InsightBoard VDB` before generating the final package.
 
-## Current production-origin blocker
+## Designated Microsoft Store VDB origin
 
-The Render production service is `insightboard-v2-bsiu`, tracking `main`, at `https://insightboard-v2-bsiu.onrender.com`. The current `main` branch does not contain `public/manifest.webmanifest`, `public/sw.js`, or the PNG PWA icons. The PWA-ready assets are only on `feature/global-ai-platform-foundation`.
+The designated Microsoft Store target for InsightBoard VDB is the Render service `insightboard-staging-dipayan` at `https://insightboard-staging-dipayan.onrender.com/`, tracking `feature/global-ai-platform-foundation`. The service name includes the word "staging", but this is the VDB origin explicitly selected for Microsoft Store packaging. Use this exact HTTPS origin in PWA Builder.
 
-Therefore the production URL cannot yet be used to generate a correct PWA package. The feature branch must first pass release gates and be approved for merge/deployment to the existing production service. This preparation does not authorize that merge or production deployment.
+The BSIU college project is separate and must not be used as the Store origin. In particular, do not use `insightboard-v2-bsiu.onrender.com`, `insightboard-college-dipayan.onrender.com`, the `main` branch, or any college-project deployment for VDB packaging. Keep all preparation changes on `feature/global-ai-platform-foundation`. This does not authorize merging into `main` or changing other Render services.
 
 ## Store listing content and assets
 
