@@ -6,7 +6,8 @@ import jwt from 'jsonwebtoken';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.env') });
 
@@ -14,11 +15,17 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || '';
 const TOKEN_LIFETIME = process.env.JWT_EXPIRES_IN || '8h';
+const boundedInt = (value, fallback, min, max) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) ? Math.min(max, Math.max(min, parsed)) : fallback;
+};
 const MAX_REPORTS = Math.min(100, Math.max(1, Number(process.env.MAX_REPORTS_PER_USER) || 20));
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDirectory = path.resolve(__dirname, '../dist');
+const publicDirectory = path.resolve(__dirname, '../public');
+const isVercelRuntime = process.env.VERCEL === '1';
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
@@ -40,11 +47,34 @@ app.use(helmet({
     }
   }
 }));
-app.use(express.json({ limit: '64kb' }));
+
+// Request IDs make production failures traceable across client reports and logs.
+// Log API metadata only: never log request bodies, auth headers, email addresses or query strings.
+app.use((req, res, next) => {
+  const requestId = randomUUID();
+  req.requestId = requestId;
+  res.set('X-Request-Id', requestId);
+  const startedAt = process.hrtime.bigint();
+  res.once('finish', () => {
+    if (!req.path.startsWith('/api') || /^\/api\/health(?:\/|$)/.test(req.path)) return;
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    console.log(JSON.stringify({
+      level: 'info',
+      event: 'http_request',
+      requestId,
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      durationMs: Math.round(durationMs * 100) / 100
+    }));
+  });
+  next();
+});
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '64kb' }));
 app.use('/api', rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 180,
-  skip: (req) => req.path === '/health' || req.path === '/ai/status',
+  skip: (req) => ['/health', '/health/live', '/health/ready', '/version', '/ai/status'].includes(req.path),
   standardHeaders: 'draft-7',
   legacyHeaders: false
 }));
@@ -97,15 +127,55 @@ const Report = mongoose.models.Report || mongoose.model('Report', reportSchema);
 const asyncRoute = handler => (req, res, next) =>
   Promise.resolve(handler(req, res, next)).catch(next);
 
+const MONGODB_URI = process.env.MONGODB_URI || '';
+const DATABASE_OPTIONS = {
+  dbName: process.env.MONGODB_DATABASE || 'insightboard_v2',
+  authSource: process.env.MONGODB_AUTH_SOURCE || 'admin',
+  serverSelectionTimeoutMS: boundedInt(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS, 5000, 1000, 30000),
+  // Small, lazy pools suit the current free-first single-instance deployment.
+  // Raise these only after measuring database wait time and Atlas connection headroom.
+  maxPoolSize: boundedInt(process.env.MONGODB_MAX_POOL_SIZE, 5, 1, 50),
+  minPoolSize: boundedInt(process.env.MONGODB_MIN_POOL_SIZE, 0, 0, 10),
+  maxConnecting: boundedInt(process.env.MONGODB_MAX_CONNECTING, 2, 1, 5),
+  maxIdleTimeMS: boundedInt(process.env.MONGODB_MAX_IDLE_TIME_MS, 30000, 1000, 300000),
+  waitQueueTimeoutMS: boundedInt(process.env.MONGODB_WAIT_QUEUE_TIMEOUT_MS, 5000, 500, 30000)
+};
+let databaseConnectionPromise = null;
+let databaseRetryAfter = 0;
+
 function databaseReady() {
   return mongoose.connection.readyState === 1;
 }
-function requireDatabase(req, res, next) {
+
+// Reuse one connection attempt per warm process. A short cooldown prevents
+// repeated requests from creating a connection storm while MongoDB is down.
+async function ensureDatabaseConnection() {
+  if (databaseReady()) return true;
+  if (!MONGODB_URI) return false;
+  if (databaseConnectionPromise) return databaseConnectionPromise;
+  if (Date.now() < databaseRetryAfter) return false;
+
+  databaseConnectionPromise = mongoose.connect(MONGODB_URI, DATABASE_OPTIONS)
+    .then(() => databaseReady())
+    .catch(error => {
+      console.error('MongoDB connection failed:', error.message);
+      return false;
+    })
+    .finally(() => {
+      databaseConnectionPromise = null;
+      if (!databaseReady()) databaseRetryAfter = Date.now() + 5000;
+    });
+
+  return databaseConnectionPromise;
+}
+
+const requireDatabase = asyncRoute(async (_req, res, next) => {
+  if (!databaseReady()) await ensureDatabaseConnection();
   if (!databaseReady()) {
     return res.status(503).json({ error: 'The database is not connected yet. Please retry shortly.' });
   }
   next();
-}
+});
 function safeText(value, maximum = 120) {
   return typeof value === 'string' ? value.trim().slice(0, maximum) : '';
 }
@@ -192,6 +262,39 @@ app.get('/api/health', (_req, res) => {
     status: ready ? 'ok' : 'degraded',
     database: ready,
     service: 'InsightBoard V2 API'
+  });
+});
+
+// Infrastructure probes: keep the legacy /api/health response unchanged.
+// Liveness answers whether this process is running; readiness answers whether
+// it can safely receive requests that depend on MongoDB.
+app.get('/api/health/live', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.status(200).json({ status: 'alive', service: 'InsightBoard V2 API' });
+});
+
+app.get('/api/health/ready', asyncRoute(async (_req, res) => {
+  if (!databaseReady()) await ensureDatabaseConnection();
+  const ready = databaseReady();
+  res.set('Cache-Control', 'no-store');
+  return res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    database: ready,
+    service: 'InsightBoard V2 API'
+  });
+}));
+
+// Used by deployment smoke tests to verify both origins run the same release.
+app.get('/api/version', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json({
+    service: 'InsightBoard V2 API',
+    version: process.env.API_VERSION || process.env.npm_package_version || 'unknown',
+    apiVersion: process.env.API_VERSION || process.env.npm_package_version || 'unknown',
+    commit: process.env.GIT_COMMIT_SHA
+      || process.env.RENDER_GIT_COMMIT
+      || process.env.VERCEL_GIT_COMMIT_SHA
+      || null
   });
 });
 
@@ -606,10 +709,13 @@ app.delete('/api/reports', requireDatabase, requireAuth, asyncRoute(async (req, 
 }));
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
-app.use(express.static(distDirectory, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
+if (!isVercelRuntime) {
+  app.use(express.static(distDirectory, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
+}
 app.get('*', (req, res, next) => {
   if (req.method !== 'GET' || req.path.startsWith('/api/')) return next();
-  res.sendFile(path.join(distDirectory, 'index.html'), error => {
+  const frontendIndex = path.join(isVercelRuntime ? publicDirectory : distDirectory, 'index.html');
+  res.sendFile(frontendIndex, error => {
     if (error) next(error);
   });
 });
@@ -621,17 +727,43 @@ app.use((error, _req, res, _next) => {
   return res.status(500).json({ error: 'Unexpected server error. Check the service logs.' });
 });
 
-if (process.env.MONGODB_URI) {
-  mongoose.connect(process.env.MONGODB_URI, {
-    dbName: process.env.MONGODB_DATABASE || 'insightboard_v2',
-    authSource: process.env.MONGODB_AUTH_SOURCE || 'admin',
-    serverSelectionTimeoutMS: 15000
-  }).then(() => console.log('MongoDB connected.'))
-    .catch(error => console.error('MongoDB connection failed:', error.message));
-} else {
-  console.warn('MONGODB_URI is not set; API account/report routes will remain unavailable.');
+export default app;
+
+// Keep imports side-effect free so the same Express application can be mounted
+// by tests and future serverless adapters. Only the standalone Node process
+// opens a listener and initiates its own database connection.
+const isDirectExecution = process.argv[1]
+  && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+
+if (isDirectExecution) {
+  if (MONGODB_URI) {
+    ensureDatabaseConnection().then(ready => {
+      if (ready) console.log('MongoDB connected.');
+    });
+  } else {
+    console.warn('MONGODB_URI is not set; API account/report routes will remain unavailable.');
+  }
+  if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    console.warn('JWT_SECRET is missing or shorter than 32 characters; account endpoints will be unavailable.');
+  }
+  const server = app.listen(PORT, '0.0.0.0', () => console.log(`InsightBoard V2 server listening on port ${PORT}`));
+  let shuttingDown = false;
+  const shutdown = signal => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(JSON.stringify({ level: 'info', event: 'server_shutdown', signal }));
+    server.close(async error => {
+      if (error) console.error('HTTP server shutdown error:', error.message);
+      try {
+        await mongoose.disconnect();
+      } catch (disconnectError) {
+        console.error('MongoDB shutdown error:', disconnectError.message);
+      }
+      process.exit(error ? 1 : 0);
+    });
+    // Do not let an unresponsive keep-alive connection block platform shutdown forever.
+    setTimeout(() => process.exit(1), 10000).unref();
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
 }
-if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  console.warn('JWT_SECRET is missing or shorter than 32 characters; account endpoints will be unavailable.');
-}
-app.listen(PORT, '0.0.0.0', () => console.log(`InsightBoard V2 server listening on port ${PORT}`));

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - feature/global-ai-platform-foundation
   pull_request:
     branches:
       - main
@@ -35,8 +36,19 @@ jobs:
       - name: Install dependencies
         run: npm install --include=dev
 
+      - name: Validate PWA package prerequisites
+        run: |
+          node --check public/sw.js
+          node scripts/validate-pwa.mjs
+
       - name: Check server syntax
         run: npm run check:server
 
-      - name: Build frontend
+      - name: Run API tests
+        run: npm test
+
+      - name: Build frontend for Render
         run: npm run build
+
+      - name: Verify offline production asset cache
+        run: npm run check:pwa:build

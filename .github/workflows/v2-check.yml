@@ -4,6 +4,7 @@ on:
     branches:
       - feature/insightboard-v2.0.1.1
       - feature/gnani-voice-studio
+      - feature/global-ai-platform-foundation
   pull_request:
     branches:
       - main
@@ -16,6 +17,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm install
+      - run: npm install --include=dev
       - run: npm run check:server
+      - run: npm test
       - run: npm run build

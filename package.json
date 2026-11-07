@@ -1,7 +1,7 @@
 {
   "name": "insightboard-schema-aware",
   "private": true,
-  "version": "2.0.2-beta.1",
+  "version": "2.0.2-beta.2",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -9,7 +9,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "start": "node server/index.js",
     "dev:api": "node --watch server/index.js",
-    "check:server": "node --check server/index.js"
+    "check:server": "node --check server/index.js",
+    "test": "node --test server/*.test.js",
+    "check:pwa:build": "node scripts/validate-pwa-build.mjs"
   },
   "dependencies": {
     "jspdf": "^3.0.1",

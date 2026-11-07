@@ -1,0 +1,19 @@
+{
+  "product": "InsightBoard VDB",
+  "displayName": "InsightBoard VDB By Dipayan",
+  "websiteVersion": "2.0.2-beta.2",
+  "apiVersion": "2.0.2-beta.2",
+  "windowsPackageVersion": "not generated",
+  "releaseChannel": "feature-preview",
+  "releasedAt": "2026-11-07",
+  "minimumSupportedApiVersion": "2.0.2-beta.2",
+  "notes": [
+    "Dual-dataset comparison for CSV and JSON files.",
+    "Microsoft Store PWA foundation with safe offline fallback.",
+    "Release Center shows website, API and Windows package versions separately."
+  ],
+  "updatePolicy": {
+    "websiteAndApi": "Continuous deployment; normally no Microsoft Store resubmission.",
+    "windowsPackage": "Submit a new Store package when the web manifest or packaged Windows identity/capabilities change."
+  }
+}

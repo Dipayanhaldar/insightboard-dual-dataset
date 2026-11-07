@@ -3,7 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f5f8fc" />
+    <meta name="theme-color" content="#123b67" />
+    <meta name="description" content="Explore, compare and understand datasets with InsightBoard." />
+    <meta name="application-name" content="InsightBoard" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="InsightBoard" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/insightboard.svg" />
+    <link rel="apple-touch-icon" href="/icons/insightboard-192.png" />
     <title>InsightBoard | Business Intelligence</title>
     <style>
       .project-dossier-link {
@@ -53,6 +61,15 @@
       aria-label="Open the InsightBoard and Insideboard project dossier in a new tab"
       title="Project explanation, architecture, code links and viva guide"
     >📘 Project Dossier</a>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js").catch(error => {
+            console.error("InsightBoard service worker registration failed:", error);
+          });
+        });
+      }
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

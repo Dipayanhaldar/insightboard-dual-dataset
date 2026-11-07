@@ -3,12 +3,26 @@
 InsightBoard is a React + Vite data exploration dashboard with an optional V2 backend prototype.
 
 ## Current dashboard features
-- Built-in datasets: Blackcoffer Corporate Data and Hyderabad Metro Rail station-reference data.
-- Import JSON arrays or objects containing records/data, plus CSV files. Imported records replace the currently active dataset.
+- Built-in dataset: Hyderabad Metro Rail station-reference data. Other datasets are user-imported; no third-party recruitment dataset is bundled or fetched.
+- Import JSON arrays or objects containing records/data, plus CSV files. Imported records replace the currently active dashboard dataset.
+- Dual-dataset comparison workspace: load a second CSV/JSON file without replacing the active dataset; compare shared schema, row counts, numeric averages and exact category counts; export metric comparisons.
 - Dynamic categorical filters, KPI cards, six chart panels, and searchable, sortable, paginated records table.
 - Light/dark themes; CSV, Excel and PDF exports; preset logo assets and Metro announcement audio.
 - Stage 2 Voice Studio: Gnani Timbre v2.5 text-to-speech using personal Bring Your Own Key (BYOK). Site-managed voice keys are not used; dataset summaries in Voice Studio are local and rule-based.
 - AI API Provider Hub: personal-key text/chat generation for OpenAI, Anthropic Claude, Google Gemini, xAI Grok, Mistral AI, DeepSeek, Groq, Cohere, OpenRouter and Together AI.
+
+## Comparison workspace limitations
+- Comparison files are limited to 20 MB and 50,000 rows in the browser.
+- Field matching uses exact column names. It does not perform fuzzy mapping, joins, statistical significance tests or causal analysis.
+- Raw rows used by this comparison remain in browser memory and are not uploaded by the comparison feature.
+
+See [the product roadmap](docs/PRODUCT_ROADMAP.md) for the planned data preparation, report studio, AI analyst, Android and scale milestones.
+
+## Windows PWA preparation (feature branch only)
+- Installable PWA manifest, app icons, service worker and an explicit offline fallback are included for Microsoft Store packaging evaluation.
+- Privacy notice is published at `/privacy.html`; it must be reviewed against final production data flows and paired with a monitored support contact before Store submission.
+- The offline experience is only a connectivity fallback; account, saved-report, AI-provider and database features still require network access.
+- See [the Microsoft Store PWA release checklist](docs/MICROSOFT_STORE_PWA_RELEASE.md). No MSIX package has been generated or submitted yet.
 
 ## V2 backend (feature branch only)
 The feature/insightboard-v2.0.1.1 branch adds Node.js + Express, MongoDB account/report storage, and a Render deployment blueprint. It does not modify main.
