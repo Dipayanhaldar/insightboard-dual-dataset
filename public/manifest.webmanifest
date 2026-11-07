@@ -39,5 +39,25 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
+  ],
+  "file_handlers": [
+    {
+      "action": "/?launch=file",
+      "accept": {
+        "text/csv": [
+          ".csv"
+        ],
+        "application/json": [
+          ".json"
+        ]
+      },
+      "icons": [
+        {
+          "src": "/icons/insightboard-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }
