@@ -97,7 +97,7 @@ The uploaded `InsightBoard.zip` was inspected as an archive. It contains:
 
 **Origin assessment:** the package manifest embeds `https://insightboard-staging-dipayan.onrender.com/` as its fallback/start URL and registers that host for URI handling. This is the designated Microsoft Store origin for InsightBoard VDB, so the origin itself is correct. The package still requires a fresh, consistent generation because the modern MSIX and classic AppX versions differ.
 
-**Additional package issue:** the modern MSIX bundle is version `1.0.1.0`, while the classic AppX bundle is version `1.0.0.0`. Regenerate the package set together from one PWA Builder run after the final production origin and manifest are live. Do not mix files from separate package generations.
+**Version note:** PWABuilder's classic AppX package is expected to use a lower version than the modern MSIX package (for example, modern `1.0.1.0` and classic `1.0.0.0`). That difference alone is not a validation failure. Regenerate the package set because the prior archive's app display name was `InsightBoard`, while the reserved product name is `InsightBoard VDB`; confirm both generated packages show the correct reserved product name and the same intended origin.
 
 The package identity and publisher match the Partner Center identity previously supplied. Keep these values unchanged. The display name inside the package is currently `InsightBoard`; align the final package display name and web manifest with the reserved Partner Center product name `InsightBoard VDB` before generating the final package.
 
