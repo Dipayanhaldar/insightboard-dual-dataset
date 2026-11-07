@@ -22,7 +22,7 @@ for (const file of ['public/sw.js', 'public/offline.html', 'public/privacy.html'
   if (!fs.existsSync(path.resolve(file))) throw new Error('PWA release file is missing: ' + file);
 }
 const serviceWorker = fs.readFileSync(path.resolve('public/sw.js'), 'utf8');
-for (const requiredBehavior of ["const CACHE_NAME = 'insightboard-shell-v4'", "cache.addAll(PRECACHE_URLS)", "cache.put(APP_SHELL_URL", "asset-manifest.json", "cache.addAll(assets)", "url.pathname.startsWith('/api/')"]) {
+for (const requiredBehavior of ["const CACHE_NAME = 'insightboard-shell-v5'", "cache.addAll(PRECACHE_URLS)", "cache.put(APP_SHELL_URL", "asset-manifest.json", "cache.addAll(assets)", "url.pathname.startsWith('/api/')"]) {
   if (!serviceWorker.includes(requiredBehavior)) {
     throw new Error('Service worker is missing offline safety behavior: ' + requiredBehavior);
   }
