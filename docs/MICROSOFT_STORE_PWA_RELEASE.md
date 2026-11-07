@@ -1,11 +1,13 @@
 # Microsoft Store PWA / MSIX release checklist
 
-Proposed Microsoft Store display name: **InsightBoard VDB By Dipayan**
+Proposed Microsoft Store display name: **InsightBoard VDB**
 
 ## Current implementation on the feature branch
 
+The built-in sample is Hyderabad Metro station-reference data. No Blackcoffer dataset or Blackcoffer-branded preset is included; user-imported data remains the user's responsibility.
+
 - Web app manifest: `/manifest.webmanifest`
-- App identity: `InsightBoard VDB By Dipayan`
+- App identity: `InsightBoard VDB`
 - Start URL and scope: same-origin root
 - Standalone display mode
 - Theme and background colors
@@ -22,7 +24,7 @@ The Store package is designed as an online-first PWA with a useful offline mode 
 
 - Client-side filtering/charts, CSV/JSON file import and supported exports run in the browser and can work offline once the app shell and bundles have been cached.
 - Imported file rows are held in the active app session; do not claim that imported datasets persist after the app is closed unless a separate persistence feature is implemented and tested.
-- External Blackcoffer dataset loading requires internet access.
+- The app does not bundle or fetch third-party recruitment datasets. Users may import datasets they are authorised to use.
 - Account registration/sign-in, MongoDB saved reports, cloud sync, AI providers and voice providers require internet access and their respective backend/provider services.
 - Service-worker caching is limited to same-origin app assets and navigation shell. API/authentication/private report responses are never cached.
 - Offline capability is not a substitute for a healthy production API. Cloud features must display a clear unavailable state rather than silently failing.
@@ -31,7 +33,7 @@ The Store package is designed as an online-first PWA with a useful offline mode 
 
 - The offline mode requires one successful online launch. The service worker pre-caches the production JavaScript/CSS asset graph during installation; wait for service-worker installation to complete before disconnecting.
 - No Windows MSIX bundle has been generated or signed in this repository.
-- The proposed display name is not reserved until it is successfully reserved in Partner Center.
+- The product name shown in Partner Center is InsightBoard VDB; verify the reservation remains active before package generation.
 - The privacy notice must be reviewed against the final production data flows and populated with a real, monitored support contact before submission.
 
 ## Required release sequence
