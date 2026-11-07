@@ -8,6 +8,7 @@
   "scope": "/",
   "display": "standalone",
   "display_override": [
+    "window-controls-overlay",
     "standalone",
     "minimal-ui"
   ],
@@ -59,5 +60,22 @@
         }
       ]
     }
-  ]
+  ],
+  "shortcuts": [
+    {
+      "name": "Open Dashboard",
+      "short_name": "Dashboard",
+      "description": "Open the InsightBoard workspace",
+      "url": "/"
+    },
+    {
+      "name": "Compare Datasets",
+      "short_name": "Compare",
+      "description": "Open dataset comparison",
+      "url": "/#dataset-compare"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  }
 }
