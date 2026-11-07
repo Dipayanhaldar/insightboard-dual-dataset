@@ -64,6 +64,23 @@ function App(){
   }
  }
  useEffect(()=>{setDataset(hyderabadDataset,'Hyderabad Metro station reference','metro');},[]);
+ // Handle CSV/JSON files opened from Windows File Explorer through the PWA file handler.
+ useEffect(()=>{
+  if(!('launchQueue' in window)) return;
+  window.launchQueue.setConsumer(async launchParams=>{
+   const files=launchParams?.files||[];
+   if(!files.length) return;
+   const file=files[0];
+   try {
+    const text=await file.text();
+    const raw=file.name.toLowerCase().endsWith('.csv')?parseCSV(text):JSON.parse(text);
+    setDataset(raw,file.name,'custom');
+   } catch(error) {
+    setNotice('Could not open '+file.name+': '+(error?.message||'Unsupported file format'));
+   }
+  });
+ },[]);
+
  useEffect(()=>{document.documentElement.dataset.theme=theme;try{localStorage.setItem('insightboard-theme',theme);}catch{}},[theme]);
  async function switchPreset(value){if(value!=='metro')return;void playMetroAnnouncement();setBusy(true);try{setDataset(hyderabadDataset,'Hyderabad Metro station reference','metro');}catch(err){setNotice(`Could not load Metro preset: ${err.message}. Your current dataset has been kept.`);}finally{setBusy(false);}}
  async function importFile(e){const file=e.target.files?.[0];if(!file)return;try{const raw=file.name.toLowerCase().endsWith('.csv')?parseCSV(await file.text()):JSON.parse(await file.text());setDataset(raw,file.name,'custom');}catch(err){setNotice(`Import failed: ${err.message}`);}e.target.value='';}
