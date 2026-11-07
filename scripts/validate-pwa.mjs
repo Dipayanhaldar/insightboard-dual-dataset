@@ -4,6 +4,13 @@ import path from 'node:path';
 const manifestPath = path.resolve('public/manifest.webmanifest');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 const required = ['name', 'short_name', 'start_url', 'display', 'icons'];
+if (!Array.isArray(manifest.file_handlers) || !manifest.file_handlers.some(handler => handler.accept?.['text/csv']?.includes('.csv') && handler.accept?.['application/json']?.includes('.json'))) {
+  throw new Error('PWA manifest must register CSV and JSON file handlers for Windows file-open integration');
+}
+const appEntry = fs.readFileSync(path.resolve('src/main.jsx'), 'utf8');
+if (!appEntry.includes('launchQueue.setConsumer')) {
+  throw new Error('PWA app entry must consume Windows file-open launches');
+}
 for (const key of required) {
   if (!manifest[key]) throw new Error('PWA manifest is missing required member: ' + key);
 }
