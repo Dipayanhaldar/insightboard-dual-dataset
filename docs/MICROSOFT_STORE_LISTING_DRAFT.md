@@ -49,9 +49,9 @@ InsightBoard processes dashboard datasets in the browser for its core exploratio
 
 ## Required publisher details — do not invent
 
-- Support email: **[publisher must provide a monitored address]**
+- Support email: **Contact.dipayanhaldar@gmail.com**
 - Support website: **[publisher must provide a monitored URL]**
-- Privacy policy URL: `https://insightboard-v2-bsiu.onrender.com/privacy.html` only after the PWA release is approved and that route is verified live on production.
+- Privacy policy URL: `https://insightboard-staging-dipayan.onrender.com/privacy.html` after the route is verified live.
 - Legal publisher/business details: enter the truthful details required by Partner Center.
 
 ## Screenshot capture plan
