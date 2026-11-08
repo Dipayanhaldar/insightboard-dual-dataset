@@ -75,7 +75,7 @@ test('security headers prevent framing and MIME sniffing', async () => {
 
   assert.match(csp, /frame-ancestors 'none'/);
   assert.match(csp, /worker-src[^;]*blob:/);
-  assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
+  assert.equal(response.headers.get('x-frame-options'), 'DENY');
   assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
 });
 
