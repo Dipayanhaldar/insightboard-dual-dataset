@@ -709,6 +709,11 @@ app.delete('/api/reports', requireDatabase, requireAuth, asyncRoute(async (req, 
 }));
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
+app.get('/privacy.html', (_req, res, next) => {
+  res.sendFile(path.join(publicDirectory, 'privacy.html'), error => {
+    if (error) next(error);
+  });
+});
 if (!isVercelRuntime) {
   app.use(express.static(distDirectory, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
 }
