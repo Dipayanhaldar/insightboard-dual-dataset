@@ -5,6 +5,7 @@ on:
       - feature/insightboard-v2.0.1.1
       - feature/gnani-voice-studio
       - feature/global-ai-platform-foundation
+      - feature/college-project-blackcoffer
   pull_request:
     branches:
       - main
