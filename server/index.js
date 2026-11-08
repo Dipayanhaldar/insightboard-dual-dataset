@@ -34,14 +34,15 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       baseUri: ["'self'"],
-      connectSrc: ["'self'", "https://generativelanguage.googleapis.com", "https://raw.githubusercontent.com"],
+      connectSrc: ["'self'", "https:", "blob:"],
       fontSrc: ["'self'", "https:", "data:"],
       formAction: ["'self'"],
-      frameAncestors: ["'self'"],
+      frameAncestors: ["'none'"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       mediaSrc: ["'self'", "data:", "blob:"],
       objectSrc: ["'none'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'"],
+      workerSrc: ["'self'", "blob:"],
       scriptSrcAttr: ["'none'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https:"]
     }
@@ -71,6 +72,12 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '64kb' }));
+// API responses can contain account details, report snapshots or generated text.
+// Never allow browsers or intermediary caches to store them.
+app.use('/api', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 app.use('/api', rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 180,
