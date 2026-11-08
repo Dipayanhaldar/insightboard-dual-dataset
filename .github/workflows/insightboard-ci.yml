@@ -6,6 +6,7 @@ on:
       - main
       - develop
       - feature/global-ai-platform-foundation
+      - feature/college-project-blackcoffer
   pull_request:
     branches:
       - main
