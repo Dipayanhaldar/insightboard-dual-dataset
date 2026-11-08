@@ -67,3 +67,19 @@ test('version endpoint returns release metadata without exposing configuration',
   assert.equal(Object.hasOwn(body, 'env'), false);
   assert.equal(Object.hasOwn(body, 'secrets'), false);
 });
+
+
+test('security headers prevent framing and MIME sniffing', async () => {
+  const response = await fetch(`${baseUrl}/api/health/live`);
+  const csp = response.headers.get('content-security-policy') || '';
+
+  assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(csp, /worker-src[^;]*blob:/);
+  assert.equal(response.headers.get('x-frame-options'), 'SAMEORIGIN');
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+});
+
+test('API responses are never cached', async () => {
+  const response = await fetch(`${baseUrl}/api/health/live`);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+});
