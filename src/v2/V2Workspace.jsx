@@ -76,6 +76,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
   const [reportSaveBusy,setReportSaveBusy]=useState(false);
   const [backendStatus,setBackendStatus]=useState('Checking backend and database…');
   const copy=LABELS[uiLanguage]||LABELS.en;
+  const switchToCustomMode=useCallback((reason)=>{setMessage(reason);setAiMode('custom');},[]);
   const quality=useMemo(()=>checkData(rows,fields,numericFields),[rows,fields,numericFields]);
 
   function saveKey() {
@@ -394,7 +395,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
         <button type="button" role="tab" aria-selected={aiMode==='instant'} className={aiMode==='instant'?'active':''} onClick={()=>setAiMode('instant')}><Cpu size={14}/> Instant Client-Side AI <small>Free · No key</small></button>
         <button type="button" role="tab" aria-selected={aiMode==='custom'} className={aiMode==='custom'?'active':''} onClick={()=>setAiMode('custom')}><KeyRound size={14}/> Custom Key Mode <small>Bring your own provider keys</small></button>
       </div>
-      {aiMode==='instant' ? <InstantClientAI analytics={analytics} defaultLanguage={summaryLanguage} /> : <>
+      {aiMode==='instant' ? <InstantClientAI analytics={analytics} defaultLanguage={summaryLanguage} onSwitchToCustom={switchToCustomMode} /> : <>
         <article className="v2-card v2-ai">
         <div className="v2-card-title"><Sparkles size={18}/><h3>{copy.ai}</h3><span className={`v2-ai-badge ${apiKey||keyDraft.trim()?'ready':aiStatus.state}`}>{apiKey||keyDraft.trim()?'PERSONAL KEY READY':aiStatus.state==='ready'?'HOSTED AI READY':aiStatus.state==='offline'?'API OFFLINE':'KEY NEEDED'}</span></div>
         <p className="v2-muted">Generate a plain-language explanation of your current dashboard. Use the site-managed AI service when available, or bring your own Google Gemini API key.</p>
