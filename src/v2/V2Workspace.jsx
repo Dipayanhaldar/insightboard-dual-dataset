@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, History, RefreshCw, Save, Sparkles, Trash2
 import './V2Workspace.css';
 import GnaniVoiceStudio from './GnaniVoiceStudio.jsx';
 import AIProviderHub from './AIProviderHub.jsx';
+import InstantClientAI from './InstantClientAI.jsx';
 import { buildLocalDemoSummary } from './localDemoInsights.js';
 
 const MODEL = 'gemini-3.5-flash-lite';
@@ -53,6 +54,7 @@ function downloadText(text, filename) {
 
 export default function V2Workspace({analytics,rows,fields,numericFields,datasetName='',sourceIsUploaded=false}) {
   const [uiLanguage,setUiLanguage]=useState('en');
+  const [aiMode,setAiMode]=useState('instant');
   const [summaryLanguage,setSummaryLanguage]=useState('en');
   const [keyDraft,setKeyDraft]=useState('');
   const [apiKey,setApiKey]=useState(loadKey);
@@ -387,7 +389,12 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
         {!quality.total&&<p className="v2-note">Import a dataset to run checks.</p>}
       </article>
 
-      <article className="v2-card v2-ai">
+      <div className="v2-auth-tabs v2-ai-mode-tabs" role="tablist" aria-label="AI mode">
+        <button type="button" role="tab" aria-selected={aiMode==='instant'} className={aiMode==='instant'?'active':''} onClick={()=>setAiMode('instant')}><Cpu size={14}/> Instant Client-Side AI <small>Free · No key</small></button>
+        <button type="button" role="tab" aria-selected={aiMode==='custom'} className={aiMode==='custom'?'active':''} onClick={()=>setAiMode('custom')}><KeyRound size={14}/> Custom Key Mode <small>Bring your own provider keys</small></button>
+      </div>
+      {aiMode==='instant' ? <InstantClientAI analytics={analytics} defaultLanguage={summaryLanguage} /> : <>
+        <article className="v2-card v2-ai">
         <div className="v2-card-title"><Sparkles size={18}/><h3>{copy.ai}</h3><span className={`v2-ai-badge ${apiKey||keyDraft.trim()?'ready':aiStatus.state}`}>{apiKey||keyDraft.trim()?'PERSONAL KEY READY':aiStatus.state==='ready'?'HOSTED AI READY':aiStatus.state==='offline'?'API OFFLINE':'KEY NEEDED'}</span></div>
         <p className="v2-muted">Generate a plain-language explanation of your current dashboard. Use the site-managed AI service when available, or bring your own Google Gemini API key.</p>
         <div className="v2-ai-mode-grid">
@@ -417,6 +424,8 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     </div>
     <GnaniVoiceStudio authToken={authToken} rows={rows} fields={fields} datasetName={datasetName} sourceIsUploaded={sourceIsUploaded} analytics={analytics} />
     <AIProviderHub rows={rows} fields={fields} datasetName={datasetName} sourceIsUploaded={sourceIsUploaded} />
+      </>}
+
     <article className="v2-card v2-history">
       <div className="v2-card-title"><History size={18}/><h3>{copy.history}</h3><button className="v2-text-button" onClick={clearHistory} disabled={!authToken||!history.length||reportsBusy}><Trash2 size={14}/>{copy.clear}</button></div>
       <p className="v2-muted">{copy.historyNote}</p>
