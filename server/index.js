@@ -28,6 +28,7 @@ const publicDirectory = path.resolve(__dirname, '../public');
 const isVercelRuntime = process.env.VERCEL === '1';
 
 app.disable('x-powered-by');
+app.use(helmet.xFrameOptions ? helmet({ xFrameOptions: { action: 'deny' } }) : (_req, _res, next) => next());
 app.set('trust proxy', 1);
 app.use(helmet({
   contentSecurityPolicy: {
