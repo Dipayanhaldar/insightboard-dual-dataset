@@ -422,7 +422,6 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
         <button className="v2-button secondary" onClick={()=>void saveSnapshot()} disabled={reportSaveBusy}>{reportSaveBusy?<RefreshCw size={15} className="v2-spin"/>:<Save size={15}/>} {reportSaveBusy?'Saving report…':copy.save}</button>
         {message&&<div className="v2-message" role="status"><span>{message}</span><button onClick={()=>setMessage('')} aria-label="Dismiss message">×</button></div>}
       </article>
-    </div>
     <GnaniVoiceStudio authToken={authToken} rows={rows} fields={fields} datasetName={datasetName} sourceIsUploaded={sourceIsUploaded} analytics={analytics} />
     <AIProviderHub rows={rows} fields={fields} datasetName={datasetName} sourceIsUploaded={sourceIsUploaded} />
       </>}
