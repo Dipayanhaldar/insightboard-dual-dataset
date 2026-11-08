@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, History, RefreshCw, Save, Sparkles, Trash2, ShieldCheck, LogIn, UserPlus, LogOut, Database, KeyRound, ArrowUpRight, Github, BookOpen, ExternalLink } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, History, RefreshCw, Save, Sparkles, Trash2, ShieldCheck, LogIn, UserPlus, LogOut, Database, KeyRound, ArrowUpRight, Github, BookOpen, ExternalLink, Cpu } from 'lucide-react';
 import './V2Workspace.css';
 import GnaniVoiceStudio from './GnaniVoiceStudio.jsx';
 import AIProviderHub from './AIProviderHub.jsx';
@@ -388,8 +388,9 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
         {quality.limited&&<p className="v2-note">Data checks inspect the first 10,000 rows for speed.</p>}
         {!quality.total&&<p className="v2-note">Import a dataset to run checks.</p>}
       </article>
+    </div>
 
-      <div className="v2-auth-tabs v2-ai-mode-tabs" role="tablist" aria-label="AI mode">
+    <div className="v2-auth-tabs v2-ai-mode-tabs" role="tablist" aria-label="AI mode">
         <button type="button" role="tab" aria-selected={aiMode==='instant'} className={aiMode==='instant'?'active':''} onClick={()=>setAiMode('instant')}><Cpu size={14}/> Instant Client-Side AI <small>Free · No key</small></button>
         <button type="button" role="tab" aria-selected={aiMode==='custom'} className={aiMode==='custom'?'active':''} onClick={()=>setAiMode('custom')}><KeyRound size={14}/> Custom Key Mode <small>Bring your own provider keys</small></button>
       </div>
