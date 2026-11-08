@@ -1,8 +1,8 @@
 {
   "id": "/",
   "name": "InsightBoard VDB",
-  "short_name": "InsightBoard",
-  "description": "Explore, compare and understand datasets with InsightBoard.",
+  "short_name": "InsightBoard VDB",
+  "description": "Explore, compare and understand datasets with InsightBoard VDB.",
   "lang": "en-IN",
   "start_url": "/",
   "scope": "/",
@@ -65,13 +65,13 @@
     {
       "name": "Open Dashboard",
       "short_name": "Dashboard",
-      "description": "Open the InsightBoard workspace",
+      "description": "Open the InsightBoard VDB workspace",
       "url": "/"
     },
     {
       "name": "Compare Datasets",
       "short_name": "Compare",
-      "description": "Open dataset comparison",
+      "description": "Compare datasets in InsightBoard VDB",
       "url": "/#dataset-compare"
     }
   ],
