@@ -161,7 +161,7 @@ export default function InstantClientAI({ analytics = {}, defaultLanguage = 'en'
       <div className="v2-card-title">
         <span className="instant-ai-icon"><Cpu size={18} /></span>
         <div><span className="v2-overline">NO API KEY · RUNS ON YOUR DEVICE</span><h3 id="instant-ai-title">Instant Client-Side AI</h3></div>
-        <span className={'instant-ai-status ' + status}>{status === 'loading' ? 'LOADING MODEL' : status === 'generating' ? 'ANALYSING' : status === 'ready' ? 'LOCAL AI READY' : supported ? 'WEBGPU AVAILABLE' : 'WEBGPU REQUIRED'}</span>
+        <span className={'instant-ai-status ' + status}>{status === 'loading' ? 'LOADING MODEL' : status === 'generating' ? 'ANALYSING' : status === 'ready' ? 'LOCAL AI READY' : gpuState === 'checking' ? 'CHECKING DEVICE' : supported ? 'WEBGPU AVAILABLE' : 'WEBGPU REQUIRED'}</span>
       </div>
       <p className="v2-muted">Generate an AI explanation from dashboard aggregates with a compact Qwen model running in your browser through WebGPU. Raw dataset rows are not sent to a server.</p>
       <div className="instant-ai-facts">
