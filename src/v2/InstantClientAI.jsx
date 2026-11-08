@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Cpu, Download, LoaderCircle, ShieldCheck, Sparkles, Volume2, Square } from 'lucide-react';
 import './InstantClientAI.css';
 
@@ -25,7 +25,7 @@ function cleanSnapshot(analytics = {}) {
   };
 }
 
-export default function InstantClientAI({ analytics = {}, defaultLanguage = 'en' }) {
+export default function InstantClientAI({ analytics = {}, defaultLanguage = 'en', onSwitchToCustom = () => {} }) {
   const [status, setStatus] = useState('idle');
   const [progress, setProgress] = useState('');
   const [summary, setSummary] = useState('');
@@ -35,11 +35,42 @@ export default function InstantClientAI({ analytics = {}, defaultLanguage = 'en'
   const [speaking, setSpeaking] = useState(false);
   const engineRef = useRef(null);
   const snapshot = useMemo(() => cleanSnapshot(analytics), [analytics]);
-  const supported = typeof navigator !== 'undefined' && Boolean(navigator.gpu);
+  const [gpuState, setGpuState] = useState('checking');
+  const supported = gpuState === 'ready';
   const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
 
+  useEffect(() => {
+    let cancelled = false;
+    async function detectGpu() {
+      if (typeof navigator === 'undefined' || !navigator.gpu) {
+        if (!cancelled) {
+          setGpuState('unsupported');
+          onSwitchToCustom('WebGPU is unavailable on this device/browser. Switched to Custom Key Mode.');
+        }
+        return;
+      }
+      try {
+        const adapter = await navigator.gpu.requestAdapter();
+        if (cancelled) return;
+        if (!adapter) {
+          setGpuState('unsupported');
+          onSwitchToCustom('This device did not provide a usable WebGPU adapter. Switched to Custom Key Mode.');
+          return;
+        }
+        setGpuState('ready');
+      } catch {
+        if (!cancelled) {
+          setGpuState('unsupported');
+          onSwitchToCustom('WebGPU could not initialise on this device/browser. Switched to Custom Key Mode.');
+        }
+      }
+    }
+    void detectGpu();
+    return () => { cancelled = true; };
+  }, [onSwitchToCustom]);
+
   async function loadEngine() {
-    if (!supported) throw new Error('WebGPU is not available in this browser/device. Use a WebGPU-enabled browser or switch to Custom Key Mode.');
+    if (!supported) throw new Error('A usable WebGPU adapter is not available. Switch to Custom Key Mode or try a supported desktop browser.');
     if (engineRef.current) return engineRef.current;
     if (!enginePromise) {
       enginePromise = (async () => {
@@ -146,8 +177,9 @@ export default function InstantClientAI({ analytics = {}, defaultLanguage = 'en'
         </button>
       </div>
       {(status === 'loading' || status === 'generating') && <div className="instant-ai-progress" role="status"><LoaderCircle size={15} className="v2-spin" /><span>{progress || 'Working locally…'}</span></div>}
-      {!supported && <div className="instant-ai-warning"><AlertTriangle size={15} /><span>This browser does not expose WebGPU. Open the site in a current WebGPU-compatible desktop browser, or choose Custom Key Mode. Model loading requires an internet connection the first time.</span></div>}
-      {error && <div className="instant-ai-error" role="alert"><AlertTriangle size={15} /><span>{error}</span></div>}
+      {gpuState === 'checking' && <div className="instant-ai-progress" role="status"><LoaderCircle size={15} className="v2-spin" /><span>Checking whether this device can run local AI…</span></div>}
+      {gpuState === 'unsupported' && <div className="instant-ai-warning"><AlertTriangle size={15} /><span>This device/browser cannot run the local WebGPU model. InsightBoard is switching to Custom Key Mode. Your dashboard data remains in the browser.</span></div>}
+      {error && <div className="instant-ai-error" role="alert"><AlertTriangle size={15} /><span>{error} You can continue with Custom Key Mode.</span><button type="button" className="v2-button secondary" onClick={() => onSwitchToCustom('Local AI could not start on this device. Switched to Custom Key Mode.')}>Switch to Custom Key Mode</button></div>}
       {summary && <section className="instant-ai-result" aria-live="polite">
         <div className="instant-ai-result-head"><strong><CheckCircle2 size={15} /> Local AI summary</strong><button type="button" className="v2-text-button" onClick={downloadSummary}><Download size={14} /> Download</button></div>
         <div className="instant-ai-summary">{summary}</div>
