@@ -50,7 +50,7 @@ jobs:
         run: npm run build
 
       - name: Install Capacitor toolchain
-        run: npm install --no-save @capacitor/core@7.4.3 @capacitor/cli@7.4.3 @capacitor/android@7.4.3
+        run: npm install --no-save --package-lock=false @capacitor/core@7.4.3 @capacitor/cli@7.4.3 @capacitor/android@7.4.3
 
       - name: Generate native Android project
         run: |
