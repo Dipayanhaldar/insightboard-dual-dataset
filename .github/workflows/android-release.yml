@@ -1,0 +1,104 @@
+name: InsightBoard Android APK Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-release.yml'
+      - 'capacitor.config.json'
+      - 'src/v2/V2Workspace.jsx'
+      - 'docs/ANDROID_RELEASE.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: insightboard-android-release
+  cancel-in-progress: false
+
+jobs:
+  build-apk:
+    name: Build and publish Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Build production web application
+        env:
+          VITE_API_BASE_URL: https://insightboard-v2-bsiu.onrender.com
+        run: npm run build
+
+      - name: Install Capacitor toolchain
+        run: npm install --no-save @capacitor/core@7.4.3 @capacitor/cli@7.4.3 @capacitor/android@7.4.3
+
+      - name: Generate native Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Build installable APK
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Verify APK and generate checksum
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          mkdir -p release
+          cp "$APK" release/InsightBoard-Android.apk
+          cd release
+          sha256sum InsightBoard-Android.apk > SHA256SUMS.txt
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0.1
+          name: Version 1.0.0.1
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release/InsightBoard-Android.apk
+            release/SHA256SUMS.txt
+          body: |
+            ## InsightBoard for Android
+
+            Installable Android package built from the repository's production web application and bundled with Capacitor.
+
+            **Assets**
+            - `InsightBoard-Android.apk` — directly installable universal debug-signed APK.
+            - `SHA256SUMS.txt` — SHA-256 integrity checksum.
+
+            **Included workflows**
+            - CSV and JSON import, interactive dashboard analysis, filtering and comparison.
+            - CSV, Excel and PDF export.
+            - Hosted account, report and AI API connectivity.
+            - Device/browser-supported speech and narration capabilities.
+
+            **Compatibility notes**
+            - Internet access is required for hosted account/API features and first-time remote AI provider calls.
+            - On-device WebGPU inference depends on Android WebView/device support and is not guaranteed on every device.
+            - This APK is debug-signed for direct testing and installation. It is not a Google Play production-signing artifact.
+            - Review the repository's Android release notes for feature limitations and validation details.
