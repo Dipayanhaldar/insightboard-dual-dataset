@@ -1,11 +1,13 @@
 # InsightBoard
 
-**A browser-based data exploration and comparison workspace.** Import CSV or JSON datasets, inspect metrics and visualisations, compare datasets, and export useful results.
+**A practical business-intelligence workspace built to make data work easier and simpler.** Turn CSV and JSON files into interactive dashboards, compare datasets, understand key metrics, and export decision-ready reports from the web or Android app.
 
 <p align="center">
   <a href="https://insightboard-college-dipayan.onrender.com"><strong>🌐 Launch InsightBoard</strong></a>
   ·
   <a href="https://github.com/Dipayanhaldar/insightboard-dual-dataset"><strong>GitHub repository</strong></a>
+  ·
+  <a href="https://github.com/Dipayanhaldar/insightboard-dual-dataset/releases/tag/v1.0.0.1"><strong>📱 Download Android APK</strong></a>
   ·
   <a href="https://app.notion.com/p/406a0f05cdd280c09762fef99e5c5d53"><strong>Project documentation</strong></a>
 </p>
@@ -13,6 +15,7 @@
 ![React](https://img.shields.io/badge/React-18-149eca?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)
+![Android](https://img.shields.io/badge/Android-APK-3DDC84?logo=android&logoColor=white)
 
 ## Overview
 
@@ -28,6 +31,24 @@ InsightBoard turns structured files into an interactive dashboard. It is designe
 - Switch between light and dark themes.
 
 The built-in Hyderabad Metro content is station-reference data. It does not represent live train locations, arrival predictions or service status.
+
+## Android app
+
+InsightBoard is also available as an installable Android application. The Android package bundles the production React interface locally using Capacitor; it is not simply a shortcut to the hosted website.
+
+<blockquote>
+  **Android download:** [InsightBoard-Android.apk](https://github.com/Dipayanhaldar/insightboard-dual-dataset/releases/download/v1.0.0.1/InsightBoard-Android.apk) · [GitHub Release and checksum](https://github.com/Dipayanhaldar/insightboard-dual-dataset/releases/tag/v1.0.0.1)
+</blockquote>
+
+The Android build includes the dashboard, CSV/JSON import, KPI and chart analysis, filtering, search, sorting, dual-dataset comparison, and CSV/Excel/PDF export workflows. Hosted account, saved-report and server-backed AI features require an internet connection and an available backend.
+
+**Installation**
+1. Download the APK from the GitHub Release on your Android device.
+2. Open the downloaded APK and allow installation from that source if Android asks.
+3. Complete installation and launch InsightBoard.
+4. Import a CSV or JSON file and start exploring the dashboard.
+
+The published APK is debug-signed for direct installation and testing. It is not a Google Play production-signed package. A Play Store release requires a protected, persistent signing key and a separately signed build. Android WebView support varies by device; local WebGPU AI and speech capabilities are conditional and are not guaranteed on every Android device. See [Android packaging and compatibility notes](docs/ANDROID_RELEASE.md).
 
 ## Use InsightBoard
 
@@ -51,6 +72,7 @@ To compare datasets, open the comparison workspace and add a second CSV or JSON 
 | Area | Technologies | Purpose |
 | --- | --- | --- |
 | Frontend | React 18, Vite 6, JavaScript | Application interface and client-side workflows |
+| Android packaging | Capacitor 7, Android SDK, Gradle | Bundles the production web client into an installable Android app |
 | Charts and UI | Recharts, Lucide React | Data visualisation and interface icons |
 | Data import/export | SheetJS (`xlsx`), jsPDF, jsPDF-AutoTable, html2canvas | Spreadsheet and PDF workflows |
 | Backend foundation | Node.js 22+, Express 4 | API and server-side routes |
@@ -81,12 +103,14 @@ The recent project work has focused on:
 - **Release foundation:** consolidating the application structure and preparing the public-facing release.
 - **Dataset scope:** removing an unused third-party dataset integration and keeping the application aligned with its intended data workflows.
 - **PWA readiness:** improving the offline application shell and expanding production asset precaching and validation.
+- **Android application:** adding a Capacitor-based native shell, hosted API routing for the Android origin, automated APK compilation and checksum generation.
+- **Release delivery:** publishing an installable APK and SHA-256 checksum through GitHub Releases after the Android build succeeds.
 - **Offline reliability:** adding checks that verify the production asset graph required for offline use.
 - **Store preparation:** aligning the app identity and preparing listing and release-checklist material.
 - **Infrastructure planning:** documenting a free-first hosting approach, conservative database connection-pool settings and scalability milestones.
 - **AI and voice exploration:** maintaining separate work for local AI, BYOK and narration instead of presenting every prototype as part of the same release.
 
-These updates improve release discipline, reduce unused integrations, strengthen offline readiness and make the product's deployment boundaries clearer. The [commit history](https://github.com/Dipayanhaldar/insightboard-dual-dataset/commits/main) contains the source-level change record.
+These updates improve release discipline, reduce unused integrations, strengthen offline readiness, extend access to Android devices and make the product's deployment boundaries clearer. The [commit history](https://github.com/Dipayanhaldar/insightboard-dual-dataset/commits/main) contains the source-level change record.
 
 ## Branch and feature boundaries
 
@@ -153,6 +177,9 @@ These describe implementation choices, not an independent security certification
 ## Project resources
 
 - [Launch InsightBoard](https://insightboard-college-dipayan.onrender.com)
+- [Download InsightBoard for Android](https://github.com/Dipayanhaldar/insightboard-dual-dataset/releases/download/v1.0.0.1/InsightBoard-Android.apk)
+- [Android release and SHA-256 checksum](https://github.com/Dipayanhaldar/insightboard-dual-dataset/releases/tag/v1.0.0.1)
+- [Android packaging and compatibility guide](docs/ANDROID_RELEASE.md)
 - [GitHub repository](https://github.com/Dipayanhaldar/insightboard-dual-dataset)
 - [Main source branch](https://github.com/Dipayanhaldar/insightboard-dual-dataset/tree/main)
 - [All branches](https://github.com/Dipayanhaldar/insightboard-dual-dataset/branches)
