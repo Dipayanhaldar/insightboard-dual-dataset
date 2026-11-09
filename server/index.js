@@ -29,6 +29,29 @@ const isVercelRuntime = process.env.VERCEL === '1';
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+
+// The Android Capacitor shell runs on a local secure origin. Allow only the
+// known app origins plus explicitly configured web origins; never use '*'.
+const allowedOrigins = new Set([
+  'https://localhost',
+  'capacitor://localhost',
+  ...(process.env.CAPACITOR_ALLOWED_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean)
+]);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.has(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Vary', 'Origin');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Max-Age', '86400');
+  }
+  if (req.method === 'OPTIONS') {
+    if (origin && !allowedOrigins.has(origin)) return res.sendStatus(403);
+    return res.sendStatus(204);
+  }
+  next();
+});
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
