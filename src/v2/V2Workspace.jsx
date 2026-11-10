@@ -1,6 +1,3 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
-const apiUrl = path => `${API_BASE_URL}${path}`;
-
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, History, RefreshCw, Save, Sparkles, Trash2, ShieldCheck, LogIn, UserPlus, LogOut, Database, KeyRound, ArrowUpRight, Github, BookOpen, ExternalLink } from 'lucide-react';
 import './V2Workspace.css';
@@ -14,9 +11,9 @@ const LANGUAGES = [
   ['bn','বাংলা'],['mr','मराठी'],['kn','ಕನ್ನಡ'],['ml','മലയാളം'],['ur','اردو']
 ];
 const LABELS = {
- en:{title:'Insight Assistant',subtitle:'Private report history, clear data-quality checks and AI-assisted insights. Your imported raw rows stay in this browser.',quality:'Smart data checks',records:'Rows inspected',duplicates:'Possible duplicate rows',invalid:'Invalid numeric values',missing:'Fields with missing values',local:'Local checks: your imported rows stay in this browser.',language:'Summary language',summarize:'Generate Gemini summary',apiKey:'Gemini API key',saveKey:'Use key in this browser',remember:'Remember on this browser',forget:'Forget key',keyHint:'Paste your own Gemini API key. It is never written to GitHub or sent to an InsightBoard server.',warning:'When using your own key, the browser calls Google directly; the key can be inspected by someone using this browser. Use a private device and a Gemini-restricted key. Do not submit confidential data.',consent:'I understand that clicking Generate sends only this aggregate KPI/chart snapshot and category/field labels to Google Gemini—not the raw rows. Free-tier prompts may be used by Google to improve products. I will not send confidential or sensitive data.',ai:'AI summary',none:'No summary yet. Enter a Gemini key or use the site-managed AI service, confirm the data-sharing note, then generate a summary.',save:'Save snapshot to account',history:'Saved report history (MongoDB)',historyNote:'Account-specific aggregate snapshots sync across devices. Raw imported rows are not uploaded.',noHistory:'No saved reports in this account yet.',saved:'Aggregate snapshot saved to your account.',cleared:'Account report history cleared.',missingKey:'Enter your Gemini API key first.',consentErr:'Confirm the data-sharing note before requesting a summary.',keySaved:'Key is available in this browser session only.',keyRemembered:'Key remembered in this browser. Clear browser storage to remove it.',forgot:'Gemini key removed from this browser.',storage:'Browser-only storage',notSent:'No data has been sent to Gemini yet.',setup:'Get a Gemini API key',delete:'Delete saved report',clear:'Clear account history',apiError:'Gemini request failed'},
- hi:{title:'इनसाइट सहायक',subtitle:'निजी खाते और MongoDB में सहेजी गई रिपोर्ट। मूल आयातित पंक्तियाँ ब्राउज़र में रहती हैं।',quality:'स्मार्ट डेटा जाँच',records:'जाँची गई पंक्तियाँ',duplicates:'संभावित डुप्लिकेट पंक्तियाँ',invalid:'अमान्य संख्यात्मक मान',missing:'खाली मान वाले फ़ील्ड',local:'स्थानीय जाँच: अपलोड की गई पंक्तियाँ इसी ब्राउज़र में रहती हैं।',language:'सारांश की भाषा',summarize:'Gemini सारांश बनाएँ',apiKey:'Gemini API key',saveKey:'इस ब्राउज़र में उपयोग करें',remember:'इस ब्राउज़र में याद रखें',forget:'कुंजी हटाएँ',keyHint:'अपनी Gemini API key पेस्ट करें। यह GitHub पर नहीं लिखी जाएगी और InsightBoard सर्वर पर नहीं भेजी जाएगी।',warning:'ब्राउज़र-आधारित डेमो: यह ब्राउज़र Google को सीधे कॉल करता है। सार्वजनिक वेबसाइट पर साझा करने के लिए बनी कुंजी का उपयोग न करें।',consent:'मैं समझता/समझती हूँ कि Generate दबाने पर केवल समेकित KPI/चार्ट आँकड़े और फ़ील्ड/श्रेणी नाम Google Gemini को भेजे जाएँगे, पूरी पंक्तियाँ नहीं। मुफ़्त टियर के प्रॉम्प्ट का उपयोग Google उत्पाद सुधारने के लिए कर सकता है। मैं गोपनीय डेटा नहीं भेजूँगा/भेजूँगी।',ai:'AI सारांश',none:'अभी सारांश नहीं है। कुंजी डालें, डेटा साझा करने की सहमति दें और सारांश बनाएँ।',save:'स्नैपशॉट स्थानीय रूप से सहेजें',history:'सहेजे गए रिपोर्ट (यह ब्राउज़र)',historyNote:'केवल आँकड़े, फ़िल्टर और वैकल्पिक AI पाठ स्थानीय रूप से सहेजे जाते हैं।',noHistory:'इस ब्राउज़र में कोई स्नैपशॉट नहीं है।',saved:'स्नैपशॉट इस ब्राउज़र में सहेजा गया।',cleared:'इतिहास हटाया गया।',missingKey:'पहले Gemini API key डालें।',consentErr:'सारांश बनाने से पहले डेटा-साझाकरण नोट स्वीकार करें।',keySaved:'कुंजी केवल इस ब्राउज़र सत्र में उपलब्ध है।',keyRemembered:'कुंजी इस ब्राउज़र में याद रखी गई है।',forgot:'कुंजी हटा दी गई।',storage:'ब्राउज़र-स्थानीय स्टोरेज',notSent:'Gemini को अभी डेटा नहीं भेजा गया है।',setup:'Gemini API key प्राप्त करें',delete:'स्नैपशॉट हटाएँ',clear:'इतिहास हटाएँ',apiError:'Gemini अनुरोध विफल'},
- te:{title:'ఇన్‌సైట్ అసిస్టెంట్',subtitle:'Private accounts మరియు MongoDBలో saved reports. అసలు imported rows ఈ browserలోనే ఉంటాయి.',quality:'స్మార్ట్ డేటా తనిఖీలు',records:'పరిశీలించిన వరుసలు',duplicates:'సంభావ్య డూప్లికేట్ వరుసలు',invalid:'చెల్లని సంఖ్యా విలువలు',missing:'ఖాళీ విలువలున్న ఫీల్డ్‌లు',local:'స్థానిక తనిఖీలు: మీ దిగుమతి చేసిన వరుసలు ఈ browser‌లోనే ఉంటాయి.',language:'సారాంశ భాష',summarize:'Gemini సారాంశం రూపొందించు',apiKey:'Gemini API key',saveKey:'ఈ browser‌లో ఉపయోగించు',remember:'ఈ browser‌లో గుర్తుంచుకో',forget:'Key తొలగించు',keyHint:'మీ Gemini API keyను పేస్ట్ చేయండి. ఇది GitHub‌లో రాయబడదు లేదా InsightBoard server‌కు పంపబడదు.',warning:'Browser-only demo: ఈ browser Google APIని నేరుగా పిలుస్తుంది. పబ్లిక్ వెబ్‌సైట్‌లో అందరికీ పంచుకునే key ఉపయోగించవద్దు.',consent:'Generate నొక్కితే సమగ్ర KPI/chart గణాంకాలు, field/category పేర్లు మాత్రమే Google Geminiకి పంపబడతాయని అర్థం చేసుకున్నాను; raw rows పంపబడవు. ఉచిత API promptలను Google ఉత్పత్తులను మెరుగుపరచడానికి ఉపయోగించవచ్చు. గోప్యమైన డేటాను పంపను.',ai:'AI సారాంశం',none:'ఇంకా సారాంశం లేదు. key నమోదు చేసి, డేటా పంపేందుకు అంగీకరించి, సారాంశం రూపొందించండి.',save:'స్నాప్‌షాట్‌ను స్థానికంగా సేవ్ చేయి',history:'సేవ్ చేసిన రిపోర్టులు (ఈ browser)',historyNote:'సారాంశ గణాంకాలు, ఫిల్టర్లు, ఐచ్ఛిక AI పాఠ్యం మాత్రమే స్థానికంగా నిల్వ అవుతాయి.',noHistory:'ఈ browser‌లో స్నాప్‌షాట్‌లు లేవు.',saved:'స్నాప్‌షాట్ ఈ browser‌లో సేవ్ అయింది.',cleared:'చరిత్ర తొలగించబడింది.',missingKey:'ముందుగా Gemini API key నమోదు చేయండి.',consentErr:'సారాంశానికి ముందు డేటా-షేరింగ్ నోటును అంగీకరించండి.',keySaved:'Key ఈ browser session‌లో మాత్రమే ఉంటుంది.',keyRemembered:'Key ఈ browser‌లో గుర్తుంచబడింది.',forgot:'Gemini key తొలగించబడింది.',storage:'Browser-only storage',notSent:'ఇంకా Geminiకి డేటా పంపలేదు.',setup:'Gemini API key పొందండి',delete:'స్నాప్‌షాట్ తొలగించు',clear:'చరిత్ర తొలగించు',apiError:'Gemini అభ్యర్థన విఫలమైంది'}
+ en:{title:'Insight Assistant · V2.0.1.1',subtitle:'Private report history, clear data-quality checks and AI-assisted insights. Your imported raw rows stay in this browser.',quality:'Smart data checks',records:'Rows inspected',duplicates:'Possible duplicate rows',invalid:'Invalid numeric values',missing:'Fields with missing values',local:'Local checks: your imported rows stay in this browser.',language:'Summary language',summarize:'Generate Gemini summary',apiKey:'Gemini API key',saveKey:'Use key in this browser',remember:'Remember on this browser',forget:'Forget key',keyHint:'Paste your own Gemini API key. It is never written to GitHub or sent to an InsightBoard server.',warning:'When using your own key, the browser calls Google directly; the key can be inspected by someone using this browser. Use a private device and a Gemini-restricted key. Do not submit confidential data.',consent:'I understand that clicking Generate sends only this aggregate KPI/chart snapshot and category/field labels to Google Gemini—not the raw rows. Free-tier prompts may be used by Google to improve products. I will not send confidential or sensitive data.',ai:'AI summary',none:'No summary yet. Enter a Gemini key or use the site-managed AI service, confirm the data-sharing note, then generate a summary.',save:'Save snapshot to account',history:'Saved report history (MongoDB)',historyNote:'Account-specific aggregate snapshots sync across devices. Raw imported rows are not uploaded.',noHistory:'No saved reports in this account yet.',saved:'Aggregate snapshot saved to your account.',cleared:'Account report history cleared.',missingKey:'Enter your Gemini API key first.',consentErr:'Confirm the data-sharing note before requesting a summary.',keySaved:'Key is available in this browser session only.',keyRemembered:'Key remembered in this browser. Clear browser storage to remove it.',forgot:'Gemini key removed from this browser.',storage:'Browser-only storage',notSent:'No data has been sent to Gemini yet.',setup:'Get a Gemini API key',delete:'Delete saved report',clear:'Clear account history',apiError:'Gemini request failed'},
+ hi:{title:'इनसाइट सहायक · V2.0.1.1',subtitle:'निजी खाते और MongoDB में सहेजी गई रिपोर्ट। मूल आयातित पंक्तियाँ ब्राउज़र में रहती हैं।',quality:'स्मार्ट डेटा जाँच',records:'जाँची गई पंक्तियाँ',duplicates:'संभावित डुप्लिकेट पंक्तियाँ',invalid:'अमान्य संख्यात्मक मान',missing:'खाली मान वाले फ़ील्ड',local:'स्थानीय जाँच: अपलोड की गई पंक्तियाँ इसी ब्राउज़र में रहती हैं।',language:'सारांश की भाषा',summarize:'Gemini सारांश बनाएँ',apiKey:'Gemini API key',saveKey:'इस ब्राउज़र में उपयोग करें',remember:'इस ब्राउज़र में याद रखें',forget:'कुंजी हटाएँ',keyHint:'अपनी Gemini API key पेस्ट करें। यह GitHub पर नहीं लिखी जाएगी और InsightBoard सर्वर पर नहीं भेजी जाएगी।',warning:'ब्राउज़र-आधारित डेमो: यह ब्राउज़र Google को सीधे कॉल करता है। सार्वजनिक वेबसाइट पर साझा करने के लिए बनी कुंजी का उपयोग न करें।',consent:'मैं समझता/समझती हूँ कि Generate दबाने पर केवल समेकित KPI/चार्ट आँकड़े और फ़ील्ड/श्रेणी नाम Google Gemini को भेजे जाएँगे, पूरी पंक्तियाँ नहीं। मुफ़्त टियर के प्रॉम्प्ट का उपयोग Google उत्पाद सुधारने के लिए कर सकता है। मैं गोपनीय डेटा नहीं भेजूँगा/भेजूँगी।',ai:'AI सारांश',none:'अभी सारांश नहीं है। कुंजी डालें, डेटा साझा करने की सहमति दें और सारांश बनाएँ।',save:'स्नैपशॉट स्थानीय रूप से सहेजें',history:'सहेजे गए रिपोर्ट (यह ब्राउज़र)',historyNote:'केवल आँकड़े, फ़िल्टर और वैकल्पिक AI पाठ स्थानीय रूप से सहेजे जाते हैं।',noHistory:'इस ब्राउज़र में कोई स्नैपशॉट नहीं है।',saved:'स्नैपशॉट इस ब्राउज़र में सहेजा गया।',cleared:'इतिहास हटाया गया।',missingKey:'पहले Gemini API key डालें।',consentErr:'सारांश बनाने से पहले डेटा-साझाकरण नोट स्वीकार करें।',keySaved:'कुंजी केवल इस ब्राउज़र सत्र में उपलब्ध है।',keyRemembered:'कुंजी इस ब्राउज़र में याद रखी गई है।',forgot:'कुंजी हटा दी गई।',storage:'ब्राउज़र-स्थानीय स्टोरेज',notSent:'Gemini को अभी डेटा नहीं भेजा गया है।',setup:'Gemini API key प्राप्त करें',delete:'स्नैपशॉट हटाएँ',clear:'इतिहास हटाएँ',apiError:'Gemini अनुरोध विफल'},
+ te:{title:'ఇన్‌సైట్ అసిస్టెంట్ · V2.0.1.1',subtitle:'Private accounts మరియు MongoDBలో saved reports. అసలు imported rows ఈ browserలోనే ఉంటాయి.',quality:'స్మార్ట్ డేటా తనిఖీలు',records:'పరిశీలించిన వరుసలు',duplicates:'సంభావ్య డూప్లికేట్ వరుసలు',invalid:'చెల్లని సంఖ్యా విలువలు',missing:'ఖాళీ విలువలున్న ఫీల్డ్‌లు',local:'స్థానిక తనిఖీలు: మీ దిగుమతి చేసిన వరుసలు ఈ browser‌లోనే ఉంటాయి.',language:'సారాంశ భాష',summarize:'Gemini సారాంశం రూపొందించు',apiKey:'Gemini API key',saveKey:'ఈ browser‌లో ఉపయోగించు',remember:'ఈ browser‌లో గుర్తుంచుకో',forget:'Key తొలగించు',keyHint:'మీ Gemini API keyను పేస్ట్ చేయండి. ఇది GitHub‌లో రాయబడదు లేదా InsightBoard server‌కు పంపబడదు.',warning:'Browser-only demo: ఈ browser Google APIని నేరుగా పిలుస్తుంది. పబ్లిక్ వెబ్‌సైట్‌లో అందరికీ పంచుకునే key ఉపయోగించవద్దు.',consent:'Generate నొక్కితే సమగ్ర KPI/chart గణాంకాలు, field/category పేర్లు మాత్రమే Google Geminiకి పంపబడతాయని అర్థం చేసుకున్నాను; raw rows పంపబడవు. ఉచిత API promptలను Google ఉత్పత్తులను మెరుగుపరచడానికి ఉపయోగించవచ్చు. గోప్యమైన డేటాను పంపను.',ai:'AI సారాంశం',none:'ఇంకా సారాంశం లేదు. key నమోదు చేసి, డేటా పంపేందుకు అంగీకరించి, సారాంశం రూపొందించండి.',save:'స్నాప్‌షాట్‌ను స్థానికంగా సేవ్ చేయి',history:'సేవ్ చేసిన రిపోర్టులు (ఈ browser)',historyNote:'సారాంశ గణాంకాలు, ఫిల్టర్లు, ఐచ్ఛిక AI పాఠ్యం మాత్రమే స్థానికంగా నిల్వ అవుతాయి.',noHistory:'ఈ browser‌లో స్నాప్‌షాట్‌లు లేవు.',saved:'స్నాప్‌షాట్ ఈ browser‌లో సేవ్ అయింది.',cleared:'చరిత్ర తొలగించబడింది.',missingKey:'ముందుగా Gemini API key నమోదు చేయండి.',consentErr:'సారాంశానికి ముందు డేటా-షేరింగ్ నోటును అంగీకరించండి.',keySaved:'Key ఈ browser session‌లో మాత్రమే ఉంటుంది.',keyRemembered:'Key ఈ browser‌లో గుర్తుంచబడింది.',forgot:'Gemini key తొలగించబడింది.',storage:'Browser-only storage',notSent:'ఇంకా Geminiకి డేటా పంపలేదు.',setup:'Gemini API key పొందండి',delete:'స్నాప్‌షాట్ తొలగించు',clear:'చరిత్ర తొలగించు',apiError:'Gemini అభ్యర్థన విఫలమైంది'}
 };
 const blank = value => value === null || value === undefined || (typeof value === 'string' && !value.trim());
 function rowFingerprint(row, fields) {
@@ -111,7 +108,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     if(!token){setHistory([]);return;}
     setReportsBusy(true);
     try {
-      const response=await fetch(apiUrl('/api/reports'),{headers:{Authorization:`Bearer ${token}`}});
+      const response=await fetch('/api/reports',{headers:{Authorization:`Bearer ${token}`}});
       const result=await response.json().catch(()=>({}));
       if(response.status===401){
         try{sessionStorage.removeItem('insightboard-api-token');}catch{}
@@ -135,7 +132,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     const controller=new AbortController();
     const requestTimeout=setTimeout(()=>controller.abort(),60000);
     try {
-      const response=await fetch(apiUrl('/api/auth/'+(authMode==='register'?'register':'login')),{
+      const response=await fetch('/api/auth/'+(authMode==='register'?'register':'login'),{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({email:cleanEmail,password}),
@@ -169,7 +166,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
 
   useEffect(()=>{
     let alive=true;
-    fetch(apiUrl('/api/health')).then(async response=>{
+    fetch('/api/health').then(async response=>{
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(data.error||'Database not ready');
       return data;
@@ -179,7 +176,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
   },[]);
   useEffect(()=>{
     let alive=true;
-    fetch(apiUrl('/api/ai/status')).then(async response=>{
+    fetch('/api/ai/status').then(async response=>{
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(data.error||'AI status unavailable');
       return data;
@@ -194,7 +191,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     if(!authToken){setAccount(null);setHistory([]);return ()=>{alive=false;};}
     (async()=>{
       try {
-        const response=await fetch(apiUrl('/api/auth/me'),{headers:{Authorization:`Bearer ${authToken}`}});
+        const response=await fetch('/api/auth/me',{headers:{Authorization:`Bearer ${authToken}`}});
         const data=await response.json().catch(()=>({}));
         if(response.status===401){
           try{sessionStorage.removeItem('insightboard-api-token');}catch{}
@@ -267,7 +264,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
         }
         result={summary:(result?.candidates?.[0]?.content?.parts||[]).map(part=>typeof part.text==='string'?part.text:'').join('\n').trim()};
       } else {
-        response=await fetch(apiUrl('/api/ai/summary'),{
+        response=await fetch('/api/ai/summary',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({snapshot:analytics,language:summaryLanguage})
@@ -301,7 +298,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     };
     setReportSaveBusy(true);setMessage('');
     try {
-      const response=await fetch(apiUrl('/api/reports'),{
+      const response=await fetch('/api/reports',{
         method:'POST',
         headers:{'Content-Type':'application/json',Authorization:`Bearer ${authToken}`},
         body:JSON.stringify(entry)
@@ -317,7 +314,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
   async function deleteSnapshot(id) {
     if(!authToken)return;
     try {
-      const response=await fetch(apiUrl('/api/reports/'+encodeURIComponent(id)),{method:'DELETE',headers:{Authorization:`Bearer ${authToken}`}});
+      const response=await fetch('/api/reports/'+encodeURIComponent(id),{method:'DELETE',headers:{Authorization:`Bearer ${authToken}`}});
       const result=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(result.error||'Could not delete the report.');
       await fetchReports(authToken);setMessage('Saved report deleted from your account.');
@@ -328,7 +325,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
     if(!authToken||!history.length)return;
     if(!window.confirm('Delete all saved reports from this account? This cannot be undone.'))return;
     try {
-      const response=await fetch(apiUrl('/api/reports'),{method:'DELETE',headers:{Authorization:`Bearer ${authToken}`}});
+      const response=await fetch('/api/reports',{method:'DELETE',headers:{Authorization:`Bearer ${authToken}`}});
       const result=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(result.error||'Could not clear report history.');
       setHistory([]);setMessage(copy.cleared);
