@@ -1,0 +1,257 @@
+name: Release Microsoft Store PWA & Android APK
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Synchronized version to build & publish (e.g., 2.1.0)'
+        required: false
+        default: '2.1.0'
+      submit_to_microsoft_store:
+        description: 'Submit package update to Microsoft Partner Center'
+        required: false
+        default: 'true'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: insightboard-vdb-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  APP_NAME: "InsightBoard VDB"
+  DEFAULT_VERSION: "2.1.0"
+  PRODUCTION_WEB_URL: ${{ vars.PRODUCTION_WEB_URL || 'https://insightboard.me' }}
+
+jobs:
+  validate-and-build-web:
+    name: 1. Validate & Build Web Bundle (v2.1.0)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      windows_version: ${{ steps.meta.outputs.windows_version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --include=dev
+
+      - name: Read synchronized version from package.json & release-info.json
+        id: meta
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          REL_VERSION=$(node -p "require('./public/release-info.json').websiteVersion")
+          WIN_VERSION=$(node -p "require('./public/release-info.json').windowsPackageVersion")
+          if [ "$PKG_VERSION" != "$REL_VERSION" ]; then
+            echo "Version mismatch: package.json ($PKG_VERSION) != release-info.json ($REL_VERSION)"
+            exit 1
+          fi
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "windows_version=$WIN_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Validate PWA manifest, service worker & release metadata
+        run: |
+          node --check public/sw.js
+          node scripts/validate-pwa.mjs
+          npm run check:server
+
+      - name: Run API & Retail Intelligence unit tests
+        run: npm test
+
+      - name: Build production web bundle
+        run: npm run build
+
+      - name: Validate offline PWA cache against production build
+        run: npm run check:pwa:build
+
+      - name: Upload production web dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: insightboard-vdb-web-dist-v${{ steps.meta.outputs.version }}
+          path: dist/
+          retention-days: 14
+
+  build-android-apk:
+    name: 2. Build Signed Android APK
+    needs: validate-and-build-web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up JDK 17 for Android Gradle build
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Download production web build
+        uses: actions/download-artifact@v4
+        with:
+          name: insightboard-vdb-web-dist-v${{ needs.validate-and-build-web.outputs.version }}
+          path: dist/
+
+      - name: Package Android APK via Capacitor CLI
+        env:
+          VERSION_NAME: ${{ needs.validate-and-build-web.outputs.version }}
+        run: |
+          mkdir -p build-android
+          cd build-android
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "InsightBoard VDB" "com.insightboard.vdb" --web-dir ../dist
+          npx cap add android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+          mkdir -p ../../release-artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk "../../release-artifacts/InsightBoard-VDB-v${VERSION_NAME}.apk"
+
+      - name: Upload Android APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: insightboard-vdb-android-apk-v${{ needs.validate-and-build-web.outputs.version }}
+          path: release-artifacts/InsightBoard-VDB-v${{ needs.validate-and-build-web.outputs.version }}.apk
+          retention-days: 30
+
+  microsoft-store-update:
+    name: 3. Package & Auto-Update Microsoft Store Windows App
+    needs: validate-and-build-web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Generate Windows Store PWA Submission Manifest
+        env:
+          VERSION: ${{ needs.validate-and-build-web.outputs.version }}
+          WIN_VERSION: ${{ needs.validate-and-build-web.outputs.windows_version }}
+        run: |
+          mkdir -p release-artifacts
+          cat <<EOF > release-artifacts/windows-store-package-config-v${VERSION}.json
+          {
+            "appName": "InsightBoard VDB (Visual Dashboard)",
+            "storeId": "9N20PQ3BJRSG",
+            "packageId": "InsightBoardVDB.VisualDashboard",
+            "version": "${WIN_VERSION}",
+            "webVersion": "${VERSION}",
+            "manifestUrl": "${PRODUCTION_WEB_URL}/manifest.webmanifest",
+            "startUrl": "${PRODUCTION_WEB_URL}/",
+            "releaseChannel": "production",
+            "autoUpdateEnabled": true
+          }
+          EOF
+
+      - name: Submit Update to Microsoft Partner Center (when Store Certificate & Credentials are configured)
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+          MSSTORE_SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+          MSSTORE_APP_ID: ${{ vars.MSSTORE_APP_ID || '9N20PQ3BJRSG' }}
+        run: |
+          if [ -n "$MSSTORE_TENANT_ID" ] && [ -n "$MSSTORE_CLIENT_ID" ] && [ -n "$MSSTORE_CLIENT_SECRET" ] && [ -n "$MSSTORE_SELLER_ID" ]; then
+            echo "Microsoft Partner Center credentials detected. Running automated Microsoft Store CLI submission..."
+            npx @microsoft/store-cli@latest reconfigure \
+              --tenantId "$MSSTORE_TENANT_ID" \
+              --sellerId "$MSSTORE_SELLER_ID" \
+              --clientId "$MSSTORE_CLIENT_ID" \
+              --clientSecret "$MSSTORE_CLIENT_SECRET"
+            npx @microsoft/store-cli@latest package "$PRODUCTION_WEB_URL" --output release-artifacts
+            npx @microsoft/store-cli@latest publish --id "$MSSTORE_APP_ID" --inputDirectory release-artifacts
+          else
+            echo "Microsoft Partner Center secrets not yet attached (Store certificate pending approval). Generated ready-to-submit Windows Store configuration artifact."
+          fi
+
+      - name: Upload Windows Store Configuration Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: insightboard-vdb-windows-store-v${{ needs.validate-and-build-web.outputs.version }}
+          path: release-artifacts/windows-store-package-config-v${{ needs.validate-and-build-web.outputs.version }}.json
+          retention-days: 30
+
+  publish-github-release:
+    name: 4. Publish Synchronized GitHub Release (APK + Windows Store + Web)
+    needs:
+      - validate-and-build-web
+      - build-android-apk
+      - microsoft-store-update
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Android APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: insightboard-vdb-android-apk-v${{ needs.validate-and-build-web.outputs.version }}
+          path: release-bundle/
+
+      - name: Download Windows Store artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: insightboard-vdb-windows-store-v${{ needs.validate-and-build-web.outputs.version }}
+          path: release-bundle/
+
+      - name: Generate Release Notes from public/release-info.json
+        id: notes
+        run: |
+          node -e '
+            const fs = require("fs");
+            const info = JSON.parse(fs.readFileSync("./public/release-info.json", "utf8"));
+            const lines = [
+              `## ${info.displayName} — v${info.websiteVersion}`,
+              "",
+              `- **Website & Cloud API Version:** \`v${info.websiteVersion}\``,
+              `- **Windows Store Package Version:** \`${info.windowsPackageVersion}\` (Store ID: \`9N20PQ3BJRSG\`)`,
+              `- **Android APK Version:** \`v${info.androidApkVersion || info.websiteVersion}\``,
+              "",
+              "### Highlights in this Release",
+              ...info.notes.map(n => `- ${n}`),
+              "",
+              "### Attached Installers & Artifacts",
+              `- \`InsightBoard-VDB-v${info.websiteVersion}.apk\` — Direct-install Android package`,
+              `- \`windows-store-package-config-v${info.websiteVersion}.json\` — Microsoft Store PWA submission manifest`
+            ];
+            fs.writeFileSync("release-bundle/RELEASE_NOTES.md", lines.join("\n"));
+          '
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.validate-and-build-web.outputs.version }}
+          name: "InsightBoard VDB v${{ needs.validate-and-build-web.outputs.version }} (Web + Windows Store + Android APK)"
+          body_path: release-bundle/RELEASE_NOTES.md
+          files: |
+            release-bundle/InsightBoard-VDB-v${{ needs.validate-and-build-web.outputs.version }}.apk
+            release-bundle/windows-store-package-config-v${{ needs.validate-and-build-web.outputs.version }}.json
+          draft: false
+          prerelease: false

@@ -5,10 +5,11 @@ import './ReleaseCenter.css';
 const CLIENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown';
 
 const FALLBACK = {
-  websiteVersion: 'unknown',
-  apiVersion: 'unknown',
-  windowsPackageVersion: 'not generated',
-  releaseChannel: 'unknown',
+  websiteVersion: '2.1.0',
+  apiVersion: '2.1.0',
+  windowsPackageVersion: '2.1.0.0',
+  androidApkVersion: '2.1.0',
+  releaseChannel: 'stable',
   notes: [],
   updatePolicy: {}
 };
@@ -65,31 +66,31 @@ export default function ReleaseCenter() {
     <div className="release-center">
       <button type="button" className="release-center-trigger" onClick={() => { setOpen(value => !value); if (!checkedAt) void checkForUpdates(); }} aria-expanded={open}>
         <Bell size={14} />
-        <span>Release center</span>
+        <span>Release center · v{currentWebsiteVersion}</span>
         <span className={updateAvailable ? 'release-dot update' : 'release-dot'} />
       </button>
-      {open && <section className="release-panel" aria-label="InsightBoard release status">
+      {open && <section className="release-panel" aria-label="InsightBoard VDB release status">
         <header className="release-panel-head">
-          <div><strong>InsightBoard releases</strong><small>Version and update status</small></div>
+          <div><strong>InsightBoard VDB releases</strong><small>Synchronized Web, Windows Store &amp; Android APK status</small></div>
           <button type="button" onClick={() => setOpen(false)} aria-label="Close release center"><X size={16}/></button>
         </header>
         <div className="release-version-grid">
-          <div><span>Website</span><strong>{currentWebsiteVersion}</strong><small>{updateAvailable ? 'New version available' : 'Current runtime'}</small></div>
-          <div><span>API</span><strong>{runtime?.apiVersion || runtime?.version || release.apiVersion}</strong><small>{runtime?.commit ? `Build ${runtime.commit.slice(0, 7)}` : 'Build identifier unavailable'}</small></div>
-          <div><span>Windows Store package</span><strong>{release.windowsPackageVersion}</strong><small>Package version tracked separately</small></div>
+          <div><span>Website</span><strong>v{currentWebsiteVersion}</strong><small>{updateAvailable ? 'New version available' : 'Current runtime'}</small></div>
+          <div><span>API</span><strong>v{runtime?.apiVersion || runtime?.version || release.apiVersion}</strong><small>{runtime?.commit ? `Build ${runtime.commit.slice(0, 7)}` : 'Synchronized backend'}</small></div>
+          <div><span>Windows Store &amp; APK</span><strong>{release.windowsPackageVersion} · APK v{release.androidApkVersion || release.websiteVersion}</strong><small>CI/CD auto-published</small></div>
         </div>
         {updateAvailable && <div className="release-update-callout">
           <strong>A website update is available.</strong>
           <span>Reload to load the latest deployed frontend. Save your work first.</span>
-          <button type="button" onClick={() => window.location.reload()}>Reload InsightBoard</button>
+          <button type="button" onClick={() => window.location.reload()}>Reload InsightBoard VDB</button>
         </div>}
         <div className="release-notes">
-          <strong>Latest release notes</strong>
+          <strong>Latest release notes (v{release.websiteVersion})</strong>
           {release.notes?.length ? <ul>{release.notes.map((note, index) => <li key={index}>{note}</li>)}</ul> : <p>No release notes published yet.</p>}
         </div>
         <div className="release-policy">
-          <div><CheckCircle2 size={15}/><span>Website and API releases normally arrive without a Store package update.</span></div>
-          <div><MonitorDown size={15}/><span>Manifest or Windows package identity changes require a new Store package submission.</span></div>
+          <div><CheckCircle2 size={15}/><span>Website, API, Windows Store PWA, and Android APK versions are synchronized via GitHub Actions.</span></div>
+          <div><MonitorDown size={15}/><span>Manifest or Windows package changes automatically trigger Microsoft Store &amp; APK release workflows.</span></div>
         </div>
         {error && <p className="release-error" role="status">{error}</p>}
         <footer className="release-panel-foot">

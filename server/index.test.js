@@ -60,7 +60,7 @@ test('version endpoint returns release metadata without exposing configuration',
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(body.service, 'InsightBoard V2 API');
+  assert.equal(body.service, 'InsightBoard VDB API');
   assert.equal(typeof body.version, 'string');
   assert.ok(body.commit === null || typeof body.commit === 'string');
   assert.equal(response.headers.get('cache-control'), 'no-store');
@@ -114,4 +114,62 @@ test('in-memory auth and report persistence work when MongoDB is offline', async
   assert.equal(listBody.reports.length, 1);
   assert.equal(listBody.reports[0].title, 'Test Snapshot');
 });
+
+test('lifetime-free AI summary and retail optimization endpoints work without personal API keys', async () => {
+  const summaryRes = await fetch(`${baseUrl}/api/ai/summary`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      language: 'en',
+      snapshot: {
+        datasetName: 'Shopping Mall & Retail Sales — Flagship Portfolio',
+        recordCount: 16,
+        sourceRecordCount: 16,
+        fields: ['Store Name', 'Mall Zone', 'Monthly Revenue Inr'],
+        numericMetrics: [{ field: 'Monthly Revenue Inr', average: 8950000, sum: 143200000 }],
+        topCategories: [{ category: 'Atrium Ground', average: 18350000, count: 3, total: 55050000 }]
+      }
+    })
+  });
+  const summaryBody = await summaryRes.json();
+  assert.equal(summaryRes.status, 200);
+  assert.ok(typeof summaryBody.summary === 'string' && summaryBody.summary.length > 40);
+
+  const optimizeRes = await fetch(`${baseUrl}/api/ai/optimize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      datasetName: 'Shopping Mall & Retail Sales — Flagship Portfolio',
+      metrics: {
+        totalRevenue: 143200000,
+        targetAttainment: 98.4,
+        avgConversionRate: 18.2,
+        revenuePerSqft: 2450
+      }
+    })
+  });
+  const optimizeBody = await optimizeRes.json();
+  assert.equal(optimizeRes.status, 200);
+  assert.ok(typeof optimizeBody.plan === 'string' && optimizeBody.plan.length > 40);
+});
+
+test('cross-platform Google OAuth URL and portable Google SSO endpoints function across hosts', async () => {
+  const urlRes = await fetch(`${baseUrl}/api/auth/google/url?origin=${encodeURIComponent(baseUrl)}`);
+  const urlBody = await urlRes.json();
+  assert.equal(urlRes.status, 200);
+  assert.equal(typeof urlBody.redirectUri, 'string');
+  assert.ok(urlBody.redirectUri.endsWith('/auth/callback'));
+
+  const ssoRes = await fetch(`${baseUrl}/api/auth/google/portable`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'mall.manager@corporate.com', name: 'Mall Manager' })
+  });
+  const ssoBody = await ssoRes.json();
+  assert.equal(ssoRes.status, 200);
+  assert.ok(ssoBody.token);
+  assert.equal(ssoBody.user.email, 'mall.manager@corporate.com');
+  assert.equal(ssoBody.user.provider, 'google');
+});
+
 

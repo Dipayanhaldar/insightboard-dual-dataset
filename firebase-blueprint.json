@@ -1,0 +1,109 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public profile metadata for an authenticated InsightBoard VDB user.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Immutable Firebase Auth UID of the account owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the authenticated user.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "plan": {
+          "type": "string",
+          "description": "Subscription tier (free forever default).",
+          "enum": ["free"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was last updated."
+        }
+      },
+      "required": ["uid", "displayName", "plan", "createdAt", "updatedAt"]
+    },
+    "SavedReport": {
+      "title": "SavedReport",
+      "description": "Aggregate BI and shopping mall dashboard report snapshot owned by an authenticated user.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the report owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Report title.",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "datasetName": {
+          "type": "string",
+          "description": "Source dataset name.",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "recordCount": {
+          "type": "number",
+          "description": "Count of filtered records in the snapshot."
+        },
+        "summary": {
+          "type": "string",
+          "description": "AI or analytical executive summary text.",
+          "minLength": 0,
+          "maxLength": 8000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the report was saved."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the report was last updated."
+        }
+      },
+      "required": [
+        "ownerId",
+        "title",
+        "datasetName",
+        "recordCount",
+        "summary",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "User profile document keyed by Firebase Auth UID."
+    },
+    "/reports/{reportId}": {
+      "schema": {
+        "$ref": "#/entities/SavedReport"
+      },
+      "description": "Saved dashboard report snapshots scoped strictly to ownerId."
+    }
+  }
+}

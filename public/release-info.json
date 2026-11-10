@@ -1,19 +1,21 @@
 {
   "product": "InsightBoard VDB",
-  "displayName": "InsightBoard VDB By Dipayan",
-  "websiteVersion": "2.0.2-beta.2",
-  "apiVersion": "2.0.2-beta.2",
-  "windowsPackageVersion": "not generated",
-  "releaseChannel": "feature-preview",
-  "releasedAt": "2026-11-07",
-  "minimumSupportedApiVersion": "2.0.2-beta.2",
+  "displayName": "InsightBoard VDB (Visual Dashboard)",
+  "websiteVersion": "2.1.0",
+  "apiVersion": "2.1.0",
+  "windowsPackageVersion": "2.1.0.0",
+  "androidApkVersion": "2.1.0",
+  "releaseChannel": "production",
+  "releasedAt": "2026-11-09",
+  "minimumSupportedApiVersion": "2.1.0",
   "notes": [
-    "Dual-dataset comparison for CSV and JSON files.",
-    "Microsoft Store PWA foundation with safe offline fallback.",
-    "Release Center shows website, API and Windows package versions separately."
+    "Renamed to InsightBoard VDB (Visual Dashboard) with warm, corporate Light & Dark UI.",
+    "Added Commercial Retail & Shopping Mall Command Center with tenant yield (₹/sq.ft), footfall conversion funnel, and interactive What-If Scenario Simulator.",
+    "Added lifetime-free Server AI Summary & Retail Action Plan Optimizer with Google Gemini + automatic analytical fallback.",
+    "Implemented platform-independent Cross-Platform Google Sign-In SSO and automated GitHub Actions for Microsoft Store PWA and Android APK releases."
   ],
   "updatePolicy": {
-    "websiteAndApi": "Continuous deployment; normally no Microsoft Store resubmission.",
-    "windowsPackage": "Submit a new Store package when the web manifest or packaged Windows identity/capabilities change."
+    "websiteAndApi": "Continuous deployment across Render, Vercel, and cloud hosts; synchronized at v2.1.0.",
+    "windowsPackage": "Automated Microsoft Store MSIX/PWA submission and Android APK release via GitHub Actions."
   }
 }
