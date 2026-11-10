@@ -12,6 +12,8 @@ import { spawn, execFile } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { GoogleGenAI, Modality } from '@google/genai';
 import { WebSocketServer } from 'ws';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { createInsiMcpServer } from './mcpServer.js';
 import {
   executeInsiCommand,
   buildExternalConnectorOpenApiSpec,
@@ -1650,6 +1652,44 @@ app.delete('/api/reports', requireDatabase, requireAuth, asyncRoute(async (req, 
   const result = await Report.deleteMany({ userId: req.auth.sub });
   return res.json({ deletedCount: result.deletedCount || 0 });
 }));
+
+// Public, stateless MCP endpoint. Tools are deliberately read-only and never access persistence.
+const mcpLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'InsightBoard MCP request limit reached. Try again later.' }
+});
+
+app.post('/api/mcp', mcpLimiter, asyncRoute(async (req, res) => {
+  const mcpServer = createInsiMcpServer();
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined
+  });
+
+  res.once('close', () => {
+    void transport.close().catch(() => {});
+    void mcpServer.close().catch(() => {});
+  });
+
+  try {
+    await mcpServer.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (error) {
+    console.error('InsightBoard MCP request failed:', error?.message || error);
+    if (!res.headersSent) {
+      return res.status(500).json({
+        jsonrpc: '2.0',
+        error: { code: -32603, message: 'InsightBoard MCP request failed.' },
+        id: null
+      });
+    }
+  }
+}));
+
+app.get('/api/mcp', (_req, res) => res.status(405).json({ error: 'MCP Streamable HTTP requires POST for this stateless endpoint.' }));
+app.delete('/api/mcp', (_req, res) => res.status(405).json({ error: 'This stateless MCP endpoint does not support DELETE.' }));
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
 
