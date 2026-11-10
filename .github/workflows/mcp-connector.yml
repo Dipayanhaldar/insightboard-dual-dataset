@@ -24,7 +24,7 @@ on:
       - ".github/workflows/mcp-connector.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -33,12 +33,23 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install dependencies
-        run: npm install --include=dev --no-audit --no-fund --legacy-peer-deps
+      - name: Install dependencies and refresh Bun lockfile
+        run: bun install
+      - name: Commit the resolved Bun lockfile when dependencies change
+        run: |
+          if ! git diff --quiet -- bun.lock; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add bun.lock
+            git commit -m "chore(deps): sync Bun lockfile for MCP connector"
+            git push
+          fi
       - name: Check server syntax
         run: npm run check:server
       - name: Run server and MCP tests
