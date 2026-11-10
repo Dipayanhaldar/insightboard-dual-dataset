@@ -1,0 +1,556 @@
+/* insi.ai — The Intelligent AI Pet of InsightBoard VDB
+   Pure Human Feelings, Expressions, Dynamic Sizes, Multi-Props & Zero Text Below Mascot */
+
+.insi-pet-stage {
+  position: fixed;
+  z-index: 9990;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  filter: drop-shadow(0 16px 32px rgba(15, 23, 42, 0.32));
+  user-select: none;
+  transform-origin: center bottom;
+}
+
+/* Dynamic Scale Variants (Appears in different sizes each time) */
+.insi-pet-stage.size-sm {
+  --insi-scale: 0.84;
+}
+.insi-pet-stage.size-md {
+  --insi-scale: 1;
+}
+.insi-pet-stage.size-lg {
+  --insi-scale: 1.18;
+}
+.insi-pet-stage.size-xl {
+  --insi-scale: 1.32;
+}
+
+.insi-entering {
+  animation: insiAppearSmooth 0.68s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.insi-leaving {
+  animation: insiDisappearSmooth 0.52s cubic-bezier(0.55, 0.08, 0.68, 0.53) forwards;
+}
+
+/* Main Robot & Scene Rig */
+.insi-robot-rig {
+  position: relative;
+  width: 138px;
+  height: 136px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: scale(var(--insi-scale, 1));
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.insi-ambient-halo {
+  position: absolute;
+  inset: 12px;
+  border-radius: 999px;
+  background: radial-gradient(
+    circle,
+    rgba(56, 189, 248, 0.32) 0%,
+    rgba(37, 99, 235, 0.12) 58%,
+    transparent 100%
+  );
+  animation: insiHaloPulse 2.4s ease-in-out infinite;
+}
+
+.insi-quantum-ring-outer {
+  position: absolute;
+  inset: 2px;
+  border-radius: 999px;
+  border: 2px dashed rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.45);
+  animation: insiSpinRing 4s linear infinite;
+}
+
+.insi-robot-svg {
+  width: 136px;
+  height: 134px;
+  position: relative;
+  z-index: 2;
+  overflow: visible;
+}
+
+/* ============================================================
+   EXPRESSIVE PERSONALITY, HEAVY AI, MAGIC STICK & AUDIO SYNC STATES
+   ============================================================ */
+
+/* Idle & Greeting */
+.state-idle .insi-robot-torso,
+.state-idle .insi-robot-head,
+.state-greeting .insi-robot-torso {
+  animation: insiBreathe 3s ease-in-out infinite;
+}
+.state-idle .insi-digital-eyes,
+.state-greeting .insi-digital-eyes {
+  transform-origin: 91px 45px;
+  animation: insiNaturalBlink 3.8s infinite;
+}
+
+/* Waving / Greeting */
+.state-waving .insi-arm-right,
+.state-greeting .insi-arm-right {
+  transform-origin: 118px 86px;
+  animation: insiWaveGreeting 0.5s ease-in-out infinite alternate;
+}
+
+/* Magician Stick Import (magic_import) */
+.state-magic_import .insi-robot-rig {
+  animation: insiCelebrateJump 0.65s cubic-bezier(0.28, 0.84, 0.42, 1) infinite alternate;
+}
+.state-magic_import .insi-arm-right {
+  transform-origin: 118px 86px;
+  animation: insiCastWand 0.6s ease-in-out infinite alternate;
+}
+.insi-wand-star {
+  transform-origin: 158px 66px;
+  animation: insiSpinStar 1.6s linear infinite;
+}
+.insi-magic-cube.c1 {
+  animation: insiFloatCube 1.1s ease-in-out infinite alternate;
+}
+.insi-magic-cube.c2 {
+  animation: insiFloatCube 1.3s 0.25s ease-in-out infinite alternate-reverse;
+}
+
+/* Heavy AI Computation Task (heavy_ai) */
+.state-heavy_ai .insi-robot-rig {
+  animation: insiLevitatePower 1.2s ease-in-out infinite alternate;
+}
+.state-heavy_ai .insi-robot-head {
+  transform-origin: 91px 66px;
+  animation: insiAiHeadPulse 0.9s ease-in-out infinite alternate;
+}
+.insi-quantum-orb {
+  transform-origin: 91px 105px;
+  animation: insiPulseOrb 0.7s ease-in-out infinite alternate;
+}
+.insi-neural-bolt {
+  animation: insiFlashBolt 0.45s ease-in-out infinite alternate;
+}
+
+/* Audio Sync & Dancing (when Gnani voice or audio is generated/heard) */
+.state-audio_sync .insi-robot-rig,
+.state-dancing .insi-robot-rig {
+  animation: insiDanceGroove 0.55s ease-in-out infinite alternate;
+}
+.state-audio_sync .insi-robot-head,
+.state-dancing .insi-robot-head {
+  transform-origin: 91px 66px;
+  animation: insiHeadBop 0.45s ease-in-out infinite alternate;
+}
+.eq-bar {
+  transform-origin: center bottom;
+  animation: insiEqBounce 0.35s ease-in-out infinite alternate;
+}
+.eq-bar.eq2 { animation-delay: 0.1s; }
+.eq-bar.eq3 { animation-delay: 0.2s; }
+.eq-bar.eq4 { animation-delay: 0.05s; }
+.eq-bar.eq5 { animation-delay: 0.18s; }
+.eq-bar.eq6 { animation-delay: 0.26s; }
+
+/* Viewing Charts & Exporting */
+.state-viewing_charts .insi-robot-head,
+.state-observing .insi-robot-head {
+  transform-origin: 91px 66px;
+  animation: insiObserveTurn 2.4s ease-in-out infinite;
+}
+.holo-bar {
+  animation: insiHoloGrow 1s ease-in-out infinite alternate;
+}
+.holo-bar.b2 { animation-delay: 0.2s; }
+.holo-bar.b3 { animation-delay: 0.4s; }
+
+/* Sleeping */
+.state-sleeping .insi-robot-head {
+  transform-origin: 91px 66px;
+  animation: insiSleepNod 3.4s ease-in-out infinite;
+}
+
+/* Reading & Typing on 101 Laptop */
+.state-reading .insi-robot-head {
+  transform-origin: 91px 66px;
+  animation: insiReadScan 2.2s ease-in-out infinite;
+}
+.state-typing .insi-arm-left,
+.state-exporting .insi-arm-left {
+  transform-origin: 63px 86px;
+  animation: insiTypeTap 0.26s ease-in-out infinite alternate;
+}
+.state-typing .insi-arm-right,
+.state-exporting .insi-arm-right {
+  transform-origin: 118px 86px;
+  animation: insiTypeTap 0.26s 0.13s ease-in-out infinite alternate;
+}
+
+/* Drinking Coffee */
+.state-drinking .insi-arm-right {
+  transform-origin: 118px 86px;
+  animation: insiSipCoffee 2.4s ease-in-out infinite;
+}
+.state-drinking .insi-steam-1,
+.state-drinking .insi-steam-2 {
+  animation: insiSteamRise 1.4s ease-out infinite;
+}
+
+/* Thinking, Confused, Surprised, Happy, Celebrating, Walking */
+.state-thinking .insi-robot-head {
+  transform-origin: 91px 66px;
+  animation: insiThinkTilt 2s ease-in-out infinite;
+}
+.state-confused .insi-robot-head {
+  transform-origin: 91px 66px;
+  animation: insiConfusedTilt 1.4s ease-in-out infinite;
+}
+.state-surprised .insi-robot-rig {
+  animation: insiSurprisePop 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.state-happy .insi-robot-head {
+  transform-origin: 91px 66px;
+  animation: insiHappyBob 1.3s ease-in-out infinite;
+}
+.state-celebrating .insi-robot-rig {
+  animation: insiCelebrateJump 0.65s cubic-bezier(0.28, 0.84, 0.42, 1) infinite alternate;
+}
+.state-walking .insi-robot-rig {
+  animation: insiPlayfulWalk 1s ease-in-out infinite alternate;
+}
+.state-walking .insi-leg-left {
+  transform-origin: 80px 124px;
+  animation: insiStepLeg 0.42s ease-in-out infinite alternate;
+}
+.state-walking .insi-leg-right {
+  transform-origin: 104px 124px;
+  animation: insiStepLeg 0.42s ease-in-out infinite alternate-reverse;
+}
+
+/* ============================================================
+   NON-VERBAL EMOTIVE FX LAYER
+   ============================================================ */
+.insi-fx-layer {
+  position: relative;
+  height: 22px;
+  width: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: -8px;
+  z-index: 4;
+}
+
+.insi-zzz-group {
+  display: flex;
+  gap: 4px;
+  color: #38bdf8;
+  font-weight: 800;
+}
+.insi-z {
+  display: inline-block;
+  animation: insiFloatZ 1.8s ease-in-out infinite;
+}
+.insi-z.z1 { font-size: 10px; animation-delay: 0s; }
+.insi-z.z2 { font-size: 13px; animation-delay: 0.35s; }
+.insi-z.z3 { font-size: 15px; animation-delay: 0.7s; }
+
+.insi-emotive-bubbles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.insi-question-bubble {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.45);
+  animation: insiQuestionPop 0.8s ease-in-out infinite alternate;
+}
+
+.insi-ai-energy-crown {
+  display: flex;
+  gap: 7px;
+}
+.energy-orb {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #38bdf8;
+  box-shadow: 0 0 10px #38bdf8;
+  animation: insiDotBounce 0.75s ease-in-out infinite;
+}
+.energy-orb.o2 {
+  background: #a855f7;
+  box-shadow: 0 0 10px #a855f7;
+  animation-delay: 0.2s;
+}
+.energy-orb.o3 {
+  background: #facc15;
+  box-shadow: 0 0 10px #facc15;
+  animation-delay: 0.4s;
+}
+
+.insi-music-notes {
+  display: flex;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #38bdf8;
+}
+.m-note {
+  display: inline-block;
+  animation: insiNoteFloat 0.9s ease-in-out infinite alternate;
+}
+.m-note.n2 {
+  color: #f472b6;
+  animation-delay: 0.25s;
+}
+.m-note.n3 {
+  color: #facc15;
+  animation-delay: 0.5s;
+}
+
+.insi-sparkles {
+  display: flex;
+  gap: 9px;
+  color: #facc15;
+  font-size: 14px;
+}
+.insi-sparkles .spark {
+  animation: insiSparkleTwinkle 0.75s ease-in-out infinite alternate;
+}
+.insi-sparkles .s2 {
+  color: #38bdf8;
+  animation-delay: 0.25s;
+}
+
+/* ============================================================
+   KEYFRAMES
+   ============================================================ */
+@keyframes insiAppearSmooth {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 26px, 0) scale(0.68);
+  }
+  70% {
+    opacity: 1;
+    transform: translate3d(0, -5px, 0) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes insiDisappearSmooth {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0) scale(0.7);
+  }
+}
+
+@keyframes insiBreathe {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3.5px); }
+}
+
+@keyframes insiNaturalBlink {
+  0%, 45%, 49%, 100% { transform: scaleY(1); }
+  47% { transform: scaleY(0.1); }
+}
+
+@keyframes insiWaveGreeting {
+  0% { transform: rotate(-18deg); }
+  100% { transform: rotate(-48deg) translateY(-4px); }
+}
+
+@keyframes insiCastWand {
+  0% { transform: rotate(-12deg); }
+  100% { transform: rotate(22deg) translateY(-5px); }
+}
+
+@keyframes insiSpinStar {
+  0% { transform: rotate(0deg) scale(0.95); }
+  50% { transform: rotate(180deg) scale(1.2); }
+  100% { transform: rotate(360deg) scale(0.95); }
+}
+
+@keyframes insiFloatCube {
+  0% { transform: translateY(0px) rotate(0deg); }
+  100% { transform: translateY(-7px) rotate(18deg); }
+}
+
+@keyframes insiLevitatePower {
+  0% { transform: scale(var(--insi-scale, 1.32)) translateY(0px); }
+  100% { transform: scale(var(--insi-scale, 1.32)) translateY(-10px); }
+}
+
+@keyframes insiAiHeadPulse {
+  0% { transform: translateY(0px) rotate(-3deg); }
+  100% { transform: translateY(-3px) rotate(3deg); }
+}
+
+@keyframes insiPulseOrb {
+  0% { transform: scale(0.88); opacity: 0.75; }
+  100% { transform: scale(1.16); opacity: 1; }
+}
+
+@keyframes insiFlashBolt {
+  0% { opacity: 0.35; }
+  100% { opacity: 1; }
+}
+
+@keyframes insiSpinRing {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes insiDanceGroove {
+  0% { transform: scale(var(--insi-scale, 1.18)) translateY(0px) rotate(-6deg); }
+  100% { transform: scale(var(--insi-scale, 1.18)) translateY(-9px) rotate(6deg); }
+}
+
+@keyframes insiHeadBop {
+  0% { transform: rotate(-7deg) translateY(0px); }
+  100% { transform: rotate(7deg) translateY(-3px); }
+}
+
+@keyframes insiEqBounce {
+  0% { transform: scaleY(0.45); }
+  100% { transform: scaleY(1.15); }
+}
+
+@keyframes insiHoloGrow {
+  0% { opacity: 0.65; }
+  100% { opacity: 1; }
+}
+
+@keyframes insiSleepNod {
+  0%, 100% { transform: rotate(4deg) translateY(2px); }
+  50% { transform: rotate(9deg) translateY(4px); }
+}
+
+@keyframes insiReadScan {
+  0%, 100% { transform: rotate(-4deg) translateY(2px); }
+  50% { transform: rotate(5deg) translateY(2px); }
+}
+
+@keyframes insiSipCoffee {
+  0%, 100% { transform: rotate(0deg); }
+  45%, 65% { transform: rotate(-32deg) translate(-4px, -7px); }
+}
+
+@keyframes insiSteamRise {
+  0% { opacity: 0.2; transform: translateY(2px); }
+  50% { opacity: 0.85; transform: translateY(-2px); }
+  100% { opacity: 0; transform: translateY(-5px); }
+}
+
+@keyframes insiThinkTilt {
+  0%, 100% { transform: rotate(-9deg); }
+  50% { transform: rotate(-3deg) translateY(-2px); }
+}
+
+@keyframes insiConfusedTilt {
+  0%, 100% { transform: rotate(11deg); }
+  50% { transform: rotate(-9deg); }
+}
+
+@keyframes insiSurprisePop {
+  0% { transform: scale(0.85); }
+  50% { transform: scale(1.14) translateY(-6px); }
+  100% { transform: scale(1); }
+}
+
+@keyframes insiHappyBob {
+  0%, 100% { transform: translateY(0px) rotate(-2deg); }
+  50% { transform: translateY(-4px) rotate(2deg); }
+}
+
+@keyframes insiTypeTap {
+  0% { transform: rotate(-10deg) translateY(0px); }
+  100% { transform: rotate(-22deg) translateY(-3px); }
+}
+
+@keyframes insiCelebrateJump {
+  0% { transform: scale(var(--insi-scale, 1.18)) translateY(0px); }
+  100% { transform: scale(var(--insi-scale, 1.18)) translateY(-12px); }
+}
+
+@keyframes insiObserveTurn {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-5deg); }
+  70% { transform: rotate(5deg); }
+}
+
+@keyframes insiPlayfulWalk {
+  0% { transform: scale(var(--insi-scale, 0.84)) translateX(-6px) translateY(0px); }
+  50% { transform: scale(var(--insi-scale, 0.84)) translateX(0px) translateY(-4px); }
+  100% { transform: scale(var(--insi-scale, 0.84)) translateX(6px) translateY(0px); }
+}
+
+@keyframes insiStepLeg {
+  0% { transform: rotate(-12deg); }
+  100% { transform: rotate(12deg); }
+}
+
+@keyframes insiHaloPulse {
+  0%, 100% { transform: scale(0.94); opacity: 0.65; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+@keyframes insiFloatZ {
+  0%, 100% { transform: translateY(2px); opacity: 0.45; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes insiQuestionPop {
+  0% { transform: scale(0.92) rotate(-8deg); }
+  100% { transform: scale(1.08) rotate(8deg); }
+}
+
+@keyframes insiDotBounce {
+  0%, 100% { transform: translateY(0); opacity: 0.45; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes insiNoteFloat {
+  0% { transform: translateY(2px) rotate(-8deg); }
+  100% { transform: translateY(-5px) rotate(10deg); }
+}
+
+@keyframes insiSparkleTwinkle {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(1.25); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .insi-entering,
+  .insi-leaving,
+  .insi-robot-rig,
+  .insi-robot-head,
+  .insi-robot-torso,
+  .insi-arm-left,
+  .insi-arm-right,
+  .insi-leg-left,
+  .insi-leg-right,
+  .insi-digital-eyes {
+    animation: none !important;
+  }
+}

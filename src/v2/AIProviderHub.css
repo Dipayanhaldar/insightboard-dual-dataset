@@ -64,3 +64,101 @@ html[data-theme="dark"] .ai-provider-privacy strong,html[data-theme="dark"] .ai-
 html[data-theme="dark"] .ai-provider-notice{background:#142e28;border-color:#265748;color:#9de0bf}
 html[data-theme="dark"] .ai-provider-error{background:#351e27;border-color:#64323b;color:#ffb9c1}
 @media(prefers-reduced-motion:reduce){.ai-provider-choice,.ai-provider-spinner{animation:none!important;transition:none!important}}
+
+/* Clean, spacious, readable Python Statistical Engine section */
+.python-clean-box {
+  margin: 0 0 20px;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid #dbe6f5;
+  background: linear-gradient(135deg, #f8fbff 0%, #f2f8f7 100%);
+}
+.python-clean-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.python-clean-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #0d9488;
+}
+.python-clean-header h4 {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+.python-clean-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.python-stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 11px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+}
+.python-stat-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.4;
+}
+.python-stat-value {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.python-stat-sub {
+  display: block;
+  font-size: 11px;
+  color: #475569;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 960px) {
+  .python-clean-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 540px) {
+  .python-clean-grid {
+    grid-template-columns: 1fr;
+  }
+}
+html[data-theme="dark"] .python-clean-box {
+  background: linear-gradient(135deg, #132238 0%, #12292b 100%);
+  border-color: #2b425f;
+}
+html[data-theme="dark"] .python-clean-header h4,
+html[data-theme="dark"] .python-stat-value {
+  color: #f8fafc;
+}
+html[data-theme="dark"] .python-stat-tile {
+  background: #0f172a;
+  border-color: #263850;
+}
+html[data-theme="dark"] .python-stat-label {
+  color: #94a3b8;
+}
+html[data-theme="dark"] .python-stat-sub {
+  color: #cbd5e1;
+}
+

@@ -1,0 +1,279 @@
+/* Usage & Quotas Dashboard Panel — Free-Tier Consumption & Zero-Billing Lock */
+
+.usage-quotas-panel {
+  margin-bottom: 18px;
+}
+
+.usage-quotas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.usage-quotas-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.usage-quotas-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #2563eb, #0d9488);
+  color: #ffffff;
+  box-shadow: 0 4px 0 #1e3a8a;
+}
+
+.usage-quotas-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quota-global-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.quota-global-pill.within-free {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.quota-global-pill.limit-reached {
+  background: rgba(225, 29, 72, 0.14);
+  color: #be123c;
+  border: 1px solid rgba(225, 29, 72, 0.42);
+}
+
+.usage-quotas-subtitle {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.quota-limit-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 16px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: rgba(225, 29, 72, 0.08);
+  border: 1px solid rgba(225, 29, 72, 0.35);
+  color: #9f1239;
+}
+
+.quota-limit-banner strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.quota-limit-banner span {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.usage-quotas-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1120px) {
+  .usage-quotas-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .usage-quotas-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quota-service-card {
+  padding: 14px 16px;
+  border-radius: 13px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 3px 0 rgba(148, 163, 184, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.quota-service-card.is-limit-reached {
+  background: rgba(255, 241, 242, 0.85);
+  border-color: #f43f5e;
+  box-shadow: 0 3px 0 rgba(225, 29, 72, 0.25);
+}
+
+.quota-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quota-card-top h4 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.quota-card-top small {
+  display: block;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.quota-status-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.quota-status-badge.badge-ok {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.quota-status-badge.badge-limit {
+  background: #e11d48;
+  color: #ffffff;
+  border: 1px solid #be123c;
+}
+
+.quota-numbers {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.quota-numbers strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.quota-numbers small {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.quota-numbers span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.quota-progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.quota-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease;
+}
+
+.quota-progress-fill.fill-ok {
+  background: linear-gradient(90deg, #2563eb, #0d9488);
+}
+
+.quota-progress-fill.fill-limit {
+  background: linear-gradient(90deg, #e11d48, #f97316);
+}
+
+.quota-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.quota-cost-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.quota-test-btn {
+  padding: 3px 9px;
+  border-radius: 7px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 0 #cbd5e1;
+  transition: transform 0.12s ease;
+}
+
+.quota-test-btn:hover {
+  transform: translateY(-1px);
+  border-color: #94a3b8;
+}
+
+html[data-theme="dark"] .quota-service-card {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+html[data-theme="dark"] .quota-service-card.is-limit-reached {
+  background: rgba(136, 19, 55, 0.25);
+  border-color: #f43f5e;
+}
+
+html[data-theme="dark"] .quota-card-top h4,
+html[data-theme="dark"] .quota-numbers strong {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .quota-progress-track {
+  background: #1e293b;
+}
+
+html[data-theme="dark"] .quota-test-btn {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f8fafc;
+  box-shadow: 0 2px 0 #090d16;
+}

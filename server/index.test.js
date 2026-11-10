@@ -256,3 +256,35 @@ test('Search grounding, audio transcription, and live voice conversation endpoin
   assert.equal(liveBody.model, 'gemini-3.8-live');
   assert.ok(typeof liveBody.reply === 'string' && liveBody.reply.length > 20);
 });
+
+test('security hardening status, SHA-256 dataset integrity verification, and payload sanitization work without external dependencies', async () => {
+  const statusRes = await fetch(`${baseUrl}/api/security/status`);
+  const statusBody = await statusRes.json();
+  assert.equal(statusRes.status, 200);
+  assert.equal(statusBody.status, 'hardened');
+  assert.equal(statusBody.vendorIndependent, true);
+  assert.equal(responseHeaderPresent(statusRes, 'x-content-type-options'), true);
+
+  const verifyRes = await fetch(`${baseUrl}/api/security/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      datasetName: 'Audit Portfolio',
+      rows: [
+        { store: 'Anchor A', revenue: 125000, note: '=CMD|"/C calc"!A0' },
+        { store: 'Anchor B', revenue: 190000, note: 'Standard record' }
+      ]
+    })
+  });
+  const verifyBody = await verifyRes.json();
+  assert.equal(verifyRes.status, 200);
+  assert.equal(verifyBody.verified, true);
+  assert.equal(verifyBody.algorithm, 'SHA-256');
+  assert.match(verifyBody.sha256, /^[0-9a-f]{64}$/);
+  assert.equal(verifyBody.formulaTriggersNeutralized, 1);
+});
+
+function responseHeaderPresent(res, headerName) {
+  return Boolean(res.headers.get(headerName));
+}
+

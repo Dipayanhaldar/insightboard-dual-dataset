@@ -1,21 +1,21 @@
 {
   "product": "InsightBoard VDB",
   "displayName": "InsightBoard VDB (Visual Dashboard)",
-  "websiteVersion": "2.1.0",
-  "apiVersion": "2.1.0",
-  "windowsPackageVersion": "2.1.0.0",
-  "androidApkVersion": "2.1.0",
+  "websiteVersion": "2.2.0",
+  "apiVersion": "2.2.0",
+  "windowsPackageVersion": "2.2.0.0",
+  "androidApkVersion": "2.2.0",
   "releaseChannel": "production",
-  "releasedAt": "2026-11-09",
-  "minimumSupportedApiVersion": "2.1.0",
+  "releasedAt": "2026-11-10",
+  "minimumSupportedApiVersion": "2.2.0",
   "notes": [
-    "Renamed to InsightBoard VDB (Visual Dashboard) with compact tabbed navigation and Light & Dark UI.",
-    "Added Schema-Aware Decision & Statistical Hub with What-If Scenario Simulator, Pearson Correlation, Z-Score Anomaly Detector, and Smart Slice Query.",
-    "Integrated Google Search Grounding (gemini-3.8-flash), Microphone Audio Transcription (gemini-3.5-transcribe), and Real-Time Live Voice Conversation (gemini-3.8-live).",
-    "Connected Python Scientific Backend Engine for OLS Linear Regression (R² & 3-step projections), Tukey IQR outlier fencing, and Monte Carlo confidence intervals."
+    "InsightBoard VDB (Visual Dashboard) with schema-aware analytics, 6 interactive charts, and Light & Dark UI.",
+    "Cryptographic SHA-256 dataset integrity verification, CSV formula injection protection, and recursive payload sanitization.",
+    "Python Scientific Engine for OLS Linear Regression, Tukey IQR outlier fencing, and Monte Carlo confidence intervals.",
+    "Synchronized Web, API, Microsoft Store PWA (2.2.0.0), and Android APK (v2.2.0) builds."
   ],
   "updatePolicy": {
-    "websiteAndApi": "Continuous deployment across Render, Vercel, and cloud hosts; synchronized at v2.1.0.",
-    "windowsPackage": "Automated Microsoft Store MSIX/PWA submission and Android APK release via GitHub Actions."
+    "websiteAndApi": "Synchronized production runtime at v2.2.0.",
+    "windowsPackage": "Synchronized Microsoft Store MSIX/PWA (2.2.0.0) and Android APK (v2.2.0) packages."
   }
 }
