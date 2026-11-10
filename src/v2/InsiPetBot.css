@@ -54,8 +54,8 @@
   border-radius: 999px;
   background: radial-gradient(
     circle,
-    rgba(56, 189, 248, 0.32) 0%,
-    rgba(37, 99, 235, 0.12) 58%,
+    color-mix(in srgb, var(--insi-aura, #00F0FF) 36%, transparent) 0%,
+    rgba(37, 99, 235, 0.14) 58%,
     transparent 100%
   );
   animation: insiHaloPulse 2.4s ease-in-out infinite;

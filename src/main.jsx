@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import hyderabadDataset from './hyderabad_metro_stations.json';
 import shoppingMallDataset from './shopping_mall_sales.json';
 import { createRoot } from 'react-dom/client';
-import { Activity, BarChart3, Search, SlidersHorizontal, RotateCcw, Download, FileSpreadsheet, FileText, Upload, ChevronDown, Menu, X, Database, Sparkles, ArrowUpRight, Layers3, Globe2, Volume2, Moon, Sun, GitCompareArrows, Building2, BookOpen, Gauge } from 'lucide-react';
+import { Activity, BarChart3, Search, SlidersHorizontal, RotateCcw, Download, FileSpreadsheet, FileText, Upload, ChevronDown, Menu, X, Database, Sparkles, ArrowUpRight, Layers3, Globe2, Volume2, Moon, Sun, GitCompareArrows, Building2, BookOpen, Gauge, Radio } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -15,11 +15,12 @@ import V2Workspace from './v2/V2Workspace.jsx';
 import DatasetCompare from './v2/DatasetCompare.jsx';
 import ReleaseCenter from './v2/ReleaseCenter.jsx';
 import UsageQuotasPanel from './v2/UsageQuotasPanel.jsx';
+import UniversalConnectorHub from './v2/UniversalConnectorHub.jsx';
 import InsiPetBot from './v2/InsiPetBot.jsx';
 import { playButtonClick, summonInsi } from './v2/uiSound.js';
 import { insi } from './v2/insiController.js';
 
-const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.2.0';
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '3.0.0';
 const COLORS = ['#2563eb','#0d9488','#d97706','#7c3aed','#e11d48','#0284c7','#65a30d','#ea580c'];
 const nice = key => String(key).replace(/([a-z])([A-Z])/g,'$1 $2').replace(/[_-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 const isLinkField = key => /(^|[_\s-])(url|link|href|hyperlink)([_\s-]|$)/i.test(String(key).trim());
@@ -175,6 +176,8 @@ function App(){
   setSidebarOpen(false);
   if(tabId==='overview'){
    insi.viewCharts();
+  }else if(tabId==='connector'){
+   insi.magicImport();
   }else if(tabId==='studio'){
    insi.heavyAi();
   }else if(tabId==='quotas'){
@@ -207,6 +210,7 @@ function App(){
    </div>
    <div className="side-label">WORKSPACE MODULES</div>
    <button type="button" className={`nav-item ${activeTab==='overview'?'active':''}`} onClick={()=>handleSwitchTab('overview','Overview & 6 Charts')}><Activity size={18}/> Overview &amp; 6 Charts</button>
+   <button type="button" className={`nav-item ${activeTab==='connector'?'active':''}`} onClick={()=>handleSwitchTab('connector','Universal Connector & Hey INSI')}><Radio size={18}/> Connector &amp; Hey INSI</button>
    <button type="button" className={`nav-item ${activeTab==='intelligence'?'active':''}`} onClick={()=>handleSwitchTab('intelligence','Decision & Stats Hub')}><Building2 size={18}/> {preset==='mall'?'Mall & Sales Suite':'Decision & Stats Hub'}</button>
    <button type="button" className={`nav-item ${activeTab==='studio'?'active':''}`} onClick={()=>handleSwitchTab('studio','AI, Gnani Voice & Sign In')}><Sparkles size={18}/> AI, Gnani Voice &amp; Sign In</button>
    <button type="button" className={`nav-item ${activeTab==='compare'?'active':''}`} onClick={()=>handleSwitchTab('compare','Compare Datasets')}><GitCompareArrows size={18}/> Compare Datasets</button>
@@ -293,6 +297,9 @@ function App(){
       <button type="button" className={`workspace-tab-btn ${activeTab==='overview'?'active':''}`} onClick={()=>handleSwitchTab('overview','Overview & 6 Charts')}>
        <BarChart3 size={15}/> <span>Overview &amp; 6 Charts</span>
       </button>
+      <button type="button" className={`workspace-tab-btn ${activeTab==='connector'?'active':''}`} onClick={()=>handleSwitchTab('connector','Universal Connector & Hey INSI')} data-testid="tab-universal-connector">
+       <Radio size={15}/> <span>Universal Connector &amp; Hey INSI</span>
+      </button>
       <button type="button" className={`workspace-tab-btn ${activeTab==='intelligence'?'active':''}`} onClick={()=>handleSwitchTab('intelligence','Decision & Statistical Hub')}>
        <Building2 size={15}/> <span>{preset==='mall'?'Mall & Sales Command Hub':'Decision & Statistical Hub'}</span>
       </button>
@@ -312,6 +319,18 @@ function App(){
       </button>
      </div>
     </nav>
+
+    {(activeTab==='connector'||activeTab==='all')&&(
+     <UniversalConnectorHub
+      rows={rows}
+      fields={fields}
+      datasetName={datasetName}
+      preset={preset}
+      onLoadDataset={setDataset}
+      onSwitchPreset={switchPreset}
+      onParseCsv={parseCSV}
+     />
+    )}
 
     {(activeTab==='quotas'||activeTab==='all')&&(
      <UsageQuotasPanel />

@@ -14,12 +14,12 @@ import {
 } from './uiSound.js';
 
 const CORNER_POSITIONS = {
-  'bottom-right': { bottom: '76px', right: '26px', top: 'auto', left: 'auto' },
-  'bottom-left': { bottom: '28px', left: '26px', top: 'auto', right: 'auto' },
-  'top-right': { top: '88px', right: '28px', bottom: 'auto', left: 'auto' },
-  'mid-right': { top: '44%', right: '24px', bottom: 'auto', left: 'auto' },
-  'top-left': { top: '88px', left: '28px', bottom: 'auto', right: 'auto' },
-  'mid-left': { top: '46%', left: '24px', bottom: 'auto', right: 'auto' }
+  'bottom-right': { bottom: '76px', right: '18px', top: 'auto', left: 'auto' },
+  'bottom-left': { bottom: '24px', left: '18px', top: 'auto', right: 'auto' },
+  'top-right': { top: '58px', right: '16px', bottom: 'auto', left: 'auto' },
+  'mid-right': { bottom: '180px', right: '14px', top: 'auto', left: 'auto' },
+  'top-left': { top: '58px', left: '16px', bottom: 'auto', right: 'auto' },
+  'mid-left': { bottom: '180px', left: '14px', top: 'auto', right: 'auto' }
 };
 
 const AMBIENT_ACTIVITIES = [
@@ -39,6 +39,7 @@ export default function InsiPetBot({
   const [animState, setAnimState] = useState('idle');
   const [activeProp, setActiveProp] = useState('chair_laptop');
   const [sizeVariant, setSizeVariant] = useState('md');
+  const [auraColor, setAuraColor] = useState('#00F0FF');
   const [corner, setCorner] = useState('bottom-right');
 
   const fadeTimerRef = useRef(null);
@@ -95,6 +96,7 @@ export default function InsiPetBot({
       setCorner(chosenCorner);
       setSizeVariant(chosenSize);
       setActiveProp(resolvedProp);
+      setAuraColor(options.auraColor || '#00F0FF');
       setAnimState(validState);
       setLeaving(false);
       setVisible(true);
@@ -141,6 +143,7 @@ export default function InsiPetBot({
       showInsi(detail.state || 'idle', {
         prop: detail.prop,
         size: detail.size,
+        auraColor: detail.auraColor,
         durationMs: detail.durationMs,
         corner: detail.corner,
         sound: detail.sound
@@ -282,11 +285,12 @@ export default function InsiPetBot({
   return (
     <div
       className={`insi-pet-stage ${leaving ? 'insi-leaving' : 'insi-entering'} state-${animState} prop-${activeProp} size-${sizeVariant} corner-${corner}`}
-      style={posStyle}
+      style={{ ...posStyle, '--insi-aura': auraColor }}
       data-testid="insi-ai-mascot"
       data-insi-state={animState}
       data-insi-prop={activeProp}
       data-insi-size={sizeVariant}
+      data-insi-aura={auraColor}
       aria-hidden="true"
     >
       {/* Pure Emotive Non-Verbal Expressions Layer (Zero Text Below Mascot) */}

@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Synchronized version to build & publish (e.g., 2.2.0)'
+        description: 'Synchronized version to build & publish (e.g., 3.0.0)'
         required: false
-        default: '2.2.0'
+        default: '3.0.0'
       submit_to_microsoft_store:
         description: 'Submit package update to Microsoft Partner Center'
         required: false
@@ -26,12 +26,12 @@ concurrency:
 
 env:
   APP_NAME: "InsightBoard VDB"
-  DEFAULT_VERSION: "2.2.0"
+  DEFAULT_VERSION: "3.0.0"
   PRODUCTION_WEB_URL: ${{ vars.PRODUCTION_WEB_URL || 'https://insightboard.me' }}
 
 jobs:
   validate-and-build-web:
-    name: 1. Validate & Build Web Bundle (v2.2.0)
+    name: 1. Validate & Build Web Bundle (v3.0.0)
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.meta.outputs.version }}

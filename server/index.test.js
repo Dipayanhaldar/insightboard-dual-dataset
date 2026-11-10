@@ -288,3 +288,35 @@ function responseHeaderPresent(res, headerName) {
   return Boolean(res.headers.get(headerName));
 }
 
+test('Universal Connector OpenAPI 3.1 spec, live POS webhook feed, and stateless INSI analyze endpoints return valid structured schemas', async () => {
+  const openApiRes = await fetch(`${baseUrl}/api/connector/openapi.json`);
+  const openApiBody = await openApiRes.json();
+  assert.equal(openApiRes.status, 200);
+  assert.equal(openApiBody.openapi, '3.1.0');
+  assert.ok(openApiBody.paths['/api/connector/analyze']);
+
+  const feedRes = await fetch(`${baseUrl}/api/connector/sample-pos-feed`);
+  const feedBody = await feedRes.json();
+  assert.equal(feedRes.status, 200);
+  assert.equal(feedBody.status, 'ok');
+  assert.ok(Array.isArray(feedBody.data?.stores) && feedBody.data.stores.length > 0);
+
+  const analyzeRes = await fetch(`${baseUrl}/api/connector/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      command: 'Hey NC, show revenue by store as a bar chart, highlight the bottom 2 stores in red, and export a CSV',
+      active_mode: 'api_webhook',
+      dataset_name: 'External POS Webhook'
+    })
+  });
+  const analyzeBody = await analyzeRes.json();
+  assert.equal(analyzeRes.status, 200);
+  assert.ok(analyzeBody.mascot_state);
+  assert.equal(analyzeBody.connector_status.active_mode, 'api_webhook');
+  assert.ok(analyzeBody.voice_reply.split(/\s+/).length <= 35);
+  assert.ok(Array.isArray(analyzeBody.dashboard_actions) && analyzeBody.dashboard_actions.length >= 2);
+  assert.ok(Array.isArray(analyzeBody.processed_data) && analyzeBody.processed_data.length > 0);
+});
+
+

@@ -1,21 +1,21 @@
 {
   "product": "InsightBoard VDB",
   "displayName": "InsightBoard VDB (Visual Dashboard)",
-  "websiteVersion": "2.2.0",
-  "apiVersion": "2.2.0",
-  "windowsPackageVersion": "2.2.0.0",
-  "androidApkVersion": "2.2.0",
+  "websiteVersion": "3.0.0",
+  "apiVersion": "3.0.0",
+  "windowsPackageVersion": "3.0.0.0",
+  "androidApkVersion": "3.0.0",
   "releaseChannel": "production",
   "releasedAt": "2026-11-10",
-  "minimumSupportedApiVersion": "2.2.0",
+  "minimumSupportedApiVersion": "3.0.0",
   "notes": [
-    "InsightBoard VDB (Visual Dashboard) with schema-aware analytics, 6 interactive charts, and Light & Dark UI.",
-    "Cryptographic SHA-256 dataset integrity verification, CSV formula injection protection, and recursive payload sanitization.",
-    "Python Scientific Engine for OLS Linear Regression, Tukey IQR outlier fencing, and Monte Carlo confidence intervals.",
-    "Synchronized Web, API, Microsoft Store PWA (2.2.0.0), and Android APK (v2.2.0) builds."
+    "INSI (insi.ai) v3.0 Autonomous Executive Data Operator with hands-free 'Hey INSI' wake-word recognition and phonetic STT support.",
+    "Separated 3-Mode Universal Data Connector (Mode A Offline Sandbox, Mode B Drag-and-Drop POS/ERP CSV & JSON, Mode C Live Webhook & OpenAPI 3.1 External AI Bridge).",
+    "Usage & Quotas zero-billing governance for Google Gemini, Supabase, MongoDB Atlas, and Microsoft Azure.",
+    "Synchronized Web, API, Microsoft Store PWA (3.0.0.0), and Android APK (v3.0.0) builds."
   ],
   "updatePolicy": {
-    "websiteAndApi": "Synchronized production runtime at v2.2.0.",
-    "windowsPackage": "Synchronized Microsoft Store MSIX/PWA (2.2.0.0) and Android APK (v2.2.0) packages."
+    "websiteAndApi": "Synchronized production runtime at v3.0.0.",
+    "windowsPackage": "Synchronized Microsoft Store MSIX/PWA (3.0.0.0) and Android APK (v3.0.0) packages."
   }
 }

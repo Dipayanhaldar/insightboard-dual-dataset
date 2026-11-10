@@ -6,11 +6,17 @@ import jwt from 'jsonwebtoken';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'node:path';
+import fs from 'node:fs';
 import { randomUUID, createHash } from 'node:crypto';
 import { spawn, execFile } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { GoogleGenAI, Modality } from '@google/genai';
 import { WebSocketServer } from 'ws';
+import {
+  executeInsiCommand,
+  buildExternalConnectorOpenApiSpec,
+  extractConnectorRecords
+} from '../src/v2/insiOperatorEngine.js';
 
 dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.env') });
 
@@ -27,7 +33,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || process.env.CLIENT_SECRET || '';
-const APP_VERSION = process.env.API_VERSION || process.env.npm_package_version || '2.1.0';
+const APP_VERSION = process.env.API_VERSION || process.env.npm_package_version || '3.0.0';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDirectory = path.resolve(__dirname, '../dist');
 const publicDirectory = path.resolve(__dirname, '../public');
@@ -471,6 +477,73 @@ app.get('/api/ai/status', (_req, res) => {
     freeLifetimeMode: true,
     model: 'insightboard-intelligence-engine'
   });
+});
+
+// ============================================================================
+// UNIVERSAL CONNECTOR & EXTERNAL AI BRIDGE (OpenAPI 3.1 + Stateless INSI Operator)
+// Allows external POS/ERP webhooks, ChatGPT Custom GPT Actions, Claude, or Gemini
+// to query InsightBoard VDB without opening the web UI.
+// ============================================================================
+let defaultMallRecordsCache = null;
+function getDefaultMallRecords() {
+  if (defaultMallRecordsCache) return defaultMallRecordsCache;
+  try {
+    const raw = fs.readFileSync(path.resolve(__dirname, '../src/shopping_mall_sales.json'), 'utf8');
+    defaultMallRecordsCache = JSON.parse(raw);
+    return defaultMallRecordsCache;
+  } catch {
+    return [];
+  }
+}
+
+app.get('/api/connector/openapi.json', (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Cache-Control', 'no-store');
+  const origin = `${req.protocol}://${req.get('host')}`;
+  return res.json(buildExternalConnectorOpenApiSpec(origin));
+});
+
+app.get('/api/connector/sample-pos-feed', (_req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Cache-Control', 'no-store');
+  const stores = getDefaultMallRecords();
+  return res.json({
+    status: 'ok',
+    connector: 'InsightBoard VDB Live POS Webhook Feed',
+    version: APP_VERSION,
+    data: {
+      stores
+    }
+  });
+});
+
+app.post('/api/connector/analyze', (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Cache-Control', 'no-store');
+  const command = safeText(req.body?.command || 'Hey INSI, summarize revenue by store', 500);
+  const activeMode = safeText(req.body?.active_mode || req.body?.activeMode || 'api_webhook', 32);
+  const datasetName = safeText(
+    req.body?.dataset_name || req.body?.datasetName || 'External Connector Dataset',
+    140
+  );
+  const incomingRecords = extractConnectorRecords(
+    req.body?.records || req.body?.rows || req.body?.data || req.body?.payload
+  );
+  const rowsToAnalyze =
+    incomingRecords.length > 0
+      ? incomingRecords.slice(0, 2500)
+      : activeMode === 'awaiting_data'
+      ? []
+      : getDefaultMallRecords();
+
+  const structuredOutput = executeInsiCommand({
+    rows: rowsToAnalyze,
+    datasetName,
+    command,
+    activeMode: rowsToAnalyze.length === 0 ? 'awaiting_data' : activeMode
+  });
+
+  return res.json(structuredOutput);
 });
 
 

@@ -238,6 +238,7 @@ export function createInsiController(dispatchFn) {
     state: 'idle',
     prop: 'chair_laptop',
     size: 'md',
+    auraColor: '#00F0FF',
     message: '',
     corner: 'bottom-right'
   };
@@ -275,6 +276,7 @@ export function createInsiController(dispatchFn) {
       state: validState,
       prop: options.prop || 'chair_laptop',
       size: nextSize,
+      auraColor: options.auraColor || '#00F0FF',
       message: String(message || ''),
       corner: nextCorner,
       durationMs: Number(options.durationMs) || 4600,
@@ -369,6 +371,27 @@ export function createInsiController(dispatchFn) {
         durationMs: mapped.durationMs,
         sound: mapped.sound,
         corner: mapped.corner
+      });
+    },
+    applyMascotState(mascotState = {}) {
+      const anim = String(mascotState?.animation || 'idle_prompt');
+      const auraColor = mascotState?.aura_color || '#00F0FF';
+      if (anim === 'slide_out') {
+        return notify({ visible: false, auraColor, sound: 'disappear' });
+      }
+      const mapping = {
+        celebrate_sparkles: { state: 'celebrating', prop: 'magician_wand', size: 'lg', sound: 'celebrate', durationMs: 5600 },
+        thinking_pulse: { state: 'heavy_ai', prop: 'ai_power_core', size: 'xl', sound: 'appear', durationMs: 5600 },
+        alert_glow: { state: 'surprised', prop: 'chart_holo', size: 'lg', sound: 'error', durationMs: 5400 },
+        export_complete: { state: 'exporting', prop: 'chair_laptop', size: 'md', sound: 'celebrate', durationMs: 5000 },
+        nod_confirm: { state: 'viewing_charts', prop: 'chart_holo', size: 'md', sound: 'appear', durationMs: 4800 },
+        slide_in: { state: 'waving', prop: 'chair_laptop', size: 'md', sound: 'appear', durationMs: 4800 },
+        idle_prompt: { state: 'idle', prop: 'chair_laptop', size: 'md', sound: 'appear', durationMs: 4600 }
+      }[anim] || { state: 'viewing_charts', prop: 'chart_holo', size: 'md', sound: 'appear', durationMs: 4800 };
+
+      return transitionTo(mapping.state, '', {
+        ...mapping,
+        auraColor
       });
     }
   };

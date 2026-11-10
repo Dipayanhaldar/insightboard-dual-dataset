@@ -3,13 +3,13 @@ import { ShieldCheck, CheckCircle2, RefreshCw, X, ExternalLink, Gauge, AlertOcta
 import './ReleaseCenter.css';
 import { insi } from './insiController.js';
 
-const CLIENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.2.0';
+const CLIENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '3.0.0';
 
 const FALLBACK = {
-  websiteVersion: '2.2.0',
-  apiVersion: '2.2.0',
-  windowsPackageVersion: '2.2.0.0',
-  androidApkVersion: '2.2.0',
+  websiteVersion: '3.0.0',
+  apiVersion: '3.0.0',
+  windowsPackageVersion: '3.0.0.0',
+  androidApkVersion: '3.0.0',
   releaseChannel: 'production'
 };
 

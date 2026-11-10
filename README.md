@@ -1,27 +1,36 @@
-# InsightBoard VDB (Visual Dashboard) — `v2.1.0`
+# InsightBoard VDB (Visual Dashboard) — `v3.0.0`
 
-**InsightBoard VDB (Visual Dashboard)** is an enterprise-ready **Shopping Mall Management, Retail Sales Intelligence, and Schema-Aware Visual Dashboard** platform built with React 18, Vite, Recharts, and Node.js/Express.
+**InsightBoard VDB (Visual Dashboard)** is an enterprise-ready **Shopping Mall Management, Retail Sales Intelligence, and Schema-Aware Visual Dashboard** platform built with React 18, Vite, Recharts, Python 3 Scientific Analytics, and Node.js/Express.
 
-Designed for both **corporate operations (Shopping Mall Directors, Retail Leasing Managers, Sales Analysts)** and **academic/college engineering demonstrations**, InsightBoard VDB transforms raw JSON and CSV datasets into an interactive command center with automated KPI detection, What-If scenario simulations, lifetime-free server AI summaries and optimization plans, dual-dataset comparison, voice synthesis, and one-click PDF/Excel/CSV reporting.
+Designed for both **corporate operations (Shopping Mall Directors, Retail Leasing Managers, Sales Analysts)** and **offline field/mall environments**, InsightBoard VDB transforms raw JSON, CSV, POS exports, and live webhooks into an interactive command center powered by **INSI (`insi.ai`)** — an autonomous 3D robot mascot and voice-guided executive data operator.
 
 ---
 
-## Synchronized Multi-Platform Version (`v2.1.0`)
+## Synchronized Multi-Platform Version (`v3.0.0`)
 
 All connected surfaces share the same semantic release version and are validated automatically in CI/CD:
 
 | Platform / Surface | Version | Status / Package Identifier |
 | :--- | :--- | :--- |
-| **Web Application (PWA & Browser)** | `v2.1.0` | Displayed in top badge, sidebar, Release Center & footer |
-| **Backend API (`/api/version`)** | `v2.1.0` | Synchronized via `package.json` & `public/release-info.json` |
-| **Microsoft Store Windows App** | `2.1.0.0` | Store ID: `9N20PQ3BJRSG` (`InsightBoard VDB`) |
-| **Android APK Package** | `v2.1.0` | Automated Gradle/Capacitor APK (`InsightBoard-VDB-v2.1.0.apk`) |
+| **Web Application (PWA & Browser)** | `v3.0.0` | Displayed in top badge, sidebar, Release Center & footer |
+| **Backend API (`/api/version`)** | `v3.0.0` | Synchronized via `package.json` & `public/release-info.json` |
+| **Microsoft Store Windows App** | `3.0.0.0` | Store ID: `9N20PQ3BJRSG` (`InsightBoard VDB`) |
+| **Android APK Package** | `v3.0.0` | Automated Gradle/Capacitor APK (`InsightBoard-VDB-v3.0.0.apk`) |
 
 ---
 
 ## Version History & Feature Matrix (What Each Version Includes)
 
-### `v2.1.0` — Commercial Retail & Shopping Mall Command Center (Current Release)
+### `v3.0.0` — INSI (`insi.ai`) Autonomous Voice Operator & Separated 3-Mode Universal Connector (Current Release)
+- **Hands-Free `"Hey INSI"` Wake-Word & Phonetic STT Operator**: Recognizes `"Hey INSI"` and phonetic browser Speech-to-Text transcriptions (`"Hey NC"`, `"Hey in C"`, `"Hey insi"`, `"Hey easy"`, `"Hey insight"`), executes multi-step dashboard commands, and speaks concise replies ($\le 35$ words) via browser TTS.
+- **Separated 3-Mode Universal Connector Hub (`UniversalConnectorHub.jsx`)**:
+  - **Mode A (`demo_sandbox`)**: Instant offline-ready Shopping Mall & Retail and Hyderabad Metro Rail sandboxes.
+  - **Mode B (`file_upload`)**: Drag-and-drop CSV/JSON ingestion for POS, ERP, SAP, Tally, and Shopify exports with automatic fuzzy column mapping (`gross_sales` $\leftrightarrow$ `revenue`, `tenant_name` $\leftrightarrow$ `store`, `visitor_count` $\leftrightarrow$ `footfall`).
+  - **Mode C (`api_webhook`)**: Live REST/Webhook feed fetcher (auto-extracting nested arrays like `data.stores`) + **External OpenAPI 3.1 Bridge (`GET /api/connector/openapi.json` & `POST /api/connector/analyze`)** so ChatGPT Custom GPT Actions, Claude, Gemini, or corporate webhooks can query InsightBoard VDB without opening the browser UI.
+- **3D Reference-Matched `insi` Robot Mascot (`InsiPetBot.jsx`)**: Non-verbal expressive 3D white & metallic-blue robot with cognac-brown pedestal armchair, `101` laptop, stack of books, Magician Stick on data import, Quantum AI Core on heavy AI tasks, and Studio Equalizer Deck on audio playback.
+- **Usage & Quotas Zero-Billing Governance (`UsageQuotasPanel.jsx`)**: Live consumption monitoring and `Limit Reached` cutoff protection for Google Gemini API, Supabase Cloud, MongoDB Atlas, and Microsoft Azure.
+
+### `v2.1.0` — Commercial Retail & Shopping Mall Command Center
 - **Renamed to InsightBoard VDB (Visual Dashboard)**: Unified branding across Web, API, Microsoft Store PWA manifest, and Android APK.
 - **Warm Corporate Light & Dark UI**: Replaced the cold, dark-locked interface with a high-contrast, warm corporate slate & sapphire design system supporting both **Light Mode** and **Dark Mode** with tabular numeric alignment (`tabular-nums`).
 - **Shopping Mall & Retail Sales Command Center (`#retail-command-center`)**:
