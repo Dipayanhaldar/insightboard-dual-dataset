@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.dipayanhaldar/insightboard-vdb",
+  "title": "InsightBoard VDB",
+  "description": "Read-only retail and mall analytics for supplied JSON data and a built-in sample.",
+  "repository": {
+    "url": "https://github.com/Dipayanhaldar/insightboard-dual-dataset",
+    "source": "github"
+  },
+  "version": "3.0.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://insightboard-v2-bsiu.onrender.com/api/mcp"
+    }
+  ]
+}
