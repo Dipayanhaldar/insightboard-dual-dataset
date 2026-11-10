@@ -29,6 +29,7 @@ function App(){
  const [rows,setRows]=useState(()=>getRecords(shoppingMallDataset));
  const [datasetName,setDatasetName]=useState('Shopping Mall & Retail Sales — Flagship Portfolio');
  const [preset,setPreset]=useState('mall');
+ const [customDataset,setCustomDataset]=useState({rows:null,name:''});
  const [filters,setFilters]=useState({});
  const [search,setSearch]=useState('');
  const [page,setPage]=useState(1);
@@ -62,11 +63,15 @@ function App(){
   setRows(clean);
   setDatasetName(name);
   setPreset(presetName);
-  if(presetName!=='custom'){try{localStorage.setItem('insightboard-preset',presetName);}catch{}}
+  if(presetName==='custom'){
+   setCustomDataset({rows:clean,name});
+  }else{
+   try{localStorage.setItem('insightboard-preset',presetName);}catch{}
+  }
   setFilters({});setSearch('');setPage(1);setSort({key:'',dir:'asc'});
-  setNotice(`Loaded ${clean.length.toLocaleString()} records from "${name}". Filters, KPIs, retail intelligence, charts, and table columns updated.`);
+  setNotice(`Loaded ${clean.length.toLocaleString()} records from "${name}". All KPIs, dynamic filters, intelligence panels, charts, and table columns are now strictly bound to this dataset.`);
  }
- const logoTitle=preset==='mall'?'Shopping Mall & Retail Portfolio':preset==='metro'?'Hyderabad Metro Rail':'Imported Data';
+ const logoTitle=preset==='mall'?'Shopping Mall & Retail Portfolio':preset==='metro'?'Hyderabad Metro Rail':`Imported Data · ${datasetName}`;
  const [audioStatus,setAudioStatus]=useState('');
  const [showAudioFallback,setShowAudioFallback]=useState(false);
  const audioRef=useRef(null);
@@ -101,6 +106,9 @@ function App(){
    }else if(value==='metro'){
     void playMetroAnnouncement();
     setDataset(hyderabadDataset,'Hyderabad Metro station reference','metro');
+   }else if(value==='custom'&&customDataset.rows){
+    if(audioRef.current){audioRef.current.pause();setAudioStatus('');}
+    setDataset(customDataset.rows,customDataset.name||'Imported Dataset','custom');
    }
   }catch(err){
    setNotice(`Could not load preset: ${err.message}. Your current dataset has been kept.`);
@@ -109,7 +117,7 @@ function App(){
   }
  }
 
- async function importFile(e){const file=e.target.files?.[0];if(!file)return;try{const raw=file.name.toLowerCase().endsWith('.csv')?parseCSV(await file.text()):JSON.parse(await file.text());setDataset(raw,file.name,'custom');}catch(err){setNotice(`Import failed: ${err.message}`);}e.target.value='';}
+ async function importFile(e){const file=e.target.files?.[0];if(!file)return;if(audioRef.current){audioRef.current.pause();setAudioStatus('');}try{const raw=file.name.toLowerCase().endsWith('.csv')?parseCSV(await file.text()):JSON.parse(await file.text());setDataset(raw,file.name,'custom');}catch(err){setNotice(`Import failed: ${err.message}`);}e.target.value='';}
  function exportCSV(){const cols=fields;const text=[cols.map(csvCell).join(','),...filtered.map(r=>cols.map(k=>csvCell(r[k])).join(','))].join('\r\n');downloadBlob(new Blob(['\ufeff'+text],{type:'text/csv;charset=utf-8;'}),'insightboard-vdb-filtered-data.csv');setNotice(`Exported ${filtered.length} filtered records to CSV.`);}
  function exportExcel(){const clean=filtered.map(r=>Object.fromEntries(fields.map(k=>[nice(k),r[k]===undefined||r[k]===null?'':typeof r[k]==='object'?JSON.stringify(r[k]):r[k]])));const ws=XLSX.utils.json_to_sheet(clean);ws['!cols']=fields.map(k=>({wch:Math.min(32,Math.max(12,nice(k).length+3))}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Filtered Data');const meta=XLSX.utils.aoa_to_sheet([['InsightBoard VDB (Visual Dashboard) Export'],['Version',`v${APP_VERSION}`],['Dataset',datasetName],['Records',filtered.length],['Generated',new Date().toLocaleString()],['Note','Contains the currently filtered records.']]);XLSX.utils.book_append_sheet(wb,meta,'Report Info');XLSX.writeFile(wb,'insightboard-vdb-filtered-data.xlsx');setNotice(`Exported ${filtered.length} filtered records to Excel.`);}
  async function exportPDF(){try{setBusy(true);setNotice('Preparing report and rendering the six visible charts…');await document.fonts?.ready;await new Promise(resolve=>setTimeout(resolve,700));const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});const width=doc.internal.pageSize.getWidth();doc.setFontSize(18);doc.setTextColor(25,48,74);doc.text(`InsightBoard VDB v${APP_VERSION} — Visual Data Report`,14,14);try{const logoPath=preset==='metro'?'/assets/hyderabad-metro-logo.webp':null;if(logoPath){const response=await fetch(logoPath);if(response.ok){const blob=await response.blob();const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob);});doc.addImage(dataUrl,'WEBP',width-39,6,24,15);}}}catch(e){console.warn('Preset logo could not be embedded in PDF',e);}doc.setFontSize(9);doc.setTextColor(80,95,115);doc.text(`Dataset: ${datasetName} | Records: ${filtered.length} | Generated: ${new Date().toLocaleString()}`,14,21);doc.text(`Active filters: ${Object.entries(filters).filter(([,v])=>v).map(([k,v])=>`${nice(k)}=${v}`).join(' · ')||'None'}${search.trim()?` | Search: ${search.trim()}`:''}`,14,27,{maxWidth:width-28});const cards=[...document.querySelectorAll('.charts-grid .chart-card')];if(cards.length){let count=0;for(const card of cards){if(count%2===0){if(count>0)doc.addPage();doc.setFontSize(10);doc.setTextColor(25,48,74);doc.text(`Dashboard charts (${count+1}–${Math.min(count+2,cards.length)} of ${cards.length})`,14,35);}const canvas=await html2canvas(card,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false,allowTaint:false,windowWidth:Math.max(card.scrollWidth,card.clientWidth),windowHeight:Math.max(card.scrollHeight,card.clientHeight)});const img=canvas.toDataURL('image/png');const margin=14,gap=6,cardW=(width-margin*2-gap)/2,cardH=78,x=margin+(count%2)*(cardW+gap),y=40;doc.addImage(img,'PNG',x,y,cardW,cardH,undefined,'FAST');count++;}if(cards.length!==6){setNotice(`Note: the current view rendered ${cards.length} chart panels. The PDF will include all panels currently shown.`);}}else{doc.setFontSize(11);doc.text('No charts are currently visible. Clear filters or import records to generate charts.',14,42);}doc.addPage();doc.setFontSize(16);doc.setTextColor(25,48,74);doc.text('Filtered Data Table',14,15);doc.setFontSize(9);doc.text(`Showing ${filtered.length} records; PDF table includes up to 1,000 rows and first 12 fields. Use Excel export for the complete filtered dataset.`,14,21);autoTable(doc,{startY:26,head:[fields.slice(0,12).map(nice)],body:filtered.slice(0,1000).map(r=>fields.slice(0,12).map(k=>typeof r[k]==='object'?JSON.stringify(r[k]):String(r[k]??''))),styles:{fontSize:6,cellPadding:1.5,overflow:'linebreak'},headStyles:{fillColor:[37,99,235]},margin:{left:10,right:10}});doc.save('insightboard-vdb-visual-report.pdf');setNotice(`PDF exported with ${cards.length} chart panels and up to ${Math.min(filtered.length,1000)} data rows.`);}catch(err){console.error(err);setNotice(`PDF export failed: ${err.message}. Please retry or use Excel export.`);}finally{setBusy(false);}}
@@ -131,12 +139,12 @@ function App(){
   <aside className={`sidebar ${sidebarOpen?'open':'closed'}`}>
    <div className="brand">
     <div className="brand-icon"><BarChart3 size={24}/></div>
-    <div><strong>InsightBoard VDB</strong><span>Visual Dashboard · Retail &amp; BI</span></div>
+    <div><strong>InsightBoard VDB</strong><span>Visual Dashboard · Universal BI</span></div>
     <button className="icon-btn mobile-only" onClick={()=>setSidebarOpen(false)} aria-label="Close menu"><X/></button>
    </div>
    <div className="side-label">WORKSPACE</div>
    <div className="nav-item active"><Activity size={18}/> Executive Overview</div>
-   <a className="nav-item" href="#retail-command-center"><Building2 size={18}/> Mall &amp; Sales Suite</a>
+   <a className="nav-item" href="#retail-command-center"><Building2 size={18}/> {preset==='mall'?'Mall & Sales Suite':'Data Intelligence Hub'}</a>
    <a className="nav-item" href="#dataset-compare"><GitCompareArrows size={18}/> Compare Datasets</a>
    <a className="nav-item" href="#v2-title"><Sparkles size={18}/> AI &amp; Cloud Reports</a>
    <div className="side-label filter-heading"><span>DYNAMIC FILTERS</span><SlidersHorizontal size={15}/></div>
@@ -151,17 +159,17 @@ function App(){
   <main className="main-area">
    <header className="topbar">
     <button className="icon-btn" onClick={()=>setSidebarOpen(!sidebarOpen)} aria-label="Toggle sidebar"><Menu/></button>
-    <div className="top-search"><Search size={18}/><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}} placeholder="Search stores, zones, categories, stations, or metrics…"/><kbd>⌕</kbd></div>
+    <div className="top-search"><Search size={18}/><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}} placeholder={`Search across ${fields.slice(0,4).map(nice).join(', ')||'all fields'}…`}/><kbd>⌕</kbd></div>
     <div className="top-actions">
      <button type="button" className="btn btn-light theme-toggle" onClick={()=>setTheme(theme==='light'?'dark':'light')} aria-label={`Switch to ${theme==='light'?'dark':'light'} mode`} title={`Switch to ${theme==='light'?'dark':'light'} mode`}>
       {theme==='light'?<Moon size={16}/>:<Sun size={16}/>}<span>{theme==='light'?'Dark mode':'Light mode'}</span>
      </button>
-     <label className="dataset-switch" title="Choose a built-in business dataset">
+     <label className="dataset-switch" title="Choose active dataset or preset">
       <span>Preset</span>
       <select value={preset} onChange={e=>switchPreset(e.target.value)} disabled={busy}>
        <option value="mall">Shopping Mall &amp; Retail Sales</option>
        <option value="metro">Hyderabad Metro Rail</option>
-       {preset==='custom'&&<option value="custom">Imported Data</option>}
+       {(preset==='custom'||Boolean(customDataset.rows))&&<option value="custom">Imported Data{customDataset.name?` (${customDataset.name})`:''}</option>}
       </select>
      </label>
      <label className="btn btn-light upload-btn"><Upload size={16}/> <span>Import JSON / CSV</span><input type="file" accept=".json,.csv,application/json,text/csv" onChange={importFile} /></label>
@@ -173,16 +181,20 @@ function App(){
    <div className="content">
     <div className="page-intro">
      <div>
-      <div className="eyebrow"><Sparkles size={14}/> INSIGHTBOARD VDB · VISUAL DASHBOARD &amp; RETAIL INTELLIGENCE</div>
+      <div className="eyebrow"><Sparkles size={14}/> {preset==='mall'?'INSIGHTBOARD VDB · VISUAL DASHBOARD & RETAIL INTELLIGENCE':preset==='metro'?'INSIGHTBOARD VDB · TRANSIT & NETWORK INTELLIGENCE':'INSIGHTBOARD VDB · DATA-DEPENDENT VISUAL ANALYTICS ENGINE'}</div>
       <h1>InsightBoard VDB</h1>
-      <p>Enterprise visual dashboard for Shopping Mall Managers, Retail Sales Directors, and Data Analysts. Import any JSON or CSV dataset or explore built-in commercial portfolios with automated KPIs, What-If simulations, lifetime-free AI summaries, and multi-format export.</p>
+      <p>{preset==='mall'
+       ?'Enterprise visual dashboard for Shopping Mall Managers, Retail Sales Directors, and Data Analysts. Explore commercial portfolios with automated KPIs, What-If simulations, lifetime-free AI summaries, and multi-format export.'
+       :preset==='metro'
+       ?'Interactive transit and station intelligence dashboard for Hyderabad Metro Rail. Filter lines, interchange corridors, and station metrics with automated KPIs, statistical correlations, and multi-format export.'
+       :`100% data-dependent visual intelligence workspace for "${datasetName}". All KPIs, statistical correlations, Z-score anomaly detectors, What-If simulations, and charts are generated exclusively from your uploaded schema (${fields.length} fields).`}</p>
       <div className="dataset-line"><Database size={14}/><span>{datasetName}</span><span className="dot-sep">·</span><span>{filtered.length.toLocaleString()} matching records</span></div>
      </div>
      <div className="dataset-brand">
       {preset==='metro'?<img src="/assets/hyderabad-metro-logo.webp" alt="Hyderabad Metro logo"/>:<div className="dataset-logo custom-logo"><Building2 size={22}/></div>}
       <div>
        <strong>{logoTitle}</strong>
-       <small>{preset==='mall'?'16 Anchor & Specialty Tenants · 6 Zones':preset==='metro'?'Station reference dataset':'Custom imported dataset'}</small>
+       <small>{preset==='mall'?'16 Anchor & Specialty Tenants · 6 Zones':preset==='metro'?'Station reference dataset (isolated preset)':`${rows.length.toLocaleString()} uploaded rows · ${fields.length} columns`}</small>
        {preset==='metro'&&<>{audioStatus&&<small role="status">{audioStatus}</small>}{showAudioFallback&&<button type="button" className="btn btn-light" style={{marginTop:8,padding:'6px 10px',fontSize:12}} onClick={()=>void playMetroAnnouncement()}><Volume2 size={14}/> Play Metro announcement</button>}</>}
       </div>
      </div>
@@ -197,7 +209,7 @@ function App(){
      <Kpi icon={<Activity/>} label={primaryMetric?`Avg. ${nice(primaryMetric)}`:'Numeric fields'} value={primaryMetric?Number(avg(primaryMetric)).toLocaleString(undefined,{maximumFractionDigits:2}):numericFields.length} sub={primaryMetric?`Sum: ${filtered.reduce((s,r)=>s+(Number(r[primaryMetric])||0),0).toLocaleString(undefined,{maximumFractionDigits:2})}`:'no numeric metric detected'} color="orange"/>
     </section>
 
-    <RetailCommandCenter rows={filtered} fields={fields} datasetName={datasetName} onLoadMallPreset={()=>switchPreset('mall')} />
+    <RetailCommandCenter rows={filtered} fields={fields} datasetName={datasetName} preset={preset} />
     <DatasetCompare rows={rows} datasetName={datasetName} />
     <V2Workspace analytics={v2Analytics} rows={rows} fields={fields} numericFields={numericFields} datasetName={datasetName} sourceIsUploaded={preset==='custom'} />
 

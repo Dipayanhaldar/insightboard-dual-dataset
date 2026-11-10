@@ -483,13 +483,13 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
   return <section className="v2-workspace" aria-labelledby="v2-title">
     <div className="v2-heading">
       <div><div className="v2-eyebrow"><Sparkles size={15}/> INSIGHTBOARD VDB · VERSION 2.1.0</div><h2 id="v2-title">{copy.title}</h2><p>{copy.subtitle}</p></div>
-      <a className="v2-button secondary" href="#retail-command-center">Retail &amp; Sales Suite <ArrowUpRight size={14}/></a>
+      <a className="v2-button secondary" href="#retail-command-center">Data Intelligence Hub <ArrowUpRight size={14}/></a>
       <label className="v2-language"><span>UI</span><select value={uiLanguage} onChange={event=>setUiLanguage(event.target.value)} aria-label="Workspace language"><option value="en">English</option><option value="hi">हिन्दी</option><option value="te">తెలుగు</option></select></label>
     </div>
       <div className="v2-account-panel v2-account-hero">
         <div className="v2-account-intro">
           <div className="v2-account-mark"><Sparkles size={19}/></div>
-          <div><span className="v2-overline">FIREBASE AUTH &amp; PORTABLE CLOUD WORKSPACE</span><h3>Turn data into direction.</h3><p>Explore your data, uncover retail and sales patterns, and keep aggregate reports synced in Firebase Firestore. Sign in free with Google from any platform.</p>
+          <div><span className="v2-overline">FIREBASE AUTH &amp; PORTABLE CLOUD WORKSPACE</span><h3>Turn data into direction.</h3><p>Explore any dataset, uncover statistical correlations and anomalies, and keep aggregate reports synced in Firebase Firestore. Sign in free with Google from any domain or platform.</p>
             <div className="v2-hero-visual" aria-hidden="true"><div className="v2-hero-glow"></div><div className="v2-mini-chart"><span style={{'--bar-height':'28%','--bar-delay':'0ms'}}></span><span style={{'--bar-height':'55%','--bar-delay':'90ms'}}></span><span style={{'--bar-height':'39%','--bar-delay':'180ms'}}></span><span style={{'--bar-height':'78%','--bar-delay':'270ms'}}></span><span style={{'--bar-height':'92%','--bar-delay':'360ms'}}></span></div><div className="v2-visual-caption"><span>INSIGHTBOARD VDB ANALYTICS</span><strong>Find the signal.</strong><small>Explore · Optimize · Save</small></div></div>
           </div>
         </div>
@@ -573,7 +573,7 @@ export default function V2Workspace({analytics,rows,fields,numericFields,dataset
       </div>
       <div className="v2-project-footer-actions">
         <a className="v2-project-link v2-project-link-primary" href="#retail-command-center">
-          <Sparkles size={17} aria-hidden="true" /><span>Open Mall &amp; Sales Suite</span><ArrowUpRight size={13} aria-hidden="true" />
+          <Sparkles size={17} aria-hidden="true" /><span>Open Data Intelligence Hub</span><ArrowUpRight size={13} aria-hidden="true" />
         </a>
         <a className="v2-project-link v2-project-link-secondary" href="#dataset-compare" title="Compare two datasets">
           <BookOpen size={17} aria-hidden="true" />
