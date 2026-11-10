@@ -1,0 +1,47 @@
+name: MCP connector validation
+
+on:
+  push:
+    branches:
+      - feature/mcp-connector-v3
+    paths:
+      - "server/**"
+      - "src/v2/**"
+      - "src/shopping_mall_sales.json"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/mcp-connector.yml"
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - "server/**"
+      - "src/v2/**"
+      - "src/shopping_mall_sales.json"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/mcp-connector.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --include=dev --no-audit --no-fund --legacy-peer-deps
+      - name: Check server syntax
+        run: npm run check:server
+      - name: Run server and MCP tests
+        run: npm test
+      - name: Build web application
+        run: npm run build
