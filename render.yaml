@@ -1,12 +1,12 @@
 services:
   - type: web
-    name: insightboard-v2
+    name: insightboard-vdb
     runtime: node
     plan: free
     region: singapore
-    branch: feature/insightboard-v2.0.1.1
-    autoDeployTrigger: off
-    buildCommand: npm install --include=dev && npm run build
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: npm install --include=dev --no-audit --no-fund --legacy-peer-deps && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -25,4 +25,5 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-3.5-flash-lite
+        value: gemini-3.8-flash
+

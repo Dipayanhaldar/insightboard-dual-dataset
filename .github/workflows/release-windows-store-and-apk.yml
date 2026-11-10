@@ -44,17 +44,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+
+      - name: Set up Python 3.11 for Scientific Backend
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Install dependencies
-        run: npm install --include=dev
+        run: npm install --include=dev --no-audit --no-fund --legacy-peer-deps
 
       - name: Read synchronized version from package.json & release-info.json
         id: meta
         run: |
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          REL_VERSION=$(node -p "require('./public/release-info.json').websiteVersion")
-          WIN_VERSION=$(node -p "require('./public/release-info.json').windowsPackageVersion")
+          PKG_VERSION=$(node -e "import('node:fs').then(fs => console.log(JSON.parse(fs.readFileSync('./package.json','utf8')).version))")
+          REL_VERSION=$(node -e "import('node:fs').then(fs => console.log(JSON.parse(fs.readFileSync('./public/release-info.json','utf8')).websiteVersion))")
+          WIN_VERSION=$(node -e "import('node:fs').then(fs => console.log(JSON.parse(fs.readFileSync('./public/release-info.json','utf8')).windowsPackageVersion))")
           if [ "$PKG_VERSION" != "$REL_VERSION" ]; then
             echo "Version mismatch: package.json ($PKG_VERSION) != release-info.json ($REL_VERSION)"
             exit 1
@@ -67,8 +71,9 @@ jobs:
           node --check public/sw.js
           node scripts/validate-pwa.mjs
           npm run check:server
+          npm run check:python
 
-      - name: Run API & Retail Intelligence unit tests
+      - name: Run API, Python Scientific Engine & Retail Intelligence unit tests
         run: npm test
 
       - name: Build production web bundle
@@ -96,7 +101,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
       - name: Set up JDK 17 for Android Gradle build
         uses: actions/setup-java@v4
@@ -148,7 +152,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
       - name: Generate Windows Store PWA Submission Manifest
         env:
@@ -225,24 +228,26 @@ jobs:
         id: notes
         run: |
           node -e '
-            const fs = require("fs");
-            const info = JSON.parse(fs.readFileSync("./public/release-info.json", "utf8"));
-            const lines = [
-              `## ${info.displayName} — v${info.websiteVersion}`,
-              "",
-              `- **Website & Cloud API Version:** \`v${info.websiteVersion}\``,
-              `- **Windows Store Package Version:** \`${info.windowsPackageVersion}\` (Store ID: \`9N20PQ3BJRSG\`)`,
-              `- **Android APK Version:** \`v${info.androidApkVersion || info.websiteVersion}\``,
-              "",
-              "### Highlights in this Release",
-              ...info.notes.map(n => `- ${n}`),
-              "",
-              "### Attached Installers & Artifacts",
-              `- \`InsightBoard-VDB-v${info.websiteVersion}.apk\` — Direct-install Android package`,
-              `- \`windows-store-package-config-v${info.websiteVersion}.json\` — Microsoft Store PWA submission manifest`
-            ];
-            fs.writeFileSync("release-bundle/RELEASE_NOTES.md", lines.join("\n"));
+            import("node:fs").then((fs) => {
+              const info = JSON.parse(fs.readFileSync("./public/release-info.json", "utf8"));
+              const lines = [
+                `## ${info.displayName} — v${info.websiteVersion}`,
+                "",
+                `- **Website & Cloud API Version:** \`v${info.websiteVersion}\``,
+                `- **Windows Store Package Version:** \`${info.windowsPackageVersion}\` (Store ID: \`9N20PQ3BJRSG\`)`,
+                `- **Android APK Version:** \`v${info.androidApkVersion || info.websiteVersion}\``,
+                "",
+                "### Highlights in this Release",
+                ...info.notes.map(n => `- ${n}`),
+                "",
+                "### Attached Installers & Artifacts",
+                `- \`InsightBoard-VDB-v${info.websiteVersion}.apk\` — Direct-install Android package`,
+                `- \`windows-store-package-config-v${info.websiteVersion}.json\` — Microsoft Store PWA submission manifest`
+              ];
+              fs.writeFileSync("release-bundle/RELEASE_NOTES.md", lines.join("\n"));
+            });
           '
+
 
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2

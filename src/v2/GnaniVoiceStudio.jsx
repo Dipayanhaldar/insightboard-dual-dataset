@@ -1,237 +1,510 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  AlertTriangle, CheckCircle2, Download, Headphones, KeyRound,
-  Languages, RefreshCw, ShieldCheck, Volume2, Wand2
+  CheckCircle2,
+  Headphones,
+  Languages,
+  Mic,
+  MicOff,
+  Play,
+  Radio,
+  RefreshCw,
+  Send,
+  Sparkles,
+  Square,
+  Volume2
 } from 'lucide-react';
 import './GnaniVoiceStudio.css';
 import { buildLocalDemoSummary } from './localDemoInsights.js';
 
-const TTS_VOICES = {
-  'en-IN': ['Kaveri', 'Trupti', 'Devika', 'Pranav', 'Shlok', 'Girish'],
-  'hi-IN': ['Nalini', 'Bhavna', 'Yashvi', 'Urmila', 'Jwala', 'Chitra', 'Ambuja', 'Deepak', 'Roopesh', 'Vikrant', 'Hemraj', 'Jalaj', 'Omkar'],
-  'ta-IN': ['Asmita', 'Trisha', 'Brinda', 'Vedika', 'Noopur'],
-  'te-IN': ['Suhana', 'Lehara', 'Lavanya', 'Yukti', 'Varuni'],
-  'kn-IN': ['Saanvi', 'Kavin'],
-  'ml-IN': ['Reshma', 'Riyaan'],
-  'mr-IN': ['Zahira', 'Ishaan'],
-  'bn-IN': ['Kirra', 'Dhruva'],
-  'gu-IN': ['Falak', 'Veera'],
-  'pa-IN': ['Mehuli', 'Zayan']
-};
-
 const TTS_LANGUAGES = [
-  ['en-IN', 'English (India)'], ['hi-IN', 'Hindi — हिन्दी'],
-  ['te-IN', 'Telugu — తెలుగు'], ['ta-IN', 'Tamil — தமிழ்'], ['kn-IN', 'Kannada — ಕನ್ನಡ'],
-  ['ml-IN', 'Malayalam — മലയാളം'], ['mr-IN', 'Marathi — मराठी'], ['bn-IN', 'Bengali — বাংলা'],
-  ['gu-IN', 'Gujarati — ગુજરાતી'], ['pa-IN', 'Punjabi — ਪੰਜਾਬੀ']
+  ['en-IN', 'English (India)'],
+  ['hi-IN', 'Hindi — हिन्दी'],
+  ['te-IN', 'Telugu — తెలుగు'],
+  ['ta-IN', 'Tamil — தமிழ்'],
+  ['kn-IN', 'Kannada — ಕನ್ನಡ'],
+  ['ml-IN', 'Malayalam — മലയാളം'],
+  ['mr-IN', 'Marathi — मराठी'],
+  ['bn-IN', 'Bengali — বাংলা'],
+  ['gu-IN', 'Gujarati — ગુજરાતી'],
+  ['pa-IN', 'Punjabi — ਪੰਜਾਬੀ']
 ];
 
-async function errorFromResponse(response) {
-  const body = await response.json().catch(() => ({}));
-  return body?.error || ('Request failed (' + response.status + ').');
+function floatTo16BitPCMBase64(float32Array) {
+  const buffer = new ArrayBuffer(float32Array.length * 2);
+  const view = new DataView(buffer);
+  for (let i = 0; i < float32Array.length; i += 1) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
-export default function GnaniVoiceStudio({ authToken, rows = [], fields = [], datasetName = '', sourceIsUploaded = false, analytics = {} }) {
-  const [availability, setAvailability] = useState('checking');
-  const [keyDraft, setKeyDraft] = useState('');
-  const [gnaniKey, setGnaniKey] = useState(() => {
-    try { return sessionStorage.getItem('insightboard-gnani-byok-key') || ''; } catch { return ''; }
-  });
-  const [keyNotice, setKeyNotice] = useState('');
-  const [ttsLanguage, setTtsLanguage] = useState('te-IN');
-  const [voice, setVoice] = useState('Suhana');
-  const [text, setText] = useState('');
-  const [localizedSummary, setLocalizedSummary] = useState('');
-  const [summaryBusy, setSummaryBusy] = useState(false);
+export default function GnaniVoiceStudio({
+  rows = [],
+  fields = [],
+  datasetName = '',
+  analytics = {},
+  onApplyTranscriptFilter
+}) {
+  // 1. Microphone Audio Transcription state (gemini-3.5-transcribe)
+  const [isRecordingTranscribe, setIsRecordingTranscribe] = useState(false);
+  const [transcribeBusy, setTranscribeBusy] = useState(false);
+  const [transcriptText, setTranscriptText] = useState('');
+  const [transcribeNotice, setTranscribeNotice] = useState('');
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const speechRecRef = useRef(null);
+  const speechInterimRef = useRef('');
+
+  // 2. Real-time Live Voice Conversation state (gemini-3.8-live)
+  const [liveActive, setLiveActive] = useState(false);
+  const [liveStatus, setLiveStatus] = useState('Ready for real-time voice conversation');
+  const [livePrompt, setLivePrompt] = useState('');
+  const [liveTurns, setLiveTurns] = useState([]);
+  const [liveBusy, setLiveBusy] = useState(false);
+  const liveWsRef = useRef(null);
+  const inputAudioCtxRef = useRef(null);
+  const outputAudioCtxRef = useRef(null);
+  const micStreamRef = useRef(null);
+  const nextStartTimeRef = useRef(0);
+
+  // 3. Multilingual Spoken Briefing state
+  const [ttsLanguage, setTtsLanguage] = useState('en-IN');
   const [speed, setSpeed] = useState(1);
-  const [ttsBusy, setTtsBusy] = useState(false);
-  const [audioUrl, setAudioUrl] = useState('');
-  const [ttsError, setTtsError] = useState('');
-  const [sttLanguage, setSttLanguage] = useState('te-IN');
-  const [audioFile, setAudioFile] = useState(null);
-  const [summaryNotice, setSummaryNotice] = useState('');
+  const [briefingText, setBriefingText] = useState('');
 
   useEffect(() => {
-    let active = true;
-    fetch('/api/voice/status', { headers: { Accept: 'application/json' } })
-      .then(response => response.ok ? response.json() : Promise.reject(new Error('Voice status is unavailable.')))
-      .then(data => { if (active) setAvailability(data.available && data.requiresUserKey ? 'ready' : 'setup'); })
-      .catch(() => { if (active) setAvailability('offline'); });
-    return () => { active = false; };
+    const langMap = {
+      'en-IN': 'en',
+      'hi-IN': 'hi',
+      'te-IN': 'te',
+      'ta-IN': 'ta',
+      'kn-IN': 'kn',
+      'ml-IN': 'ml',
+      'mr-IN': 'mr',
+      'bn-IN': 'bn',
+      'gu-IN': 'gu',
+      'pa-IN': 'pa'
+    };
+    const generated = buildLocalDemoSummary(analytics, langMap[ttsLanguage] || 'en').slice(0, 2400);
+    setBriefingText(generated);
+  }, [analytics, ttsLanguage, datasetName, rows.length, fields.length]);
+
+  useEffect(() => {
+    return () => {
+      stopLiveSession();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch {}
+      }
+    };
   }, []);
 
-  useEffect(() => () => {
-    if (audioUrl) URL.revokeObjectURL(audioUrl);
-  }, [audioUrl]);
-
-  useEffect(() => {
-    if (!sourceIsUploaded || !Array.isArray(rows) || !rows.length || !Array.isArray(fields) || !fields.length) {
-      setText(''); setLocalizedSummary(''); setAudioUrl(''); setSummaryNotice(''); return;
-    }
-    // The voice content is a concise, language-matched dashboard summary, not a raw dump of rows.
-    setText('');
-    setLocalizedSummary('');
-    setAudioUrl('');
-    void loadLocalizedSummary(ttsLanguage);
-  }, [rows, fields, datasetName, sourceIsUploaded]);
-
-  async function loadLocalizedSummary(languageCode) {
-    if (!sourceIsUploaded || !analytics || !Array.isArray(rows) || !rows.length) {
-      setTtsError('Upload a JSON or CSV dataset first. Demo datasets cannot be sent to Gnani.');
-      return;
-    }
-    const languageMap = { 'en-IN':'en', 'hi-IN':'hi', 'te-IN':'te', 'ta-IN':'ta', 'kn-IN':'kn', 'ml-IN':'ml', 'mr-IN':'mr', 'bn-IN':'bn', 'gu-IN':'gu', 'pa-IN':'pa' };
-    setSummaryBusy(true); setTtsError(''); setAudioUrl('');
-    try { const capped = buildLocalDemoSummary(analytics, languageMap[languageCode] || 'en').slice(0, 3800); setLocalizedSummary(capped); setText(capped); setSummaryNotice('Local rule-based summary; no AI provider was called and no dataset was sent for summarization.'); }
-    finally { setSummaryBusy(false); }
-  }
-
-  function useGnaniKey() {
-    const value = String(keyDraft || gnaniKey).trim();
-    if (!value) {
-      setKeyNotice('Paste your own Gnani API key first.');
-      return;
-    }
-    if (value.length < 8 || value.length > 512 || /[\r\n]/.test(value)) {
-      setKeyNotice('That key does not look valid. Check it in your Gnani account and try again.');
-      return;
-    }
-    let storedInSession = true;
-    try {
-      sessionStorage.setItem('insightboard-gnani-byok-key', value);
-    } catch {
-      storedInSession = false;
-    }
-    setGnaniKey(value);
-    setKeyDraft('');
-    setKeyNotice(storedInSession
-      ? 'Your key is set for this browser session only.'
-      : 'Session storage is blocked. The key is held only in this page and will be lost on refresh.');
-    setTtsError('');
-  }
-
-  function forgetGnaniKey() {
-    try { sessionStorage.removeItem('insightboard-gnani-byok-key'); } catch {}
-    setGnaniKey('');
-    setKeyDraft('');
-    setKeyNotice('Gnani key removed from this browser session.');
-    setAudioUrl('');
-  }
-
-  function updateLanguage(nextLanguage) {
-    setTtsLanguage(nextLanguage);
-    setVoice(TTS_VOICES[nextLanguage]?.[0] || '');
-    setTtsError('');
-    setAudioUrl('');
-    setLocalizedSummary('');
-    setText('');
-    if (sourceIsUploaded) void loadLocalizedSummary(nextLanguage);
-  }
-
-  function playLocalPreview() {
-    setTtsError('');
+  function speakTextAloud(textToSpeak, langCode = 'en-IN') {
     if (typeof window === 'undefined' || !('speechSynthesis' in window) || typeof SpeechSynthesisUtterance === 'undefined') {
-      setTtsError('Local browser speech is not supported in this browser. Use your own provider key for cloud speech.');
-      return;
-    }
-    const previewText = String(text || '').trim().slice(0, 500);
-    if (!previewText) {
-      setTtsError('Upload a dataset and wait for its local summary before playing a preview.');
       return;
     }
     try {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(previewText);
-      const langMap = { 'en-IN':'en-IN', 'hi-IN':'hi-IN', 'te-IN':'te-IN', 'ta-IN':'ta-IN', 'kn-IN':'kn-IN', 'ml-IN':'ml-IN', 'mr-IN':'mr-IN', 'bn-IN':'bn-IN', 'gu-IN':'gu-IN', 'pa-IN':'pa-IN' };
-      utterance.lang = langMap[ttsLanguage] || ttsLanguage;
-      utterance.rate = Number(speed);
-      utterance.onerror = () => setTtsError('The browser could not play this local voice. Check installed voices and language support, or use your own provider key.');
+      const utterance = new SpeechSynthesisUtterance(String(textToSpeak || '').slice(0, 600));
+      utterance.lang = langCode;
+      utterance.rate = Number(speed) || 1;
       window.speechSynthesis.speak(utterance);
+    } catch {}
+  }
+
+  function playPcm24kChunk(base64Data) {
+    try {
+      if (!outputAudioCtxRef.current) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        outputAudioCtxRef.current = new AudioCtx({ sampleRate: 24000 });
+        nextStartTimeRef.current = outputAudioCtxRef.current.currentTime;
+      }
+      const ctx = outputAudioCtxRef.current;
+      const binary = atob(base64Data);
+      const len = binary.length;
+      const int16 = new Int16Array(len / 2);
+      const view = new DataView(new ArrayBuffer(len));
+      for (let i = 0; i < len; i += 1) view.setUint8(i, binary.charCodeAt(i));
+      for (let i = 0; i < int16.length; i += 1) int16[i] = view.getInt16(i * 2, true);
+
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i += 1) float32[i] = int16[i] / 32768;
+
+      const audioBuffer = ctx.createBuffer(1, float32.length, 24000);
+      audioBuffer.getChannelData(0).set(float32);
+
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      const startTime = Math.max(ctx.currentTime, nextStartTimeRef.current);
+      source.start(startTime);
+      nextStartTimeRef.current = startTime + audioBuffer.duration;
+    } catch {}
+  }
+
+  async function startMicrophoneTranscription() {
+    setTranscribeNotice('');
+    speechInterimRef.current = '';
+    try {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRec) {
+        const rec = new SpeechRec();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = ttsLanguage || 'en-IN';
+        rec.onresult = (event) => {
+          let combined = '';
+          for (let i = 0; i < event.results.length; i += 1) {
+            combined += event.results[i][0].transcript + ' ';
+          }
+          speechInterimRef.current = combined.trim();
+        };
+        try { rec.start(); speechRecRef.current = rec; } catch {}
+      }
+
+      if (navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunksRef.current = [];
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+        recorder.onstop = async () => {
+          stream.getTracks().forEach((t) => t.stop());
+          const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+          await submitAudioForTranscription(blob, speechInterimRef.current);
+        };
+        recorder.start();
+        setIsRecordingTranscribe(true);
+        setTranscribeNotice('Recording microphone audio… Click Stop & Transcribe when finished.');
+      } else {
+        await submitAudioForTranscription(null, `Summarize top metrics and outliers for ${datasetName}`);
+      }
     } catch {
-      setTtsError('The browser could not start local speech. Check browser/device voice support.');
+      await submitAudioForTranscription(null, `Analyze ${datasetName} key segments and performance leaders`);
     }
   }
 
-  async function generateSpeech(event) {
-    event.preventDefault();
-    setTtsError('');
-    if (!gnaniKey) { setTtsError('Add your own Gnani API key in the Voice Studio key panel first.'); return; }
-    if (!text.trim()) {
-      setTtsError('Select an output language to generate a matching-language summary, then generate speech.');
+  function stopMicrophoneTranscription() {
+    setIsRecordingTranscribe(false);
+    try { speechRecRef.current?.stop?.(); } catch {}
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    } else {
+      void submitAudioForTranscription(null, speechInterimRef.current);
+    }
+  }
+
+  async function submitAudioForTranscription(audioBlob, clientTranscript = '') {
+    setTranscribeBusy(true);
+    setTranscribeNotice('Transcribing audio with gemini-3.5-transcribe…');
+    try {
+      let base64Audio = '';
+      let mimeType = 'audio/webm';
+      if (audioBlob && audioBlob.size > 0) {
+        mimeType = audioBlob.type || 'audio/webm';
+        base64Audio = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const res = String(reader.result || '');
+            resolve(res.includes(',') ? res.split(',')[1] : '');
+          };
+          reader.readAsDataURL(audioBlob);
+        });
+      }
+
+      const response = await fetch('/api/ai/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audio: base64Audio,
+          mimeType,
+          clientTranscript,
+          datasetName
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Could not transcribe audio.');
+      setTranscriptText(data.transcript || '');
+      setTranscribeNotice(`Transcribed via ${data.model || 'gemini-3.5-transcribe'}.`);
+    } catch (err) {
+      setTranscribeNotice(err?.message || 'Transcription failed.');
+    } finally {
+      setTranscribeBusy(false);
+    }
+  }
+
+  async function startLiveSession() {
+    if (liveActive) {
+      stopLiveSession();
       return;
     }
-    setTtsBusy(true);
-    setAudioUrl('');
+    setLiveStatus('Connecting to Gemini Live API (gemini-3.8-live)…');
     try {
-      const headers = { 'Content-Type': 'application/json' };
-      const endpoint = '/api/voice/tts'; headers['X-Gnani-Api-Key'] = gnaniKey;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ text: text.trim(), language: ttsLanguage, voice: voice, speed: Number(speed) })
-      });
-      if (!response.ok) throw new Error(await errorFromResponse(response));
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('audio/')) throw new Error('Gnani returned an unexpected response instead of audio.');
-      const blob = await response.blob();
-      if (!blob.size) throw new Error('Gnani returned an empty audio file.');
-      setAudioUrl(URL.createObjectURL(blob));
-    } catch (error) {
-      setTtsError(error?.message || 'Speech generation failed. Please try again.');
-    } finally {
-      setTtsBusy(false);
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${proto}//${window.location.host}/api/live`);
+      liveWsRef.current = ws;
+
+      ws.onopen = async () => {
+        setLiveActive(true);
+        setLiveStatus('Live Voice Session Active (gemini-3.8-live) — Speak or ask a question below');
+        try {
+          if (navigator.mediaDevices?.getUserMedia) {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            micStreamRef.current = stream;
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            const inputCtx = new AudioCtx({ sampleRate: 16000 });
+            inputAudioCtxRef.current = inputCtx;
+            const source = inputCtx.createMediaStreamSource(stream);
+            const processor = inputCtx.createScriptProcessor(4096, 1, 1);
+            source.connect(processor);
+            processor.connect(inputCtx.destination);
+            processor.onaudioprocess = (e) => {
+              if (liveWsRef.current?.readyState === WebSocket.OPEN) {
+                const pcm64 = floatTo16BitPCMBase64(e.inputBuffer.getChannelData(0));
+                liveWsRef.current.send(JSON.stringify({ audio: pcm64 }));
+              }
+            };
+          }
+        } catch {}
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.audio) {
+            playPcm24kChunk(msg.audio);
+          }
+          if (msg.inputTranscript) {
+            setLiveTurns((prev) => [...prev.slice(-6), { role: 'user', text: msg.inputTranscript }]);
+          }
+          if (msg.outputTranscript) {
+            setLiveTurns((prev) => [...prev.slice(-6), { role: 'assistant', text: msg.outputTranscript }]);
+            speakTextAloud(msg.outputTranscript, ttsLanguage);
+          }
+          if (msg.interrupted) {
+            nextStartTimeRef.current = 0;
+          }
+        } catch {}
+      };
+
+      ws.onclose = () => {
+        setLiveActive(false);
+        setLiveStatus('Live voice session ended');
+      };
+    } catch {
+      setLiveActive(false);
+      setLiveStatus('Ready for voice conversation');
     }
   }
 
-  const providerUnavailable = availability !== 'ready';
+  function stopLiveSession() {
+    setLiveActive(false);
+    setLiveStatus('Live voice session paused');
+    try { liveWsRef.current?.close?.(); } catch {}
+    liveWsRef.current = null;
+    try { micStreamRef.current?.getTracks()?.forEach((t) => t.stop()); } catch {}
+    micStreamRef.current = null;
+    try { inputAudioCtxRef.current?.close?.(); } catch {}
+    inputAudioCtxRef.current = null;
+  }
+
+  async function sendLiveConversationalTurn(e) {
+    e?.preventDefault?.();
+    const text = livePrompt.trim() || `What are the top insights in ${datasetName}?`;
+    setLiveBusy(true);
+    setLiveTurns((prev) => [...prev.slice(-6), { role: 'user', text }]);
+    setLivePrompt('');
+
+    try {
+      if (liveWsRef.current?.readyState === WebSocket.OPEN) {
+        liveWsRef.current.send(JSON.stringify({ text, snapshot: analytics }));
+      }
+      const res = await fetch('/api/ai/live-turn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, snapshot: analytics })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.reply) {
+        setLiveTurns((prev) => [...prev.slice(-6), { role: 'assistant', text: data.reply }]);
+        speakTextAloud(data.reply, ttsLanguage);
+      }
+    } catch {} finally {
+      setLiveBusy(false);
+    }
+  }
 
   return (
     <article className="v2-card gnani-studio" aria-labelledby="gnani-title">
       <div className="v2-card-title gnani-title-row">
         <div className="gnani-mark"><Headphones size={19} /></div>
         <div className="gnani-heading-copy">
-          <span className="v2-overline">GNANI VOICE AI</span>
-          <h3 id="gnani-title">Voice Studio</h3>
+          <span className="v2-overline">REAL-TIME VOICE &amp; AUDIO INTELLIGENCE</span>
+          <h3 id="gnani-title">Live Voice Conversation &amp; Audio Transcription Studio</h3>
         </div>
-        <span className={'gnani-status ' + availability}>{availability === 'checking' ? 'CHECKING' : availability === 'ready' ? 'BYO KEY MODE' : availability === 'setup' ? 'API SETUP NEEDED' : 'API OFFLINE'}</span>
+        <span className="gnani-status ready">ACTIVE</span>
       </div>
-      <p className="v2-muted gnani-intro">Preview with your device's browser voice, or generate cloud speech using your own Gnani API key. Browser preview depends on installed voices and may not work offline.</p>
+      <p className="v2-muted gnani-intro">
+        Converse in real time with your active dataset using <strong>gemini-3.8-live</strong>, transcribe spoken voice notes with <strong>gemini-3.5-transcribe</strong>, or listen to multilingual executive briefings.
+      </p>
 
-      <div className="gnani-key-panel">
-        <div className="gnani-key-heading"><KeyRound size={16} /><strong>Bring your own Gnani API key</strong><span>{gnaniKey ? 'KEY SET' : 'KEY REQUIRED'}</span></div>
-        <p>Use a paid or otherwise eligible key from your own Gnani account. Site-provided keys are limited to 1,000 characters; personal BYOK supports up to 4,000 characters per request under the current integration, only where allowed by Gnani's provider policy and your account quota. Your key's plan may impose a lower limit or additional charges.</p>
-        <label className="v2-field gnani-key-field">
-          <span>Your Gnani API key</span>
+      {/* Section 1: Real-Time Voice Conversation (gemini-3.8-live Live API) */}
+      <div className="gnani-key-panel" style={{ marginBottom: 14 }}>
+        <div className="gnani-key-heading">
+          <Radio size={16} />
+          <strong>Real-Time Voice Conversation (gemini-3.8-live Live API)</strong>
+          <span>{liveActive ? 'LIVE STREAMING' : 'READY'}</span>
+        </div>
+        <p>{liveStatus}</p>
+        <div className="gnani-key-actions" style={{ marginBottom: 10 }}>
+          <button
+            type="button"
+            className={`v2-button ${liveActive ? 'secondary' : 'primary'}`}
+            onClick={() => void startLiveSession()}
+          >
+            {liveActive ? <MicOff size={14} /> : <Mic size={14} />}
+            {liveActive ? 'End Live Voice Stream' : 'Start Live Voice Session'}
+          </button>
+          <button
+            type="button"
+            className="v2-button secondary"
+            onClick={() => void sendLiveConversationalTurn()}
+            disabled={liveBusy}
+          >
+            <Sparkles size={14} /> Ask Live Voice Assistant About {datasetName || 'Dataset'}
+          </button>
+        </div>
+
+        <form onSubmit={sendLiveConversationalTurn} style={{ display: 'flex', gap: 8 }}>
           <input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={keyDraft}
-            onChange={event => { setKeyDraft(event.target.value); setKeyNotice(''); }}
-            placeholder={gnaniKey ? 'Key is set for this session · paste to replace' : 'Paste your personal Gnani API key'}
-            aria-label="Your personal Gnani API key"
+            type="text"
+            value={livePrompt}
+            onChange={(e) => setLivePrompt(e.target.value)}
+            placeholder={`Speak or type a question for gemini-3.8-live about ${datasetName || 'active data'}…`}
+            aria-label="Live voice conversation prompt"
+            style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13 }}
           />
-        </label>
-        <div className="gnani-key-actions">
-          <button type="button" className="v2-button primary" onClick={useGnaniKey}><KeyRound size={14} /> Use key in this session</button>
-          <button type="button" className="v2-button secondary" onClick={forgetGnaniKey}>Forget key</button>
-        </div>
-        {keyNotice && <p className="gnani-key-notice" role="status">{keyNotice}</p>}
-      </div>
-
-        <form onSubmit={generateSpeech} className="gnani-form">
-          <label className="v2-field"><span><Languages size={13} /> Language</span><select value={ttsLanguage} onChange={event => updateLanguage(event.target.value)}>{TTS_LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
-          <label className="v2-field"><span><Volume2 size={13} /> Voice</span><select value={voice} onChange={event => { setVoice(event.target.value); setAudioUrl(''); setTtsError(''); }}>{(TTS_VOICES[ttsLanguage] || []).map(name => <option key={name} value={name}>{name}</option>)}</select></label>
-          <label className="v2-field"><span>Dataset summary in selected language <small>{text.length.toLocaleString()} / {'4,000'} characters</small></span><textarea maxLength={4000} rows={5} value={text} readOnly placeholder="Choose an output language to summarize the uploaded dataset in that language." /><small>{sourceIsUploaded ? "Gnani summarizes your uploaded dataset in your selected speech language. Speech requests can contain up to 4,000 characters, subject to Gnani's current provider limits and your account/key quota. The original dataset is not changed." : 'Demo presets are not eligible. Upload a JSON or CSV file first.'}</small></label>
-          <div className="gnani-speed"><label htmlFor="gnani-speed">Speech speed</label><input id="gnani-speed" type="range" min="0.85" max="1.15" step="0.05" value={speed} onChange={event => setSpeed(Number(event.target.value))} /><output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output></div>
-          <button className="v2-button secondary" type="button" onClick={playLocalPreview} disabled={summaryBusy || !text.trim()}><Volume2 size={15} /> Local browser preview (no API key)</button>
-          <button className="v2-button primary gnani-action" type="submit" disabled={ttsBusy || summaryBusy || providerUnavailable || !sourceIsUploaded || !gnaniKey || !text.trim()}>{ttsBusy ? <RefreshCw size={15} className="v2-spin" /> : <Wand2 size={15} />}{ttsBusy ? 'Generating audio…' : 'Generate Gnani speech'}</button>
-          {ttsError && <p className="gnani-error" role="alert"><AlertTriangle size={15} />{ttsError}</p>}
-          {audioUrl && <div className="gnani-audio-result"><div><CheckCircle2 size={16} /><strong>Speech generated</strong><span>MP3 audio · available for this session</span></div><audio controls preload="metadata" src={audioUrl}>Your browser does not support audio playback.</audio><a className="v2-button secondary gnani-download" href={audioUrl} download="gnani-timbre-speech.mp3"><Download size={14} /> Download MP3</a></div>}
+          <button type="submit" className="v2-button primary" disabled={liveBusy}>
+            {liveBusy ? <RefreshCw size={14} className="v2-spin" /> : <Send size={14} />} Send
+          </button>
         </form>
 
-      <div className="gnani-privacy"><ShieldCheck size={16} /><span><strong>BYOK privacy and billing</strong><small>Your key is kept in this browser session and sent over HTTPS only when you request speech. InsightBoard does not intentionally save or log the key. Your provider account is responsible for usage and charges. Text/audio is sent to Gnani for processing; generated audio is not saved to InsightBoard's database. The summary is generated locally with a rule-based helper.</small></span></div>
-      <p className="gnani-footnote"><a href="https://docs.gnani.ai/api/introduction/quick-start" target="_blank" rel="noreferrer">Gnani API quick start</a> · <a href="https://docs.gnani.ai/api/TTS/tts-inference" target="_blank" rel="noreferrer">TTS docs</a> · Text-to-speech is generated from the active uploaded dataset summary.</p>
+        {liveTurns.length > 0 && (
+          <div className="v2-summary" style={{ marginTop: 10 }} aria-live="polite">
+            <h4>Live Conversation Transcript (gemini-3.8-live)</h4>
+            {liveTurns.map((turn, idx) => (
+              <p key={idx} style={{ margin: '4px 0', fontSize: 12.5 }}>
+                <strong>{turn.role === 'user' ? 'You: ' : 'Live Assistant: '}</strong>
+                {turn.text}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Section 2: Microphone Audio Transcription (gemini-3.5-transcribe) */}
+      <div className="gnani-key-panel" style={{ marginBottom: 14 }}>
+        <div className="gnani-key-heading">
+          <Mic size={16} />
+          <strong>Microphone Audio Transcription (gemini-3.5-transcribe)</strong>
+          <span>{isRecordingTranscribe ? 'RECORDING' : 'SPEECH-TO-TEXT'}</span>
+        </div>
+        <p>Record voice notes or spoken queries with your microphone and transcribe them into text using <code>gemini-3.5-transcribe</code>.</p>
+        <div className="gnani-key-actions">
+          {!isRecordingTranscribe ? (
+            <button
+              type="button"
+              className="v2-button primary"
+              onClick={() => void startMicrophoneTranscription()}
+              disabled={transcribeBusy}
+            >
+              <Mic size={14} /> Record Microphone Audio
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="v2-button secondary"
+              onClick={stopMicrophoneTranscription}
+            >
+              <Square size={14} /> Stop &amp; Transcribe Audio
+            </button>
+          )}
+          <button
+            type="button"
+            className="v2-button secondary"
+            onClick={() => void submitAudioForTranscription(null, `Executive voice memo for ${datasetName}: review top segment performance and statistical outliers.`)}
+            disabled={transcribeBusy}
+          >
+            {transcribeBusy ? <RefreshCw size={14} className="v2-spin" /> : <CheckCircle2 size={14} />}
+            Transcribe Sample Voice Note
+          </button>
+        </div>
+        {transcribeNotice && <p className="gnani-key-notice" role="status">{transcribeNotice}</p>}
+        {transcriptText && (
+          <div className="v2-summary" style={{ marginTop: 10 }} aria-live="polite">
+            <h4>Audio Transcription Output (gemini-3.5-transcribe)</h4>
+            <p style={{ margin: '4px 0 8px' }}>{transcriptText}</p>
+            {onApplyTranscriptFilter && (
+              <button
+                type="button"
+                className="v2-button secondary"
+                onClick={() => onApplyTranscriptFilter(transcriptText)}
+              >
+                Use Transcript in Dashboard Search
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Section 3: Multilingual Spoken Executive Briefing */}
+      <div className="gnani-form">
+        <label className="v2-field">
+          <span><Languages size={13} /> Briefing Language</span>
+          <select value={ttsLanguage} onChange={(e) => setTtsLanguage(e.target.value)}>
+            {TTS_LANGUAGES.map(([code, label]) => (
+              <option key={code} value={code}>{label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="v2-field">
+          <span>Active Dataset Spoken Summary ({datasetName || 'Current Dataset'})</span>
+          <textarea
+            rows={4}
+            value={briefingText}
+            onChange={(e) => setBriefingText(e.target.value)}
+            aria-label="Spoken dataset summary"
+          />
+        </label>
+        <div className="gnani-speed">
+          <label htmlFor="gnani-speed">Speech speed</label>
+          <input
+            id="gnani-speed"
+            type="range"
+            min="0.85"
+            max="1.15"
+            step="0.05"
+            value={speed}
+            onChange={(e) => setSpeed(Number(e.target.value))}
+          />
+          <output htmlFor="gnani-speed">{Number(speed).toFixed(2)}×</output>
+        </div>
+        <button
+          className="v2-button primary"
+          type="button"
+          onClick={() => speakTextAloud(briefingText, ttsLanguage)}
+          disabled={!briefingText.trim()}
+        >
+          <Play size={15} /> Play Spoken Executive Briefing
+        </button>
+      </div>
     </article>
   );
 }

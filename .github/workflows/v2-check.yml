@@ -16,8 +16,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm install --include=dev
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: npm install --include=dev --no-audit --no-fund --legacy-peer-deps
       - run: npm run check:server
+      - run: npm run check:python
       - run: npm test
       - run: npm run build
+

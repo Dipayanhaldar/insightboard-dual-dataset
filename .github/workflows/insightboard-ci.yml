@@ -31,24 +31,31 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+
+      - name: Set up Python 3.11 for Scientific Backend
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Install dependencies
-        run: npm install --include=dev
+        run: npm install --include=dev --no-audit --no-fund --legacy-peer-deps
 
       - name: Validate PWA package prerequisites
         run: |
           node --check public/sw.js
           node scripts/validate-pwa.mjs
 
-      - name: Check server syntax
-        run: npm run check:server
+      - name: Check Node & Python backend syntax
+        run: |
+          npm run check:server
+          npm run check:python
 
-      - name: Run API tests
+      - name: Run API & Python Scientific Engine tests
         run: npm test
 
-      - name: Build frontend for Render
+      - name: Build frontend for Render & Cloud Hosts
         run: npm run build
 
       - name: Verify offline production asset cache
         run: npm run check:pwa:build
+

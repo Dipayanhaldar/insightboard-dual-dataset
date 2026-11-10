@@ -29,8 +29,11 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Check Express server syntax
-        run: npm run check:server
+        run: npm install --include=dev --no-audit --no-fund --legacy-peer-deps
+      - name: Check Express & Python server syntax
+        run: |
+          npm run check:server
+          npm run check:python
       - name: Build Vite frontend
         run: npm run build
+

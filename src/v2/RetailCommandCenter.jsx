@@ -688,7 +688,7 @@ export default function RetailCommandCenter({
                 <strong>
                   <Sparkles size={14} /> Executive Optimization Brief (
                   {aiOptSource === 'gemini'
-                    ? 'Google Gemini Free Tier'
+                    ? 'Gemini Cloud Engine'
                     : 'Data-Dependent Analytical Engine'}
                   )
                 </strong>
@@ -706,12 +706,12 @@ export default function RetailCommandCenter({
         </div>
       </div>
 
-      {/* Free Statistical Correlation, Z-Score Outlier & Instant Query Suite */}
+      {/* Statistical Correlation, Z-Score Outlier & Instant Query Suite */}
       <div className="rcc-split-grid" style={{ marginTop: 18 }}>
         <div className="rcc-panel">
           <div className="rcc-panel-head">
             <div>
-              <span className="rcc-tag">FREE DATA SCIENCE ENGINE</span>
+              <span className="rcc-tag">MULTIVARIATE DATA SCIENCE ENGINE</span>
               <h3>
                 Pearson Correlation &amp; Z-Score Anomaly Detector
               </h3>

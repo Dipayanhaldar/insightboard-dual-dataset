@@ -9,10 +9,10 @@
   "releasedAt": "2026-11-09",
   "minimumSupportedApiVersion": "2.1.0",
   "notes": [
-    "Renamed to InsightBoard VDB (Visual Dashboard) with warm, corporate Light & Dark UI.",
-    "Added Commercial Retail & Shopping Mall Command Center with tenant yield (₹/sq.ft), footfall conversion funnel, and interactive What-If Scenario Simulator.",
-    "Added lifetime-free Server AI Summary & Retail Action Plan Optimizer with Google Gemini + automatic analytical fallback.",
-    "Implemented platform-independent Cross-Platform Google Sign-In SSO and automated GitHub Actions for Microsoft Store PWA and Android APK releases."
+    "Renamed to InsightBoard VDB (Visual Dashboard) with compact tabbed navigation and Light & Dark UI.",
+    "Added Schema-Aware Decision & Statistical Hub with What-If Scenario Simulator, Pearson Correlation, Z-Score Anomaly Detector, and Smart Slice Query.",
+    "Integrated Google Search Grounding (gemini-3.8-flash), Microphone Audio Transcription (gemini-3.5-transcribe), and Real-Time Live Voice Conversation (gemini-3.8-live).",
+    "Connected Python Scientific Backend Engine for OLS Linear Regression (R² & 3-step projections), Tukey IQR outlier fencing, and Monte Carlo confidence intervals."
   ],
   "updatePolicy": {
     "websiteAndApi": "Continuous deployment across Render, Vercel, and cloud hosts; synchronized at v2.1.0.",

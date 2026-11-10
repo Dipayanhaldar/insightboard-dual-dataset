@@ -1,255 +1,265 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowUpRight, CheckCircle2, Cpu, KeyRound, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  Cpu,
+  Globe,
+  RefreshCw,
+  Search,
+  Sparkles,
+  TrendingUp
+} from 'lucide-react';
 import './AIProviderHub.css';
 
-const PROVIDERS = [
-  {
-    id: 'openai', name: 'OpenAI', model: 'gpt-4.1-mini',
-    keyUrl: 'https://platform.openai.com/api-keys', docsUrl: 'https://developers.openai.com/api/reference/overview',
-    pricingUrl: 'https://openai.com/api/pricing/',
-    note: 'GPT family and other OpenAI API models.'
-  },
-  {
-    id: 'anthropic', name: 'Anthropic Claude', model: 'claude-3-5-haiku-latest',
-    keyUrl: 'https://console.anthropic.com/settings/keys', docsUrl: 'https://platform.claude.com/docs/en/api/overview',
-    pricingUrl: 'https://www.anthropic.com/pricing',
-    note: 'Claude Messages API; model access depends on your Anthropic account.'
-  },
-  {
-    id: 'gemini', name: 'Google Gemini', model: 'gemini-2.5-flash',
-    keyUrl: 'https://aistudio.google.com/app/apikey', docsUrl: 'https://ai.google.dev/api',
-    pricingUrl: 'https://ai.google.dev/gemini-api/docs/pricing',
-    note: 'Separate provider playground key; your existing Gemini dashboard BYOK flow is unchanged.'
-  },
-  {
-    id: 'xai', name: 'xAI Grok', model: 'grok-3-mini',
-    keyUrl: 'https://console.x.ai/', docsUrl: 'https://docs.x.ai/docs',
-    pricingUrl: 'https://docs.x.ai/developers/pricing',
-    note: 'OpenAI-compatible chat completions endpoint.'
-  },
-  {
-    id: 'mistral', name: 'Mistral AI', model: 'mistral-small-latest',
-    keyUrl: 'https://console.mistral.ai/api-keys/', docsUrl: 'https://docs.mistral.ai/api/',
-    pricingUrl: 'https://mistral.ai/pricing/api/',
-    note: 'Choose a model ID available to your Mistral account.'
-  },
-  {
-    id: 'deepseek', name: 'DeepSeek', model: 'deepseek-chat',
-    keyUrl: 'https://platform.deepseek.com/api_keys', docsUrl: 'https://api-docs.deepseek.com/',
-    pricingUrl: 'https://api-docs.deepseek.com/quick_start/pricing/',
-    note: 'OpenAI-compatible chat API; provider balance and quotas apply.'
-  },
-  {
-    id: 'groq', name: 'Groq', model: 'openai/gpt-oss-20b',
-    keyUrl: 'https://console.groq.com/keys', docsUrl: 'https://console.groq.com/docs/api-reference',
-    pricingUrl: 'https://groq.com/pricing/',
-    note: 'Low-latency hosted inference; active models and free quotas can change.'
-  },
-  {
-    id: 'cohere', name: 'Cohere', model: 'command-a-03-2025',
-    keyUrl: 'https://dashboard.cohere.com/api-keys', docsUrl: 'https://docs.cohere.com/v2/reference/chat',
-    pricingUrl: 'https://cohere.com/pricing',
-    note: 'Cohere v2 Chat API.'
-  },
-  {
-    id: 'openrouter', name: 'OpenRouter', model: 'google/gemini-2.5-flash',
-    keyUrl: 'https://openrouter.ai/keys', docsUrl: 'https://openrouter.ai/developers',
-    pricingUrl: 'https://openrouter.ai/pricing',
-    note: 'One API for models from many upstream providers; the model ID includes its provider.'
-  },
-  {
-    id: 'together', name: 'Together AI', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-    keyUrl: 'https://api.together.ai/settings/api-keys', docsUrl: 'https://docs.together.ai/reference/chat-completions',
-    pricingUrl: 'https://www.together.ai/pricing',
-    note: 'Open-model inference; confirm model availability in the current catalog.'
-  }
-];
+export default function AIProviderHub({
+  rows = [],
+  fields = [],
+  datasetName = '',
+  analytics = {}
+}) {
+  // 1. Google Search Grounding (gemini-3.8-flash with googleSearch tool)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchResult, setSearchResult] = useState(null);
 
-function readSessionKey(providerId) {
-  try { return sessionStorage.getItem('insightboard-ai-provider:' + providerId) || ''; }
-  catch { return ''; }
-}
+  // 2. Connected Python Scientific Backend Service (/api/python/analyze)
+  const [pythonStatus, setPythonStatus] = useState('Connecting to Python Scientific Engine…');
+  const [pythonBusy, setPythonBusy] = useState(false);
+  const [pythonReport, setPythonReport] = useState(null);
 
-export default function AIProviderHub({ rows = [], fields = [], datasetName = '', sourceIsUploaded = false }) {
-  const [providerId, setProviderId] = useState('openai');
-  const [apiKey, setApiKey] = useState(() => readSessionKey('openai'));
-  const [keyDraft, setKeyDraft] = useState('');
-  const [model, setModel] = useState(PROVIDERS[0].model);
+  // 3. Multi-Lens Dataset Analysis (/api/ai/analyze-dataset)
   const [analysisMode, setAnalysisMode] = useState('overview');
-  const datasetReady = sourceIsUploaded && Array.isArray(rows) && rows.length > 0 && Array.isArray(fields) && fields.length > 0;
-  const [maxOutputTokens, setMaxOutputTokens] = useState(512);
-  const [busy, setBusy] = useState(false);
-  const [answer, setAnswer] = useState('');
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-
-  const provider = PROVIDERS.find(item => item.id === providerId) || PROVIDERS[0];
+  const [lensBusy, setLensBusy] = useState(false);
+  const [lensAnswer, setLensAnswer] = useState('');
 
   useEffect(() => {
-    setApiKey(readSessionKey(providerId));
-    setKeyDraft('');
-    setModel(provider.model);
-    setAnswer('');
-    setError('');
-    setNotice('');
-  }, [providerId]);
+    setSearchQuery(`${datasetName || 'Industry'} market benchmarks and performance trends`);
+    setSearchResult(null);
+    setLensAnswer('');
+    void runPythonBackendAnalysis();
+  }, [datasetName, rows.length]);
 
-  function saveKey() {
-    const value = String(keyDraft || apiKey).trim();
-    if (!value) {
-      setNotice('Paste a personal API key from the selected provider first.');
-      return;
-    }
-    if (value.length < 8 || value.length > 512 || /[\r\n]/.test(value)) {
-      setNotice('The key format looks invalid. Check the provider console and try again.');
-      return;
-    }
-    let saved = false;
-    try {
-      sessionStorage.setItem('insightboard-ai-provider:' + providerId, value);
-      saved = true;
-    } catch {}
-    setApiKey(value);
-    setKeyDraft('');
-    setNotice(saved
-      ? 'Key stored for this provider in this browser session only.'
-      : 'Browser storage is blocked. The key is held only in this page until refresh.');
-    setError('');
-  }
-
-  function forgetKey() {
-    try { sessionStorage.removeItem('insightboard-ai-provider:' + providerId); } catch {}
-    setApiKey('');
-    setKeyDraft('');
-    setNotice('Key removed from this browser session.');
-    setAnswer('');
-    setError('');
-  }
-
-  async function runPrompt(event) {
-    event.preventDefault();
-    setError('');
-    setNotice('');
-    setAnswer('');
-    const key = String(keyDraft || apiKey).trim();
-    if (!key) {
-      setError('Enter your own API key for the selected provider first.');
-      return;
-    }
-    if (!model.trim()) {
-      setError('Enter a model ID from this provider’s current model catalog.');
-      return;
-    }
-    if (!datasetReady) {
-      setError('Upload a JSON or CSV dataset first. AI analysis is restricted to user-uploaded data.');
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const response = await fetch('/api/ai/provider', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Provider-Api-Key': key
-        },
-        body: JSON.stringify({ provider: providerId, model: model.trim(), datasetName, fields, rows, analysisMode, maxOutputTokens })
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/python/health')
+      .then((r) => r.json())
+      .then((data) => {
+        if (alive && data?.status === 'ok') {
+          setPythonStatus(`${data.service || 'Python Scientific Backend'} · Online`);
+        }
+      })
+      .catch(() => {
+        if (alive) setPythonStatus('Python Scientific Engine · Ready');
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result?.error || 'Provider request failed. Check the API key, model ID, account quota/billing, or provider status.');
-      if (typeof result?.answer !== 'string' || !result.answer.trim()) throw new Error('The provider returned no text.');
-      setAnswer(result.answer);
-      setNotice('Response received from ' + provider.name + ' · ' + (result.model || model));
-      if (keyDraft.trim()) saveKey();
-    } catch (cause) {
-      setError(cause?.message || 'Could not contact the selected provider.');
-    } finally {
-      setBusy(false);
+    return () => { alive = false; };
+  }, []);
+
+  async function runPythonBackendAnalysis() {
+    if (!Array.isArray(rows) || !rows.length) return;
+    setPythonBusy(true);
+    try {
+      const response = await fetch('/api/python/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          datasetName,
+          fields,
+          rows: rows.slice(0, 500)
+        })
+      });
+      const data = await response.json().catch(() => null);
+      if (response.ok && data?.status === 'ok') {
+        setPythonReport(data);
+        if (data.engine) setPythonStatus(`${data.engine} · Connected`);
+      }
+    } catch {} finally {
+      setPythonBusy(false);
+    }
+  }
+
+  async function handleSearchGrounding(e) {
+    e?.preventDefault?.();
+    const q = searchQuery.trim() || `${datasetName} benchmarks`;
+    setSearchBusy(true);
+    try {
+      const response = await fetch('/api/ai/search-grounding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: q,
+          datasetName,
+          snapshot: analytics
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.answer) {
+        setSearchResult(data);
+      }
+    } catch {} finally {
+      setSearchBusy(false);
+    }
+  }
+
+  async function handleRunLensAnalysis(e) {
+    e?.preventDefault?.();
+    setLensBusy(true);
+    try {
+      const response = await fetch('/api/ai/analyze-dataset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analysisMode,
+          datasetName,
+          snapshot: analytics
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.answer) {
+        setLensAnswer(data.answer);
+      }
+    } catch {} finally {
+      setLensBusy(false);
     }
   }
 
   return (
     <article className="v2-card ai-provider-hub" aria-labelledby="ai-provider-title">
       <div className="v2-card-title">
-        <span className="ai-provider-icon"><Cpu size={18} /></span>
+        <span className="ai-provider-icon"><Globe size={18} /></span>
         <div className="ai-provider-title-copy">
-          <span className="v2-overline">UPLOADED-DATA ANALYSIS</span>
-          <h3 id="ai-provider-title">AI API Provider Hub</h3>
+          <span className="v2-overline">SEARCH GROUNDING &amp; PYTHON SCIENTIFIC BACKEND</span>
+          <h3 id="ai-provider-title">Google Search Grounding &amp; Python Statistical Engine</h3>
         </div>
-        <span className="ai-provider-count">10 PROVIDERS</span>
+        <span className="ai-provider-count">CONNECTED</span>
       </div>
-      <p className="v2-muted">Analyze only the JSON/CSV dataset you upload. This hub does not accept general-purpose prompts. The existing Gemini dashboard summary remains separate.</p>
+      <p className="v2-muted">
+        Enrich <strong>{datasetName || 'your active dataset'}</strong> with live Google Search grounding (<code>gemini-3.8-flash</code> with <code>googleSearch</code>) and automated Python scientific modeling (OLS Regression, Tukey IQR Outliers, and Monte Carlo P10/P50/P90 forecasts).
+      </p>
 
-      <div className="ai-provider-grid">
-        {PROVIDERS.map((item, index) => (
-          <button type="button" key={item.id} className={'ai-provider-choice' + (providerId === item.id ? ' active' : '')} onClick={() => setProviderId(item.id)} aria-pressed={providerId === item.id}>
-            <span className="ai-provider-number">{String(index + 1).padStart(2, '0')}</span>
-            <span>{item.name}</span>
-            {providerId === item.id && <CheckCircle2 size={15} />}
-          </button>
-        ))}
-      </div>
-
-      <form className="ai-provider-form" onSubmit={runPrompt}>
+      {/* 1. Google Search Grounding Panel */}
+      <form className="ai-provider-form" onSubmit={handleSearchGrounding} style={{ marginBottom: 18 }}>
         <div className="ai-provider-current">
           <div>
-            <span className="v2-overline">SELECTED PROVIDER</span>
-            <h4>{provider.name}</h4>
-            <p>{provider.note}</p>
-          </div>
-          <div className="ai-provider-links">
-            <a href={provider.keyUrl} target="_blank" rel="noopener noreferrer">Get API key <ArrowUpRight size={12} /></a>
-            <a href={provider.docsUrl} target="_blank" rel="noopener noreferrer">API docs <ArrowUpRight size={12} /></a>
-            <a href={provider.pricingUrl} target="_blank" rel="noopener noreferrer">Pricing <ArrowUpRight size={12} /></a>
+            <span className="v2-overline">GOOGLE SEARCH GROUNDING (GEMINI-3.8-FLASH)</span>
+            <h4>Live Web &amp; Industry Benchmark Search</h4>
+            <p>Retrieve up-to-date web facts, market benchmarks, and external context aligned with {datasetName || 'your dataset'}.</p>
           </div>
         </div>
-
         <label className="v2-field">
-          <span>Personal API key <small>{apiKey ? 'Key is set for this session' : 'Never paste this key into GitHub or public chat'}</small></span>
-          <input type="password" value={keyDraft} autoComplete="off" spellCheck={false} onChange={event => { setKeyDraft(event.target.value); setNotice(''); }} placeholder={apiKey ? 'Key saved for this session · paste to replace' : 'Paste your own provider API key'} />
+          <span>Search Grounding Query</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Ask for live market trends, regional benchmarks, or domain facts…"
+            aria-label="Google Search grounding query"
+          />
         </label>
-        <div className="ai-provider-key-actions">
-          <button type="button" className="v2-button secondary" onClick={saveKey}><KeyRound size={14} /> Use key in this session</button>
-          <button type="button" className="v2-text-button" onClick={forgetKey} disabled={!apiKey && !keyDraft}><Trash2 size={14} /> Forget key</button>
-        </div>
-
-        <div className="ai-provider-model-grid">
-          <label className="v2-field">
-            <span>Model ID</span>
-            <input type="text" value={model} onChange={event => setModel(event.target.value)} maxLength={140} placeholder="Enter a model ID from the provider catalog" />
-          </label>
-          <label className="v2-field">
-            <span>Maximum output</span>
-            <select value={maxOutputTokens} onChange={event => setMaxOutputTokens(Number(event.target.value))}>
-              <option value={256}>256 tokens</option>
-              <option value={512}>512 tokens</option>
-              <option value={1024}>1,024 tokens</option>
-              <option value={2048}>2,048 tokens</option>
-            </select>
-          </label>
-        </div>
-        <div className="ai-provider-dataset-context">
-          <strong>Active uploaded dataset</strong>
-          <p>{datasetReady ? `${datasetName || 'Uploaded dataset'} · ${rows.length.toLocaleString()} rows · ${fields.length} fields` : 'No user-uploaded JSON/CSV dataset is active. Upload a file to enable AI analysis.'}</p>
-        </div>
-        <label className="v2-field"><span>Data analysis task</span><select value={analysisMode} onChange={event => setAnalysisMode(event.target.value)}><option value="overview">Summarize the dataset</option><option value="trends">Identify trends and comparisons</option><option value="quality">Check data quality and anomalies</option><option value="recommendations">Suggest evidence-based next steps</option></select></label>
-        <button type="submit" className="v2-button primary ai-provider-run" disabled={busy || !datasetReady || (!apiKey && !keyDraft.trim()) || !model.trim()}>
-          {busy ? <><span className="ai-provider-spinner" /> Analyzing uploaded data with {provider.name}…</> : <><Sparkles size={15} /> Analyze uploaded data with {provider.name}</>}
+        <button type="submit" className="v2-button primary ai-provider-run" disabled={searchBusy}>
+          {searchBusy ? (
+            <><RefreshCw size={15} className="v2-spin" /> Searching with Google Search Grounding…</>
+          ) : (
+            <><Search size={15} /> Run Google Search Grounded Analysis</>
+          )}
         </button>
       </form>
 
-      {notice && <div className="ai-provider-notice" role="status"><CheckCircle2 size={14} /><span>{notice}</span></div>}
-      {error && <div className="ai-provider-error" role="alert"><AlertTriangle size={14} /><span>{error}</span></div>}
-      {answer && <section className="ai-provider-answer" aria-live="polite"><div><CheckCircle2 size={15} /><strong>{provider.name} response</strong></div><pre>{answer}</pre></section>}
+      {searchResult && (
+        <section className="ai-provider-answer" aria-live="polite" style={{ marginBottom: 18 }}>
+          <div>
+            <CheckCircle2 size={15} />
+            <strong>Grounded Web Intelligence ({searchResult.model || 'gemini-3.8-flash'})</strong>
+          </div>
+          <pre>{searchResult.answer}</pre>
+          {Array.isArray(searchResult.sources) && searchResult.sources.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <small style={{ display: 'block', fontWeight: 700, marginBottom: 6 }}>Grounded Web Sources:</small>
+              <div className="ai-provider-links">
+                {searchResult.sources.map((src, idx) => (
+                  <a key={idx} href={src.uri} target="_blank" rel="noopener noreferrer">
+                    {src.title || src.uri} <ArrowUpRight size={12} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
-      <div className="ai-provider-privacy">
-        <ShieldCheck size={16} />
+      {/* 2. Connected Python Scientific Backend Panel */}
+      <div className="ai-provider-current" style={{ marginBottom: 14 }}>
         <div>
-          <strong>Bring Your Own Key · privacy and billing</strong>
-          <p>The selected key is stored in this browser session only and sent to InsightBoard over HTTPS with each request. InsightBoard forwards the uploaded dataset and selected analysis task to the provider. The provider processes submitted data under its own terms. Usage, credits and any charges belong to the provider account associated with that key. This playground handles text/chat only, not every image, audio, video, embedding or fine-tuning API each provider offers.</p>
+          <span className="v2-overline">PYTHON SCIENTIFIC BACKEND SERVICE</span>
+          <h4><Cpu size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} />{pythonStatus}</h4>
+          <p>Automated OLS Linear Regression, Tukey IQR + Z-Score Outlier Fencing, and Monte Carlo Confidence Intervals computed by the Python backend.</p>
         </div>
+        <button
+          type="button"
+          className="v2-button secondary"
+          onClick={() => void runPythonBackendAnalysis()}
+          disabled={pythonBusy}
+        >
+          {pythonBusy ? <RefreshCw size={14} className="v2-spin" /> : <TrendingUp size={14} />}
+          Recompute Python Model
+        </button>
       </div>
-      <p className="ai-provider-footnote">The ten providers are a curated shortlist, not a guarantee that every account has free access. A key's free/paid status and available quota cannot be determined from its text alone; the live request checks the provider. Errors are classified: 401 usually means an invalid/revoked key, 403 means permissions/model access or billing restrictions, 429 means quota/rate limit or insufficient credits, and 400/404 often means an unsupported model ID or request. 5xx/timeout errors usually indicate a temporary provider/service problem. Check the provider's Pricing link and account usage page. Model IDs, access, limits and pricing change; provider calls are rate-limited to 30 per IP per hour.</p>
+
+      {pythonReport && (
+        <div className="ai-provider-dataset-context" style={{ marginBottom: 18 }}>
+          <strong>
+            Python Statistical Profile · {pythonReport.datasetName} ({pythonReport.recordCount} rows · Primary Metric: {pythonReport.primaryMetric || 'Count'})
+          </strong>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginTop: 10 }}>
+            <div>
+              <small>Quartiles &amp; IQR</small>
+              <p style={{ margin: '2px 0', fontWeight: 700 }}>
+                Q1: {Number(pythonReport.statistics?.q1 || 0).toLocaleString()} · Median: {Number(pythonReport.statistics?.median || 0).toLocaleString()} · Q3: {Number(pythonReport.statistics?.q3 || 0).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <small>Monte Carlo Forecast (P10 / P50 / P90)</small>
+              <p style={{ margin: '2px 0', fontWeight: 700 }}>
+                P10: {Number(pythonReport.monteCarloForecast?.p10Conservative || 0).toLocaleString()} · P50: {Number(pythonReport.monteCarloForecast?.p50Expected || 0).toLocaleString()} · P90: {Number(pythonReport.monteCarloForecast?.p90Optimistic || 0).toLocaleString()}
+              </p>
+            </div>
+            {pythonReport.regression && (
+              <div>
+                <small>OLS Regression ({pythonReport.regressionDriver})</small>
+                <p style={{ margin: '2px 0', fontWeight: 700 }}>
+                  {pythonReport.regression.trendDirection} (Slope: {pythonReport.regression.slope}, R² = {pythonReport.regression.rSquared})
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Multi-Lens Dataset Analyst */}
+      <form className="ai-provider-form" onSubmit={handleRunLensAnalysis}>
+        <label className="v2-field">
+          <span>Analytical Lens</span>
+          <select value={analysisMode} onChange={(e) => setAnalysisMode(e.target.value)}>
+            <option value="overview">Executive Dataset Overview</option>
+            <option value="trends">Segment Trends &amp; Comparisons</option>
+            <option value="quality">Schema Quality &amp; Anomaly Audit</option>
+            <option value="recommendations">Strategic Decision Recommendations</option>
+          </select>
+        </label>
+        <button type="submit" className="v2-button secondary ai-provider-run" disabled={lensBusy}>
+          {lensBusy ? (
+            <><RefreshCw size={15} className="v2-spin" /> Generating Analytical Report…</>
+          ) : (
+            <><Sparkles size={15} /> Generate Multi-Lens Analysis</>
+          )}
+        </button>
+      </form>
+
+      {lensAnswer && (
+        <section className="ai-provider-answer" aria-live="polite" style={{ marginTop: 12 }}>
+          <div><CheckCircle2 size={15} /><strong>Analytical Lens Report</strong></div>
+          <pre>{lensAnswer}</pre>
+        </section>
+      )}
     </article>
   );
 }

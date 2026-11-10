@@ -172,4 +172,87 @@ test('cross-platform Google OAuth URL and portable Google SSO endpoints function
   assert.equal(ssoBody.user.provider, 'google');
 });
 
+test('Python scientific backend health and OLS/IQR/Monte Carlo analysis endpoints work automatically', async () => {
+  const healthRes = await fetch(`${baseUrl}/api/python/health`);
+  const healthBody = await healthRes.json();
+  assert.equal(healthRes.status, 200);
+  assert.equal(healthBody.status, 'ok');
+  assert.ok(Array.isArray(healthBody.capabilities));
 
+  const analyzeRes = await fetch(`${baseUrl}/api/python/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      datasetName: 'Enterprise Revenue & Workforce',
+      fields: ['department', 'revenue', 'headcount'],
+      primaryMetric: 'revenue',
+      secondaryMetric: 'headcount',
+      primaryCategory: 'department',
+      rows: [
+        { department: 'Cloud', revenue: 120000, headcount: 12 },
+        { department: 'Cloud', revenue: 150000, headcount: 15 },
+        { department: 'AI', revenue: 210000, headcount: 20 },
+        { department: 'Ops', revenue: 80000, headcount: 8 }
+      ]
+    })
+  });
+  const analyzeBody = await analyzeRes.json();
+  assert.equal(analyzeRes.status, 200);
+  assert.equal(analyzeBody.status, 'ok');
+  assert.equal(analyzeBody.statistics.sum, 560000);
+  assert.ok(analyzeBody.regression);
+  assert.ok(analyzeBody.monteCarloForecast.p90Optimistic >= analyzeBody.monteCarloForecast.p10Conservative);
+});
+
+test('Search grounding, audio transcription, and live voice conversation endpoints work silently without personal keys', async () => {
+  const searchRes = await fetch(`${baseUrl}/api/ai/search-grounding`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: 'Hyderabad Metro Rail corridor ridership benchmarks',
+      datasetName: 'Hyderabad Metro station reference',
+      snapshot: {
+        datasetName: 'Hyderabad Metro station reference',
+        recordCount: 57,
+        fields: ['Station Name', 'Line', 'Platforms']
+      }
+    })
+  });
+  const searchBody = await searchRes.json();
+  assert.equal(searchRes.status, 200);
+  assert.ok(typeof searchBody.answer === 'string' && searchBody.answer.length > 20);
+  assert.ok(Array.isArray(searchBody.sources) && searchBody.sources.length >= 1);
+
+  const transcribeRes = await fetch(`${baseUrl}/api/ai/transcribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mimeType: 'audio/webm',
+      clientTranscript: 'Compare top performing corridors and flag outliers',
+      datasetName: 'Hyderabad Metro station reference'
+    })
+  });
+  const transcribeBody = await transcribeRes.json();
+  assert.equal(transcribeRes.status, 200);
+  assert.equal(transcribeBody.model, 'gemini-3.5-transcribe');
+  assert.ok(transcribeBody.transcript.includes('Compare top performing'));
+
+  const liveRes = await fetch(`${baseUrl}/api/ai/live-turn`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: 'What is our leading segment?',
+      snapshot: {
+        datasetName: 'Corporate Dataset',
+        recordCount: 16,
+        fields: ['Unit', 'Segment', 'Revenue'],
+        numericMetrics: [{ field: 'Revenue', average: 5410000, sum: 86560000 }],
+        topCategories: [{ category: 'Central Plaza', count: 4, average: 8200000, total: 32800000 }]
+      }
+    })
+  });
+  const liveBody = await liveRes.json();
+  assert.equal(liveRes.status, 200);
+  assert.equal(liveBody.model, 'gemini-3.8-live');
+  assert.ok(typeof liveBody.reply === 'string' && liveBody.reply.length > 20);
+});

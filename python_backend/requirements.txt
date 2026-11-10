@@ -1,0 +1,6 @@
+# InsightBoard VDB — Python Scientific Backend Dependencies
+# Note: python_backend/app.py runs out-of-the-box using Python 3 standard library
+# (statistics, math, http.server) and is compatible with FastAPI/Uvicorn cloud hosts.
+fastapi>=0.115.0
+uvicorn>=0.32.0
+pydantic>=2.9.0
