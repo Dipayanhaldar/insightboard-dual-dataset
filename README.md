@@ -64,6 +64,21 @@ All connected surfaces share the same semantic release version and are validated
 
 ---
 
+## Native MCP Connector (Feature Branch)
+
+InsightBoard VDB is being extended with a native **Model Context Protocol (MCP)** endpoint using Streamable HTTP. The implementation is isolated on `feature/mcp-connector-v3` and is not part of the production release until reviewed and merged.
+
+- Endpoint after deployment: `https://YOUR-EXISTING-API-HOST/api/mcp`
+- Initial tools: connector capabilities, analysis of caller-supplied JSON records, and analysis of the built-in public mall sample dataset.
+- Permissions: read-only; no saved-report access, database writes, or external side effects.
+- Cost model: deterministic INSI analytics; no paid AI provider API calls.
+- Limits: 2,500 input records per request and up to 100 returned detail rows.
+- Deployment: reuse the existing Express API service and GitHub-driven deployment; no new hosting service is required.
+
+See [MCP Connector Documentation](docs/MCP_CONNECTOR.md) for transport, data handling, and client setup details.
+
+---
+
 ## Local Development & Production Start
 
 ### 1. Install Dependencies
