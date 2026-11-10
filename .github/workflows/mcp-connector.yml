@@ -9,7 +9,6 @@ on:
       - "src/v2/**"
       - "src/shopping_mall_sales.json"
       - "package.json"
-      - "bun.lock"
       - ".github/workflows/mcp-connector.yml"
   pull_request:
     branches:
@@ -20,7 +19,6 @@ on:
       - "src/v2/**"
       - "src/shopping_mall_sales.json"
       - "package.json"
-      - "bun.lock"
       - ".github/workflows/mcp-connector.yml"
 
 permissions:
@@ -33,14 +31,12 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install dependencies and refresh Bun lockfile
-        run: bun install
+      - name: Install dependencies
+        run: npm install --include=dev --no-audit --no-fund --legacy-peer-deps
       - name: Check server syntax
         run: npm run check:server
       - name: Run server and MCP tests
