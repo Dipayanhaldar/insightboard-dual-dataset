@@ -7,7 +7,6 @@ import {
   Save,
   Sparkles,
   Trash2,
-  ShieldCheck,
   LogIn,
   LogOut,
   Database,
@@ -25,13 +24,7 @@ import AIProviderHub from './AIProviderHub.jsx';
 import UsageQuotasPanel from './UsageQuotasPanel.jsx';
 import { playButtonClick, summonInsi } from './uiSound.js';
 import {
-  auth as firebaseAuth,
   db as firestoreDb,
-  googleProvider,
-  signInWithPopup,
-  signOut as firebaseSignOut,
-  onAuthStateChanged,
-  ensureFirebaseUserProfile,
   handleFirestoreError,
   OperationType,
   doc,
@@ -226,17 +219,10 @@ export default function V2Workspace({
   const [summarySource, setSummarySource] = useState('');
   const [message, setMessage] = useState('');
   const [history, setHistory] = useState([]);
-  const [authToken, setAuthToken] = useState(() => {
-    try {
-      return sessionStorage.getItem('insightboard-api-token') || '';
-    } catch {
-      return '';
-    }
-  });
-  const [account, setAccount] = useState(null);
-  const [firebaseUser, setFirebaseUser] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [authBusy, setAuthBusy] = useState(false);
+  const [authToken] = useState('');
+  const [account] = useState(null);
+  const [firebaseUser] = useState(null);
+  const [authReady] = useState(true);
   const [reportsBusy, setReportsBusy] = useState(false);
   const [reportSaveBusy, setReportSaveBusy] = useState(false);
 
@@ -255,221 +241,10 @@ export default function V2Workspace({
   const quality = useMemo(() => checkData(rows, fields, numericFields), [rows, fields, numericFields]);
   const activeGeminiKey = geminiKeyInput.trim() || savedGeminiKey.trim();
 
-  const fetchReports = useCallback(
-    async (token) => {
-      if (firebaseUser) return;
-      if (!token) {
-        setHistory([]);
-        return;
-      }
-      setReportsBusy(true);
-      try {
-        const response = await fetch('/api/reports', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const result = await response.json().catch(() => ({}));
-        if (response.status === 401) {
-          try {
-            sessionStorage.removeItem('insightboard-api-token');
-          } catch {}
-          setAuthToken('');
-          setAccount(null);
-          setHistory([]);
-          return;
-        }
-        if (!response.ok) return;
-        setHistory(Array.isArray(result.reports) ? result.reports : []);
-      } catch {
-        // Silent fallback
-      } finally {
-        setReportsBusy(false);
-      }
-    },
-    [firebaseUser]
-  );
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
-      setAuthReady(true);
-      if (user) {
-        setFirebaseUser(user);
-        setAccount({
-          id: user.uid,
-          email: user.email || user.displayName || 'Google Workspace User',
-          name: user.displayName || 'Google User',
-          provider: 'firebase-google'
-        });
-        try {
-          await ensureFirebaseUserProfile(user);
-        } catch {}
-        if (user.email) {
-          try {
-            const res = await fetch('/api/auth/google/portable', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: user.email,
-                name: user.displayName || 'Google User'
-              })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.token) {
-              try {
-                sessionStorage.setItem('insightboard-api-token', data.token);
-              } catch {}
-              setAuthToken(data.token);
-            }
-          } catch {}
-        }
-      } else {
-        setFirebaseUser(null);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!authReady || !firebaseUser?.uid) return undefined;
-    const reportsPath = 'reports';
-    const q = query(collection(firestoreDb, reportsPath), where('ownerId', '==', firebaseUser.uid));
-    setReportsBusy(true);
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const docs = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data();
-          const createdMs = data.createdAt?.toMillis ? data.createdAt.toMillis() : Date.now();
-          return {
-            id: docSnap.id,
-            title: data.title || 'InsightBoard report',
-            datasetName: data.datasetName || 'Current dataset',
-            recordCount: Number(data.recordCount) || 0,
-            summary: data.summary || '',
-            createdAt: new Date(createdMs).toISOString(),
-            snapshot: {
-              datasetName: data.datasetName,
-              recordCount: data.recordCount,
-              summary: data.summary
-            }
-          };
-        });
-        docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-        setHistory(docs);
-        setReportsBusy(false);
-      },
-      (error) => {
-        setReportsBusy(false);
-        try {
-          handleFirestoreError(error, OperationType.LIST, reportsPath);
-        } catch {}
-      }
-    );
-    return () => unsubscribe();
-  }, [authReady, firebaseUser]);
-
-  async function signOut() {
-    playButtonClick();
-    try {
-      if (firebaseUser) await firebaseSignOut(firebaseAuth);
-    } catch {}
-    try {
-      sessionStorage.removeItem('insightboard-api-token');
-    } catch {}
-    setFirebaseUser(null);
-    setAuthToken('');
-    setAccount(null);
+  const fetchReports = useCallback(async () => {
     setHistory([]);
-    setSummary('');
-    setMessage('Signed out. Sign in with Google anytime to access Gemini Summary with your API key.');
-    summonInsi('glide', 'INSI · Session locked safely');
-  }
-
-  async function signInWithGoogle() {
-    playButtonClick();
-    setAuthBusy(true);
-    setMessage('');
-    try {
-      const credential = await signInWithPopup(firebaseAuth, googleProvider);
-      const user = credential.user;
-      if (user) {
-        await ensureFirebaseUserProfile(user);
-        setMessage(`Signed in as ${user.email || user.displayName}. Gemini API Summary is now unlocked!`);
-        summonInsi('signin', 'INSI · Signed in! Sketching security seal & unlocking Gemini');
-        setAuthBusy(false);
-        return;
-      }
-    } catch (firebaseErr) {
-      const code = String(firebaseErr?.code || '');
-      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-        setMessage('Google Sign-In popup was closed before completing authentication.');
-        setAuthBusy(false);
-        return;
-      }
-    }
-
-    try {
-      const portableRes = await fetch('/api/auth/google/portable', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'verified.user@insightboard-vdb.org',
-          name: 'Verified Workspace User'
-        })
-      });
-      const portableData = await portableRes.json().catch(() => ({}));
-      if (!portableRes.ok || !portableData.token) {
-        throw new Error(portableData.error || 'Could not complete Google Sign-In.');
-      }
-      try {
-        sessionStorage.setItem('insightboard-api-token', portableData.token);
-      } catch {}
-      setAccount(portableData.user);
-      setAuthToken(portableData.token);
-      setMessage('Signed in with Google. Gemini AI Summary with your API key is now unlocked!');
-      summonInsi('signin', 'INSI · Signed in! Sketching security seal & unlocking Gemini');
-    } catch (err) {
-      setMessage(err?.message || 'Google Sign-In could not complete.');
-    } finally {
-      setAuthBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    let alive = true;
-    if (firebaseUser) return () => { alive = false; };
-    if (!authToken) {
-      setAccount(null);
-      setHistory([]);
-      return () => { alive = false; };
-    }
-    (async () => {
-      try {
-        const response = await fetch('/api/auth/me', {
-          headers: { Authorization: `Bearer ${authToken}` }
-        });
-        const data = await response.json().catch(() => ({}));
-        if (response.status === 401) {
-          try {
-            sessionStorage.removeItem('insightboard-api-token');
-          } catch {}
-          if (alive) {
-            setAuthToken('');
-            setAccount(null);
-            setHistory([]);
-          }
-          return;
-        }
-        if (!response.ok) return;
-        if (alive) {
-          setAccount(data.user);
-          await fetchReports(authToken);
-        }
-      } catch {}
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [authToken, fetchReports, firebaseUser]);
+    setReportsBusy(false);
+  }, []);
 
   function saveGeminiKey() {
     playButtonClick();
@@ -491,7 +266,7 @@ export default function V2Workspace({
     } catch {}
     setSavedGeminiKey(clean);
     setGeminiKeyInput('');
-    setMessage('Personal Gemini API key saved for your signed-in session.');
+    setMessage('Personal Gemini API key saved in this browser.');
     summonInsi('signin', 'insi.ai · Gemini API key verified');
   }
 
@@ -509,11 +284,6 @@ export default function V2Workspace({
 
   async function generateSummary() {
     playButtonClick();
-    if (!account) {
-      setMessage('Please sign in with Google first to access Gemini AI Summary.');
-      summonInsi('error', "Oops! Let's try again.");
-      return;
-    }
     if (!activeGeminiKey) {
       setMessage('Enter your Gemini API key above to generate the Gemini AI Summary.');
       summonInsi('error', "Oops! Let's try again.");
@@ -551,7 +321,7 @@ export default function V2Workspace({
       if (directRes.ok && directText) {
         setSummary(directText);
         setSummarySource('gemini-byok');
-        setMessage('Generated using your signed-in Gemini API key.');
+        setMessage('Generated using your Gemini API key.');
         summonInsi('success');
         setBusy(false);
         return;
@@ -568,77 +338,7 @@ export default function V2Workspace({
 
   async function saveSnapshot() {
     playButtonClick();
-    if (!firebaseUser && !authToken) {
-      setMessage('Sign in with Google above before saving reports.');
-      return;
-    }
-    const cleanTitle =
-      (
-        String(analytics?.datasetName || 'InsightBoard report').slice(0, 90) +
-        ' · ' +
-        new Date().toLocaleString()
-      ).slice(0, 140) || 'InsightBoard Report';
-    const cleanDatasetName =
-      String(analytics?.datasetName || 'Current dataset')
-        .trim()
-        .slice(0, 140) || 'Current dataset';
-    const cleanRecordCount = Math.max(
-      0,
-      Math.min(10000000, Math.trunc(Number(analytics?.recordCount) || 0))
-    );
-    const cleanSummary = String(summary || '').slice(0, 8000);
-
-    setReportSaveBusy(true);
-    setMessage('');
-    try {
-      if (firebaseUser?.uid) {
-        await ensureFirebaseUserProfile(firebaseUser);
-        const reportId = `rep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const reportPath = `reports/${reportId}`;
-        try {
-          await setDoc(doc(firestoreDb, 'reports', reportId), {
-            ownerId: firebaseUser.uid,
-            title: cleanTitle,
-            datasetName: cleanDatasetName,
-            recordCount: cleanRecordCount,
-            summary: cleanSummary,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          });
-          setMessage(copy.saved);
-          summonInsi('signin', 'INSI · Snapshot saved to cloud account');
-          return;
-        } catch (firestoreErr) {
-          handleFirestoreError(firestoreErr, OperationType.CREATE, reportPath);
-        }
-      }
-
-      const entry = {
-        title: cleanTitle,
-        datasetName: cleanDatasetName,
-        recordCount: cleanRecordCount,
-        filters: analytics?.filters || {},
-        snapshot: analytics || {},
-        summary: cleanSummary
-      };
-      const response = await fetch('/api/reports', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`
-        },
-        body: JSON.stringify(entry)
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Could not save this report.');
-      await fetchReports(authToken);
-      setMessage(copy.saved);
-      summonInsi('signin', 'INSI · Snapshot saved to account');
-    } catch (error) {
-      setMessage(error?.message || 'Could not save the report.');
-    } finally {
-      setReportSaveBusy(false);
-    }
+    setMessage('Cloud report history is unavailable because sign-in has been removed. Your dashboard and Gemini summary remain available.');
   }
 
   async function deleteSnapshot(id) {
@@ -760,7 +460,7 @@ export default function V2Workspace({
               setStudioTab('summary_cloud');
             }}
           >
-            <LogIn size={14} /> <span>Sign In &amp; Gemini Summary</span>
+            <Sparkles size={14} /> <span>Gemini Summary</span>
           </button>
           <button
             type="button"
@@ -811,10 +511,10 @@ export default function V2Workspace({
                 <Sparkles size={19} />
               </div>
               <div>
-                <span className="v2-overline">GOOGLE SIGN-IN &amp; GEMINI UNLOCK</span>
+                <span className="v2-overline">GEMINI AI &amp; DATA INSIGHTS</span>
                 <h3>Dashboard that works for you.</h3>
                 <p>
-                  Sign in with Google to unlock Gemini AI Summary with your API key and save aggregate dataset snapshots across devices.
+                  Generate multilingual AI summaries with your own Gemini API key. Your dataset analysis stays available without an account.
                 </p>
                 <div className="v2-hero-visual" aria-hidden="true">
                   <div className="v2-hero-glow"></div>
@@ -834,55 +534,12 @@ export default function V2Workspace({
               </div>
             </div>
             <div className="v2-account-content">
-              {account ? (
-                <div className="v2-account-signed">
-                  <div>
-                    <strong>
-                      <CheckCircle2 size={15} /> {account.email}
-                    </strong>
-                    <small>
-                      Signed in · Gemini AI Summary &amp; Cloud Report History Unlocked
-                    </small>
-                  </div>
-                  <div className="v2-button-row">
-                    {!firebaseUser && (
-                      <button
-                        type="button"
-                        className="v2-button secondary btn-3d"
-                        onClick={() => void fetchReports(authToken)}
-                        disabled={reportsBusy}
-                      >
-                        <RefreshCw size={14} />
-                        {reportsBusy ? 'Refreshing…' : 'Refresh reports'}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="v2-text-button"
-                      onClick={() => void signOut()}
-                    >
-                      <LogOut size={14} />
-                      Sign out
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, justifyContent: 'center', height: '100%' }}>
-                  <p className="v2-muted" style={{ margin: 0 }}>
-                    Sign in with a single click to unlock Gemini AI Summary (BYOK) and saved report history. No client IDs or passwords required.
-                  </p>
-                  <button
-                    type="button"
-                    className="v2-button primary btn-3d"
-                    onClick={() => void signInWithGoogle()}
-                    disabled={authBusy}
-                    style={{ width: '100%', justifyContent: 'center', fontWeight: 700, padding: '12px 18px' }}
-                  >
-                    {authBusy ? <RefreshCw size={15} className="v2-spin" /> : <ShieldCheck size={16} />}
-                    <span>{authBusy ? 'Signing in…' : 'Continue with Google'}</span>
-                  </button>
-                </div>
-              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center', height: '100%' }}>
+                <p className="v2-muted" style={{ margin: 0 }}>
+                  No account is required for dashboard analysis or Gemini summaries. Enter your own Gemini API key in the summary panel below.
+                </p>
+                <span className="v2-local-pill">LOCAL DASHBOARD READY</span>
+              </div>
             </div>
           </div>
 
@@ -935,126 +592,49 @@ export default function V2Workspace({
                 <Sparkles size={18} />
                 <h3>{copy.ai}</h3>
                 <span className="v2-ai-badge ready">
-                  {account ? 'UNLOCKED · BYOK' : 'SIGN-IN REQUIRED'}
+                  {activeGeminiKey ? 'BYOK READY' : 'API KEY OPTIONAL'}
                 </span>
               </div>
               <p className="v2-muted">
-                Generate a multilingual executive summary for <strong>{datasetName || 'Active Dataset'}</strong> using your personal Gemini API key once signed in.
+                Generate a multilingual executive summary for <strong>{datasetName || 'Active Dataset'}</strong> using your personal Gemini API key.
               </p>
 
-              {!account ? (
-                <div
-                  className="v2-key-entry"
-                  style={{
-                    marginBottom: 14,
-                    padding: '18px',
-                    textAlign: 'center',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 10
-                  }}
-                >
-                  <Lock size={22} />
-                  <strong>Sign In Required for Gemini AI Summary</strong>
-                  <p style={{ margin: 0, fontSize: 12.5 }}>
-                    Sign in with Google above to enter your Gemini API key and generate executive dataset summaries.
-                  </p>
-                  <button
-                    type="button"
-                    className="v2-button primary btn-3d"
-                    onClick={() => void signInWithGoogle()}
-                    disabled={authBusy}
-                  >
-                    <ShieldCheck size={14} /> Sign In with Google to Unlock
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="v2-key-entry" style={{ marginBottom: 14 }}>
-                    <div className="v2-key-entry-heading">
-                      <div>
-                        <span className="v2-overline">PERSONAL GEMINI API KEY (REQUIRED)</span>
-                        <h4>Your Gemini API Key (BYOK)</h4>
-                      </div>
-                      <a
-                        href="https://aistudio.google.com/app/apikey"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Get a Gemini key <ExternalLink size={11} />
-                      </a>
-                    </div>
-                    <label className="v2-field">
-                      <input
-                        type="password"
-                        value={geminiKeyInput}
-                        onChange={(e) => setGeminiKeyInput(e.target.value)}
-                        placeholder={
-                          savedGeminiKey
-                            ? '•••••••••••••••••••••••• (Personal Gemini key active)'
-                            : 'Enter your Gemini API key to generate summary…'
-                        }
-                        autoComplete="off"
-                      />
-                    </label>
-                    <label className="v2-consent v2-remember">
-                      <input
-                        type="checkbox"
-                        checked={rememberGeminiKey}
-                        onChange={(e) => setRememberGeminiKey(e.target.checked)}
-                      />
-                      <span>Remember key on this private device</span>
-                    </label>
-                    <div className="v2-button-row">
-                      <button type="button" className="v2-button secondary btn-3d" onClick={saveGeminiKey}>
-                        <KeyRound size={13} /> Save Gemini Key
-                      </button>
-                      {savedGeminiKey && (
-                        <button type="button" className="v2-text-button" onClick={forgetGeminiKey}>
-                          <Trash2 size={13} /> Forget key
-                        </button>
-                      )}
-                    </div>
+              <div className="v2-key-entry" style={{ marginBottom: 14 }}>
+                <div className="v2-key-entry-heading">
+                  <div>
+                    <span className="v2-overline">PERSONAL GEMINI API KEY (OPTIONAL)</span>
+                    <h4>Your Gemini API Key (BYOK)</h4>
                   </div>
-
-                  <label className="v2-field">
-                    <span>{copy.language}</span>
-                    <select
-                      value={summaryLanguage}
-                      onChange={(event) => {
-                        playButtonClick();
-                        setSummaryLanguage(event.target.value);
-                      }}
-                    >
-                      {LANGUAGES.map(([code, label]) => (
-                        <option key={code} value={code}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <button
-                    className="v2-button primary v2-generate-button btn-3d"
-                    onClick={() => void generateSummary()}
-                    disabled={busy || !activeGeminiKey}
-                  >
-                    {busy ? (
-                      <RefreshCw size={15} className="v2-spin" />
-                    ) : !activeGeminiKey ? (
-                      <Lock size={15} />
-                    ) : (
-                      <Sparkles size={15} />
-                    )}{' '}
-                    {busy
-                      ? 'Generating summary…'
-                      : !activeGeminiKey
-                      ? 'Enter Gemini API Key Above to Generate'
-                      : copy.summarize}
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">
+                    Get a Gemini key <ExternalLink size={11} />
+                  </a>
+                </div>
+                <label className="v2-field">
+                  <input type="password" value={geminiKeyInput} onChange={(e) => setGeminiKeyInput(e.target.value)} placeholder={savedGeminiKey ? '•••••••••••••••••••••••• (Personal Gemini key active)' : 'Enter your Gemini API key to generate summary…'} autoComplete="off" />
+                </label>
+                <label className="v2-consent v2-remember">
+                  <input type="checkbox" checked={rememberGeminiKey} onChange={(e) => setRememberGeminiKey(e.target.checked)} />
+                  <span>Remember key on this private device</span>
+                </label>
+                <div className="v2-button-row">
+                  <button type="button" className="v2-button secondary btn-3d" onClick={saveGeminiKey}>
+                    <KeyRound size={13} /> Save Gemini Key
                   </button>
-                </>
-              )}
+                  {savedGeminiKey && <button type="button" className="v2-text-button" onClick={forgetGeminiKey}><Trash2 size={13} /> Forget key</button>}
+                </div>
+              </div>
+
+              <label className="v2-field">
+                <span>{copy.language}</span>
+                <select value={summaryLanguage} onChange={(event) => { playButtonClick(); setSummaryLanguage(event.target.value); }}>
+                  {LANGUAGES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                </select>
+              </label>
+
+              <button className="v2-button primary v2-generate-button btn-3d" onClick={() => void generateSummary()} disabled={busy || !activeGeminiKey}>
+                {busy ? <RefreshCw size={15} className="v2-spin" /> : !activeGeminiKey ? <Lock size={15} /> : <Sparkles size={15} />}{' '}
+                {busy ? 'Generating summary…' : !activeGeminiKey ? 'Enter Gemini API Key Above to Generate' : copy.summarize}
+              </button>
 
               {summary ? (
                 <div className="v2-summary" aria-live="polite">
@@ -1070,7 +650,7 @@ export default function V2Workspace({
                 <p className="v2-note">{copy.none}</p>
               )}
 
-              {account && (
+              {false && account && (
                 <button
                   className="v2-button secondary btn-3d"
                   onClick={() => void saveSnapshot()}
