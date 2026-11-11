@@ -207,8 +207,7 @@ export default function V2Workspace({
   const [summarySource, setSummarySource] = useState('');
   const [message, setMessage] = useState('');
   const [history, setHistory] = useState([]);
-  const [reportsBusy] = useState(false);
-  const [reportsBusy, setReportsBusy] = useState(false);
+  const reportsBusy = false;
 
   // Personal Gemini API Key (BYOK) controls — unlocked after Sign-In
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
