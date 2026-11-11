@@ -430,23 +430,25 @@ export default function InsiPetBot({
     const onControllerState = (event) => {
       const detail = event?.detail;
       if (!detail) return;
-      if (detail.visible === false) {
-        clearTimers();
-        setLeaving(true);
-        playInsiDisappear();
-        hideTimerRef.current = setTimeout(() => {
-          setVisible(false);
-          setLeaving(false);
-        }, 550);
-        return;
-      }
-      showInsi(detail.state || 'idle', {
-        prop: detail.prop,
-        size: detail.size,
-        auraColor: detail.auraColor,
-        durationMs: detail.durationMs,
-        corner: detail.corner,
-        sound: detail.sound
+      queueMicrotask(() => {
+        if (detail.visible === false) {
+          clearTimers();
+          setLeaving(true);
+          playInsiDisappear();
+          hideTimerRef.current = setTimeout(() => {
+            setVisible(false);
+            setLeaving(false);
+          }, 550);
+          return;
+        }
+        showInsi(detail.state || 'idle', {
+          prop: detail.prop,
+          size: detail.size,
+          auraColor: detail.auraColor,
+          durationMs: detail.durationMs,
+          corner: detail.corner,
+          sound: detail.sound
+        });
       });
     };
 

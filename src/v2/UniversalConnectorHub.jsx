@@ -168,11 +168,12 @@ export default function UniversalConnectorHub({
   const [selectedFreeEngine, setSelectedFreeEngine] = useState('tfjs_onnx');
   const [freeEngineOutput, setFreeEngineOutput] = useState(null);
   const [scratchRevealed, setScratchRevealed] = useState(false);
-  const [scratchProgress, setScratchProgress] = useState(0);
+  const [, setScratchProgress] = useState(0);
 
   const fileInputRef = useRef(null);
   const scratchCanvasRef = useRef(null);
   const isDrawingScratchRef = useRef(false);
+  const scratchProgressRef = useRef(0);
 
   const schemaInfo = useMemo(() => resolveFuzzySchema(rows, fields), [rows, fields]);
 
@@ -259,6 +260,7 @@ export default function UniversalConnectorHub({
     ctx.fillStyle = '#38bdf8';
     ctx.font = '600 11.5px Inter, system-ui, sans-serif';
     ctx.fillText('Drag cursor / finger across card or click "Reveal Instantly"', width / 2, height / 2 + 16);
+    scratchProgressRef.current = 0;
     setScratchRevealed(false);
     setScratchProgress(0);
   }, []);
@@ -283,23 +285,24 @@ export default function UniversalConnectorHub({
     ctx.arc(x, y, 26, 0, Math.PI * 2);
     ctx.fill();
 
-    setScratchProgress((prev) => {
-      const next = Math.min(100, prev + 8);
-      if (next >= 55 && !scratchRevealed) {
-        setScratchRevealed(true);
-        insi.celebrate();
-      }
-      return next;
-    });
+    const next = Math.min(100, scratchProgressRef.current + 8);
+    scratchProgressRef.current = next;
+    setScratchProgress(next);
+    if (next >= 55 && !scratchRevealed) {
+      setScratchRevealed(true);
+      insi.celebrate();
+    }
   };
 
   // Run 100% Free Browser AI Engine computation on active dataset
   const runFreeBrowserEngine = useCallback(
-    async (engineId = selectedFreeEngine) => {
-      playButtonClick();
+    async (engineId = selectedFreeEngine, isUserClick = false) => {
       setSelectedFreeEngine(engineId);
-      insi.heavyAi();
-      recordRealQuotaUsage('browser_ai', 1);
+      if (isUserClick) {
+        playButtonClick();
+        insi.heavyAi();
+        recordRealQuotaUsage('browser_ai', 1);
+      }
 
       const numericVals = rows
         .map((r) => Number(r[schemaInfo.primaryMetric]))
@@ -367,7 +370,7 @@ export default function UniversalConnectorHub({
   );
 
   useEffect(() => {
-    void runFreeBrowserEngine(selectedFreeEngine);
+    void runFreeBrowserEngine(selectedFreeEngine, false);
   }, [rows, datasetName]);
 
   const runOperatorCommand = useCallback(
@@ -694,7 +697,7 @@ export default function UniversalConnectorHub({
               key={eng.id}
               type="button"
               className={`uch-engine-card ${selectedFreeEngine === eng.id ? 'active' : ''}`}
-              onClick={() => void runFreeBrowserEngine(eng.id)}
+              onClick={() => void runFreeBrowserEngine(eng.id, true)}
             >
               <div className="uch-engine-top">
                 <Cpu size={15} />

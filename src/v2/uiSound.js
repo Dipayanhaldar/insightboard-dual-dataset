@@ -52,7 +52,11 @@ export function recordRealQuotaUsage(serviceId = 'gemini', delta = 1) {
       [serviceId]: Math.max(0, (Number(current[serviceId]) || 0) + Number(delta || 1))
     };
     localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent('quota:updated', { detail: next }));
+    queueMicrotask(() => {
+      try {
+        window.dispatchEvent(new CustomEvent('quota:updated', { detail: next }));
+      } catch {}
+    });
   } catch {}
 }
 
