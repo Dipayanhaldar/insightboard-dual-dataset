@@ -8,6 +8,8 @@ import {
   Sparkles,
   Trash2,
   LogIn,
+  LogOut,
+  Mail,
   Database,
   ArrowUpRight,
   BookOpen,
@@ -207,7 +209,16 @@ export default function V2Workspace({
   const [summarySource, setSummarySource] = useState('');
   const [message, setMessage] = useState('');
   const [history, setHistory] = useState([]);
-  const reportsBusy = false;
+  const [authToken, setAuthToken] = useState(() => {
+    try { return sessionStorage.getItem('insightboard-api-token') || ''; } catch { return ''; }
+  });
+  const [account, setAccount] = useState(null);
+  const [authMode, setAuthMode] = useState('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authBusy, setAuthBusy] = useState(false);
+  const [reportsBusy, setReportsBusy] = useState(false);
+  const [reportSaveBusy, setReportSaveBusy] = useState(false);
 
   // Personal Gemini API Key (BYOK) controls — unlocked after Sign-In
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
@@ -223,6 +234,150 @@ export default function V2Workspace({
   const copy = LABELS[uiLanguage] || LABELS.en;
   const quality = useMemo(() => checkData(rows, fields, numericFields), [rows, fields, numericFields]);
   const activeGeminiKey = geminiKeyInput.trim() || savedGeminiKey.trim();
+
+  const fetchReports = useCallback(async (token) => {
+    if (!token) { setHistory([]); return; }
+    setReportsBusy(true);
+    try {
+      const response = await fetch('/api/reports', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        try { sessionStorage.removeItem('insightboard-api-token'); } catch {}
+        setAuthToken('');
+        setAccount(null);
+        setHistory([]);
+        setMessage('Your session expired. Sign in again to access saved reports.');
+        return;
+      }
+      if (!response.ok) throw new Error(result.error || 'Could not load saved reports.');
+      setHistory(Array.isArray(result.reports) ? result.reports : []);
+    } catch (error) {
+      setMessage(error?.message || 'Could not load saved reports.');
+    } finally {
+      setReportsBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authToken) { setAccount(null); setHistory([]); return undefined; }
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${authToken}` }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'Session expired.');
+        if (!active) return;
+        setAccount(data.user || null);
+        await fetchReports(authToken);
+      } catch (error) {
+        if (!active) return;
+        try { sessionStorage.removeItem('insightboard-api-token'); } catch {}
+        setAuthToken('');
+        setAccount(null);
+        setHistory([]);
+        setMessage(error?.message || 'Please sign in again.');
+      }
+    })();
+    return () => { active = false; };
+  }, [authToken, fetchReports]);
+
+  async function submitAuth(event) {
+    event.preventDefault();
+    playButtonClick();
+    const email = authEmail.trim().toLowerCase();
+    if (!email || !authPassword) {
+      setMessage('Enter your email address and password.');
+      return;
+    }
+    setAuthBusy(true);
+    setMessage('');
+    try {
+      const endpoint = authMode === 'register' ? '/api/auth/register' : '/api/auth/login';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: authPassword })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.token) throw new Error(data.error || 'Authentication failed.');
+      try { sessionStorage.setItem('insightboard-api-token', data.token); } catch {}
+      setAccount(data.user || { email });
+      setAuthToken(data.token);
+      setAuthPassword('');
+      setMessage(authMode === 'register' ? 'Account created. You are signed in.' : 'Signed in successfully.');
+      summonInsi('signin', 'INSI · Email account authenticated');
+    } catch (error) {
+      setMessage(error?.message || 'Could not authenticate. Try again.');
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  function signOut() {
+    playButtonClick();
+    try { sessionStorage.removeItem('insightboard-api-token'); } catch {}
+    setAuthToken('');
+    setAccount(null);
+    setHistory([]);
+    setAuthPassword('');
+    setMessage('You have signed out.');
+  }
+
+  async function saveSnapshot() {
+    if (!authToken) {
+      setMessage('Sign in with your email and password before saving a report.');
+      return;
+    }
+    const snapshot = analytics || {};
+    setReportSaveBusy(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          title: `${snapshot.datasetName || datasetName || 'InsightBoard report'} · ${new Date().toLocaleString()}`,
+          datasetName: snapshot.datasetName || datasetName || 'Current dataset',
+          recordCount: Number(snapshot.recordCount) || 0,
+          filters: snapshot.filters || {},
+          snapshot,
+          summary
+        })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not save this report.');
+      await fetchReports(authToken);
+      setMessage('Aggregate report snapshot saved to your account.');
+      summonInsi('success', 'INSI · Report snapshot saved');
+    } catch (error) {
+      setMessage(error?.message || 'Could not save the report.');
+    } finally {
+      setReportSaveBusy(false);
+    }
+  }
+
+  async function deleteSnapshot(id) {
+    if (!authToken) return;
+    try {
+      const response = await fetch(`/api/reports/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not delete this report.');
+      setHistory(current => current.filter(item => item.id !== id));
+      setMessage('Saved report deleted.');
+    } catch (error) {
+      setMessage(error?.message || 'Could not delete the report.');
+    }
+  }
 
   function saveGeminiKey() {
     playButtonClick();
@@ -452,12 +607,40 @@ export default function V2Workspace({
               </div>
             </div>
             <div className="v2-account-content">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'center', height: '100%' }}>
-                <p className="v2-muted" style={{ margin: 0 }}>
-                  No account is required for dashboard analysis or Gemini summaries. Enter your own Gemini API key in the summary panel below.
-                </p>
-                <span className="v2-local-pill">LOCAL DASHBOARD READY</span>
-              </div>
+              {account ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center', height: '100%' }}>
+                  <div>
+                    <strong style={{ display: 'flex', alignItems: 'center', gap: 7 }}><CheckCircle2 size={15} /> {account.email}</strong>
+                    <small className="v2-muted">Signed in · Saved report history enabled</small>
+                  </div>
+                  <div className="v2-button-row">
+                    <button type="button" className="v2-button secondary btn-3d" onClick={() => void fetchReports(authToken)} disabled={reportsBusy}>
+                      <RefreshCw size={14} /> {reportsBusy ? 'Refreshing…' : 'Refresh reports'}
+                    </button>
+                    <button type="button" className="v2-text-button" onClick={signOut}><LogOut size={14} /> Sign out</button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={submitAuth} style={{ display: 'flex', flexDirection: 'column', gap: 9, justifyContent: 'center', height: '100%' }}>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" className={authMode === 'login' ? 'v2-button primary btn-3d' : 'v2-button secondary btn-3d'} onClick={() => setAuthMode('login')}>Sign in</button>
+                    <button type="button" className={authMode === 'register' ? 'v2-button primary btn-3d' : 'v2-button secondary btn-3d'} onClick={() => setAuthMode('register')}>Create account</button>
+                  </div>
+                  <label className="v2-field">
+                    <span>Email address</span>
+                    <input type="email" value={authEmail} onChange={event => setAuthEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" required maxLength={254} />
+                  </label>
+                  <label className="v2-field">
+                    <span>Password {authMode === 'register' ? '(10–128 characters)' : ''}</span>
+                    <input type="password" value={authPassword} onChange={event => setAuthPassword(event.target.value)} placeholder="Enter your password" autoComplete={authMode === 'register' ? 'new-password' : 'current-password'} required minLength={authMode === 'register' ? 10 : 1} maxLength={128} />
+                  </label>
+                  <button type="submit" className="v2-button primary btn-3d" disabled={authBusy}>
+                    {authBusy ? <RefreshCw size={15} className="v2-spin" /> : authMode === 'register' ? <Mail size={15} /> : <LogIn size={15} />}
+                    {authBusy ? 'Please wait…' : authMode === 'register' ? 'Create email account' : 'Sign in with email'}
+                  </button>
+                  <small className="v2-muted">Email and password only. Google sign-in is not offered.</small>
+                </form>
+              )}
             </div>
           </div>
 
@@ -583,9 +766,33 @@ export default function V2Workspace({
             <div className="v2-card-title">
               <History size={18} />
               <h3>{copy.history}</h3>
+              {account && <button type="button" className="v2-button secondary btn-3d" onClick={() => void saveSnapshot()} disabled={reportSaveBusy}>
+                <Save size={14} /> {reportSaveBusy ? 'Saving…' : 'Save current snapshot'}
+              </button>}
             </div>
-            <p className="v2-muted">{copy.historyNote}</p>
-            <p className="v2-note">{copy.noHistory}</p>
+            <p className="v2-muted">{account ? copy.historyNote : 'Sign in with your email and password to save and view reports across sessions.'}</p>
+            {!account ? (
+              <p className="v2-note">Your dashboard remains usable without an account. Sign in above to enable cloud report history.</p>
+            ) : reportsBusy ? (
+              <p className="v2-note">Loading saved reports…</p>
+            ) : history.length === 0 ? (
+              <p className="v2-note">{copy.noHistory}</p>
+            ) : (
+              <div style={{ display: 'grid', gap: 10 }}>
+                {history.map(item => (
+                  <div key={item.id} className="v2-history-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 12, border: '1px solid var(--v2-border, #dbe3ef)', borderRadius: 10 }}>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <small className="v2-muted" style={{ display: 'block' }}>{item.datasetName} · {Number(item.recordCount || 0).toLocaleString()} rows · {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}</small>
+                    </div>
+                    <div className="v2-button-row">
+                      <button type="button" className="v2-button secondary btn-3d" onClick={() => exportSnapshot(item)}>Export</button>
+                      <button type="button" className="v2-text-button" onClick={() => void deleteSnapshot(item.id)} aria-label="Delete saved report"><Trash2 size={14} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </article>
         </>
       )}
