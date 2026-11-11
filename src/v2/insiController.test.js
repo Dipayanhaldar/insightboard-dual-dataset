@@ -5,6 +5,8 @@ import {
   INSI_STATES,
   INSI_SIZES,
   INSI_PROPS,
+  DEFAULT_INSI_COMMAND_ROUTER,
+  matchLocalCommandRouter,
   mapReactionToState,
   scanDatasetAndInputSecurity,
   createAutonomousTaskEngine,
@@ -18,8 +20,16 @@ test('INSI_BRAND exposes official insi and insi.ai brand identity', () => {
   assert.equal(INSI_BRAND.tagline, 'Powered by InsightBoard VDB');
 });
 
-test('INSI_STATES, INSI_SIZES, and INSI_PROPS include all personality states, sizes, and props', () => {
+test('INSI_STATES, INSI_SIZES, and INSI_PROPS include all bird & personality states, sizes, and props', () => {
   assert.ok(INSI_STATES.includes('idle'));
+  assert.ok(INSI_STATES.includes('perched'));
+  assert.ok(INSI_STATES.includes('listening'));
+  assert.ok(INSI_STATES.includes('speaking'));
+  assert.ok(INSI_STATES.includes('takeoff'));
+  assert.ok(INSI_STATES.includes('flying'));
+  assert.ok(INSI_STATES.includes('orbiting'));
+  assert.ok(INSI_STATES.includes('landing'));
+  assert.ok(INSI_STATES.includes('hopping'));
   assert.ok(INSI_STATES.includes('greeting'));
   assert.ok(INSI_STATES.includes('thinking'));
   assert.ok(INSI_STATES.includes('celebrating'));
@@ -87,11 +97,19 @@ test('scanDatasetAndInputSecurity detects malware/XSS/formula threats and develo
   assert.equal(cleanRes.riskLevel, 'SAFE');
 });
 
-test('createInsiController supports all imperative animation commands and rotates corners and sizes', () => {
+test('createInsiController supports all imperative bird and animation commands and rotates corners and sizes', () => {
   const events = [];
   const ctrl = createInsiController((state) => events.push(state));
 
   assert.equal(ctrl.appear().visible, true);
+  assert.equal(ctrl.perch().state, 'perched');
+  assert.equal(ctrl.listen().state, 'listening');
+  assert.equal(ctrl.speak().state, 'speaking');
+  assert.equal(ctrl.takeoff().state, 'takeoff');
+  assert.equal(ctrl.fly().state, 'flying');
+  assert.equal(ctrl.orbit().state, 'orbiting');
+  assert.equal(ctrl.land().state, 'landing');
+  assert.equal(ctrl.hop().state, 'hopping');
   assert.equal(ctrl.greet().state, 'greeting');
   assert.equal(ctrl.wave().state, 'waving');
   assert.equal(ctrl.sleep().state, 'sleeping');
@@ -116,7 +134,7 @@ test('createInsiController supports all imperative animation commands and rotate
   assert.equal(ctrl.react('error').state, 'confused');
   assert.equal(ctrl.react('success').state, 'celebrating');
   assert.equal(ctrl.disappear().visible, false);
-  assert.ok(events.length >= 22);
+  assert.ok(events.length >= 25);
 });
 
 test('AutonomousTaskEngine enforces permission and explicit user confirmation gates', async () => {
@@ -138,4 +156,26 @@ test('AutonomousTaskEngine enforces permission and explicit user confirmation ga
   );
   assert.equal(allowed.executed, true);
   assert.equal(allowed.result, 'ran-with-consent');
+});
+
+test('matchLocalCommandRouter routes real site actions, flags consequential actions for confirmation, and handles unrecognized requests honestly', () => {
+  assert.ok(DEFAULT_INSI_COMMAND_ROUTER.length >= 15);
+
+  const metroMatch = matchLocalCommandRouter('Hey, I N S I, switch to Hyderabad Metro');
+  assert.equal(metroMatch.recognized, true);
+  assert.equal(metroMatch.requiresConfirmation, false);
+  assert.equal(metroMatch.route.id, 'switch_metro');
+
+  const resetMatch = matchLocalCommandRouter('Hey Insee, reset all filters');
+  assert.equal(resetMatch.recognized, true);
+  assert.equal(resetMatch.requiresConfirmation, true);
+  assert.ok(resetMatch.confirmationPrompt.includes('Resetting'));
+
+  const unsupportedPizza = matchLocalCommandRouter('Hey, INSI, order pizza for the team');
+  assert.equal(unsupportedPizza.recognized, false);
+  assert.ok(unsupportedPizza.honestReason.includes('InsightBoard'));
+
+  const unsupportedEmail = matchLocalCommandRouter('Hey, INSI, send email to the CEO');
+  assert.equal(unsupportedEmail.recognized, false);
+  assert.ok(unsupportedEmail.honestReason.includes('cannot perform external'));
 });

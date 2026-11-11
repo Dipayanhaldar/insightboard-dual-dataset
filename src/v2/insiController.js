@@ -10,6 +10,16 @@ export const INSI_BRAND = Object.freeze({
 
 export const INSI_STATES = Object.freeze([
   'idle',
+  'perched',
+  'listening',
+  'speaking',
+  'takeoff',
+  'flying',
+  'orbiting',
+  'landing',
+  'hopping',
+  'success',
+  'error',
   'greeting',
   'waving',
   'sleeping',
@@ -39,6 +49,7 @@ export const INSI_STATES = Object.freeze([
 ]);
 
 export const INSI_CORNERS = Object.freeze([
+  'active-tab-perch',
   'bottom-right',
   'bottom-left',
   'top-right',
@@ -62,6 +73,380 @@ export const INSI_PROPS = Object.freeze([
   'legal_gavel',
   'flex_muscles'
 ]);
+
+/**
+ * Default Local Editable Command Router for INSI Dove Assistant
+ * Connected directly to real InsightBoard website actions (Zero external AI or paid backend).
+ */
+export const DEFAULT_INSI_COMMAND_ROUTER = Object.freeze([
+  {
+    id: 'switch_metro',
+    label: 'Switch to Hyderabad Metro Dataset',
+    triggers: ['hyderabad metro', 'switch to metro', 'metro dataset', 'metro rail', 'load metro'],
+    actionType: 'dataset',
+    commandText: 'Switch to Hyderabad Metro dataset',
+    birdMotion: 'flying',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Switched your board to the Hyderabad Metro Rail dataset.'
+  },
+  {
+    id: 'switch_mall',
+    label: 'Switch to Shopping Mall Dataset',
+    triggers: ['shopping mall', 'switch to mall', 'mall dataset', 'retail sales', 'load mall'],
+    actionType: 'dataset',
+    commandText: 'Switch to Shopping Mall dataset',
+    birdMotion: 'flying',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Switched your board to the Shopping Mall retail dataset.'
+  },
+  {
+    id: 'top_leaders',
+    label: 'Highlight Top 3 Leaders',
+    triggers: ['top 3', 'top three', 'show top', 'top stores', 'top leaders', 'best performing', 'highest revenue'],
+    actionType: 'analytics',
+    commandText: 'Show revenue by store as a bar chart and highlight the top 3 leaders',
+    birdMotion: 'orbiting',
+    requiresConfirmation: false,
+    confirmationNote: 'Task committed. Top three leading units are now highlighted in emerald.'
+  },
+  {
+    id: 'bottom_anomalies',
+    label: 'Flag Bottom 2 Underperformers',
+    triggers: ['bottom 2', 'bottom two', 'show bottom', 'lowest', 'underperforming', 'highlight anomalies', 'flag red'],
+    actionType: 'analytics',
+    commandText: 'Highlight the bottom 2 stores in red and show anomalies',
+    birdMotion: 'orbiting',
+    requiresConfirmation: false,
+    confirmationNote: 'Task committed. Bottom two underperforming units are flagged in crimson.'
+  },
+  {
+    id: 'pie_distribution',
+    label: 'Render Share Pie Chart',
+    triggers: ['pie chart', 'donut chart', 'portfolio share', 'distribution chart', 'category share'],
+    actionType: 'analytics',
+    commandText: 'Show revenue share by category as a pie chart',
+    birdMotion: 'orbiting',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Rendered the portfolio share pie chart.'
+  },
+  {
+    id: 'open_table',
+    label: 'Open Dataset Records Table',
+    triggers: ['open table', 'show table', 'expand table', 'data table', 'records table'],
+    actionType: 'ui',
+    commandText: 'Open data table',
+    birdMotion: 'hopping',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Opened the dataset records explorer table.'
+  },
+  {
+    id: 'close_table',
+    label: 'Hide Dataset Records Table',
+    triggers: ['close table', 'hide table', 'collapse table'],
+    actionType: 'ui',
+    commandText: 'Close table',
+    birdMotion: 'hopping',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Collapsed the dataset records table.'
+  },
+  {
+    id: 'switch_tab_overview',
+    label: 'Go to 6 Charts & Overview Tab',
+    triggers: ['overview tab', '6 charts', 'six charts', 'main charts', 'go to overview'],
+    actionType: 'navigation',
+    targetTab: 'overview',
+    commandText: 'Open overview tab',
+    birdMotion: 'flying',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Landed on the 6 Charts and Overview tab.'
+  },
+  {
+    id: 'switch_tab_connector',
+    label: 'Go to Universal Connector Tab',
+    triggers: ['universal connector', 'connector tab', 'connector hub', 'upload file tab'],
+    actionType: 'navigation',
+    targetTab: 'connector',
+    commandText: 'Open connector tab',
+    birdMotion: 'flying',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Landed on the Universal Connector tab.'
+  },
+  {
+    id: 'switch_tab_intelligence',
+    label: 'Go to AI Command & Statistical Hub',
+    triggers: ['command hub', 'statistical hub', 'intelligence tab', 'what if simulation'],
+    actionType: 'navigation',
+    targetTab: 'intelligence',
+    commandText: 'Open command hub tab',
+    birdMotion: 'flying',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Landed on the AI Command and Statistical Hub tab.'
+  },
+  {
+    id: 'switch_tab_studio',
+    label: 'Go to Gnani Voice & Sign-In Tab',
+    triggers: ['voice studio', 'gnani studio', 'sign in tab', 'studio tab'],
+    actionType: 'navigation',
+    targetTab: 'studio',
+    commandText: 'Open voice studio tab',
+    birdMotion: 'flying',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Landed on the Gnani Voice Studio tab.'
+  },
+  {
+    id: 'switch_tab_compare',
+    label: 'Go to Compare Datasets Tab',
+    triggers: ['compare datasets', 'comparison tab', 'compare tab', 'dataset diff'],
+    actionType: 'navigation',
+    targetTab: 'compare',
+    commandText: 'Open compare datasets tab',
+    birdMotion: 'flying',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Landed on the Compare Datasets tab.'
+  },
+  {
+    id: 'switch_tab_quotas',
+    label: 'Go to Usage Quotas Tab',
+    triggers: ['usage quotas', 'quota tab', 'quotas tab', 'check quota'],
+    actionType: 'navigation',
+    targetTab: 'quotas',
+    commandText: 'Open quota tab',
+    birdMotion: 'flying',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Landed on the Usage Quotas tab.'
+  },
+  {
+    id: 'toggle_dark_mode',
+    label: 'Switch to Dark Mode',
+    triggers: ['dark mode', 'dark theme', 'night mode'],
+    actionType: 'theme',
+    commandText: 'Switch to dark mode',
+    birdMotion: 'hopping',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Switched the workspace to dark mode.'
+  },
+  {
+    id: 'toggle_light_mode',
+    label: 'Switch to Light Mode',
+    triggers: ['light mode', 'light theme', 'day mode'],
+    actionType: 'theme',
+    commandText: 'Switch to light mode',
+    birdMotion: 'hopping',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Switched the workspace to light mode.'
+  },
+  {
+    id: 'open_calendar',
+    label: 'Open Calendar Review Invite',
+    triggers: ['open calendar', 'schedule review', 'calendar invite', 'meeting reminder'],
+    actionType: 'ui',
+    commandText: 'Open calendar review invite',
+    birdMotion: 'orbiting',
+    requiresConfirmation: false,
+    confirmationNote: 'Done. Opened the calendar review scheduler.'
+  },
+  {
+    id: 'export_csv',
+    label: 'Export Filtered CSV Report',
+    triggers: ['export csv', 'download csv', 'save csv'],
+    actionType: 'export',
+    commandText: 'Export a CSV report of the active dataset',
+    birdMotion: 'orbiting',
+    requiresConfirmation: false,
+    confirmationNote: 'Task committed. Your CSV dataset export has started.'
+  },
+  {
+    id: 'export_excel',
+    label: 'Export Formatted Excel Workbook',
+    triggers: ['export excel', 'download excel', 'export xlsx', 'save spreadsheet'],
+    actionType: 'export',
+    commandText: 'Export Excel workbook',
+    birdMotion: 'orbiting',
+    requiresConfirmation: false,
+    confirmationNote: 'Task committed. Your Excel workbook export is ready.'
+  },
+  {
+    id: 'export_pdf',
+    label: 'Export Visual PDF Executive Report',
+    triggers: ['export pdf', 'download pdf', 'save pdf report'],
+    actionType: 'export',
+    commandText: 'Export PDF report',
+    birdMotion: 'orbiting',
+    requiresConfirmation: false,
+    confirmationNote: 'Task committed. Prepared your PDF executive report.'
+  },
+  {
+    id: 'reset_filters',
+    label: 'Reset All Filters & Search State',
+    triggers: ['reset filters', 'reset all', 'clear filters', 'clear all filters', 'restore dashboard', 'delete filters'],
+    actionType: 'consequential_reset',
+    commandText: 'Reset all filters and restore full dataset',
+    birdMotion: 'orbiting',
+    requiresConfirmation: true,
+    confirmationPrompt: 'Resetting will clear your active search query, anomaly highlights, and custom table filters. Do you want INSI to proceed?',
+    confirmationNote: 'Confirmed and committed. All filters and highlights have been reset.'
+  },
+  {
+    id: 'bird_fly',
+    label: 'Fly Around Active Workspace & Perch on Active Tab',
+    triggers: ['fly around', 'take a round', 'take rounds', 'fly across', 'perch on tab', 'sit on tab', 'roam'],
+    actionType: 'bird_motion',
+    commandText: 'Fly around workspace and perch on the active tab',
+    birdMotion: 'orbiting',
+    requiresConfirmation: false,
+    confirmationNote: 'Took a flight round across your active workspace and perched on the active tab.'
+  },
+  {
+    id: 'bird_dance',
+    label: 'Dove Dance & Feather Groove',
+    triggers: ['dance', 'do a dance', 'bird dance', 'groove', 'celebrate'],
+    actionType: 'bird_motion',
+    commandText: 'Dance and celebrate',
+    birdMotion: 'dancing',
+    requiresConfirmation: false,
+    confirmationNote: 'INSI completed a joyful feather dance for you!'
+  },
+  {
+    id: 'bird_magic',
+    label: 'Avian Magic Sparkle Cast',
+    triggers: ['do magic', 'magic trick', 'cast magic', 'sparkle', 'magic'],
+    actionType: 'bird_motion',
+    commandText: 'Cast magic sparkles on the dashboard',
+    birdMotion: 'magic_import',
+    requiresConfirmation: false,
+    confirmationNote: 'INSI cast an avian magic sparkle aura over your metrics!'
+  },
+  {
+    id: 'security_scan',
+    label: 'Run Local Zero-Trust Security Audit',
+    triggers: ['security scan', 'scan security', 'check malware', 'virus scan', 'audit security'],
+    actionType: 'security',
+    commandText: 'Run security scan on active dataset',
+    birdMotion: 'security_scan',
+    requiresConfirmation: false,
+    confirmationNote: 'Task committed. Completed local security and compliance audit.'
+  }
+]);
+
+const CONSEQUENTIAL_ACTION_REGEX =
+  /\b(delete|remove|erase|wipe|clear\s+all|reset\s+all|reset\s+filter|reset\s+dashboard|drop\s+table|buy|purchase|order|pay|checkout|publish|deploy|post\s+publicly|send\s+email|send\s+message|broadcast)\b/i;
+
+const UNSUPPORTED_EXTERNAL_ACTION_REGEX =
+  /\b(order\s+pizza|book\s+flight|book\s+cab|book\s+uber|send\s+whatsapp|send\s+sms|call\s+police|make\s+phone\s+call|play\s+spotify|play\s+netflix|buy\s+stock|transfer\s+money|bank\s+transfer|hack|crack\s+password|send\s+email\s+to|post\s+to\s+twitter|post\s+to\s+instagram|publish\s+to\s+production)\b/i;
+
+const SUPPORTED_ANALYTICS_QUERY_REGEX =
+  /\b(revenue|sales|footfall|ridership|visitor|conversion|rent|area|sqft|basket|store|tenant|station|zone|category|corridor|line|top|bottom|chart|bar|pie|line|area|scatter|average|sum|count|min|max|compare|overview|summary|wake\s+up|hello|hi|hey|are\s+you\s+listening|can\s+you\s+hear)\b/i;
+
+/**
+ * Evaluates a user's spoken or typed command against the Local Editable Command Router.
+ * - Normalizes wake phrases ("Hey, INSI", "Hey I N S I", "Hey Insee", "Wake up Insee", etc.)
+ * - Never invents completed actions for unsupported requests (`recognized: false`)
+ * - Flags consequential actions (`requiresConfirmation: true`) before execution
+ */
+export function matchLocalCommandRouter(rawInput = '', customRoutes = DEFAULT_INSI_COMMAND_ROUTER) {
+  const normalizedRaw = String(rawInput || '')
+    .replace(/\bI[\s.\-_]*N[\s.\-_]*S[\s.\-_]*I\b/gi, 'INSI')
+    .replace(/\bN[\s.\-_]*C[\s.\-_]*I\b/gi, 'NCI')
+    .replace(/\b(?:in[\s\-_]*see|in[\s\-_]*sea|eensee|insee|incy|insy)\b/gi, 'INSI')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const strippedCommand = normalizedRaw
+    .replace(/^(?:hey|hi|hello|ok|okay|wake\s+up|wake|listen)[\s,:.\-!?]*(?:insi|nci|nsi|nc|inc|bird|dove|pigeon|assistant)?[\s,:.\-!?]*/i, '')
+    .trim();
+
+  const effectiveText = (strippedCommand || normalizedRaw).toLowerCase();
+  const routes = Array.isArray(customRoutes) && customRoutes.length > 0 ? customRoutes : DEFAULT_INSI_COMMAND_ROUTER;
+
+  // 1. Check explicit unsupported external actions first (Honest Unrecognized Handling)
+  if (UNSUPPORTED_EXTERNAL_ACTION_REGEX.test(effectiveText)) {
+    const involvesConsequential = CONSEQUENTIAL_ACTION_REGEX.test(effectiveText);
+    return {
+      recognized: false,
+      requiresConfirmation: false,
+      honestReason: involvesConsequential
+        ? `INSI cannot perform external buying, publishing, deleting, or messaging actions ("${strippedCommand || normalizedRaw}"). InsightBoard is a browser-based analytics workspace—I can switch datasets, filter charts, highlight top/bottom units, open tables, or export local CSV/Excel/PDF reports.`
+        : `I cannot do "${strippedCommand || normalizedRaw}" because InsightBoard does not have that capability. I only execute real dashboard actions such as switching datasets (Shopping Mall or Hyderabad Metro), filtering charts, highlighting leaders/anomalies, switching tabs, or exporting reports.`,
+      route: null,
+      cleanCommand: strippedCommand || normalizedRaw
+    };
+  }
+
+  // 2. Match against editable command router triggers
+  for (const route of routes) {
+    if (!route || !Array.isArray(route.triggers)) continue;
+    const matchedTrigger = route.triggers.find((t) => {
+      const trig = String(t || '').toLowerCase().trim();
+      return trig && effectiveText.includes(trig);
+    });
+    if (matchedTrigger) {
+      const needsConfirm = Boolean(route.requiresConfirmation || CONSEQUENTIAL_ACTION_REGEX.test(effectiveText));
+      return {
+        recognized: true,
+        requiresConfirmation: needsConfirm,
+        confirmationPrompt:
+          route.confirmationPrompt ||
+          (needsConfirm
+            ? `Please confirm before INSI executes "${route.label}" (${strippedCommand || route.commandText}).`
+            : null),
+        route,
+        matchedTrigger,
+        cleanCommand: route.commandText || strippedCommand || normalizedRaw
+      };
+    }
+  }
+
+  // 3. Check if it is a consequential request not in a preset route (e.g., "delete dataset", "clear all data")
+  if (CONSEQUENTIAL_ACTION_REGEX.test(effectiveText)) {
+    if (/\b(reset|clear)\b/i.test(effectiveText)) {
+      const resetRoute = routes.find((r) => r.id === 'reset_filters') || DEFAULT_INSI_COMMAND_ROUTER.find((r) => r.id === 'reset_filters');
+      return {
+        recognized: true,
+        requiresConfirmation: true,
+        confirmationPrompt:
+          resetRoute?.confirmationPrompt ||
+          'Resetting will clear active filters and search queries on the dashboard. Confirm to proceed?',
+        route: resetRoute,
+        matchedTrigger: 'reset',
+        cleanCommand: 'Reset all filters and restore full dataset'
+      };
+    }
+    return {
+      recognized: false,
+      requiresConfirmation: false,
+      honestReason: `Hold on—"${strippedCommand || normalizedRaw}" is a consequential action (deleting, buying, publishing, or sending) that this website does not perform. No data was modified or sent.`,
+      route: null,
+      cleanCommand: strippedCommand || normalizedRaw
+    };
+  }
+
+  // 4. Check if it is a valid dataset analytics query (revenue, footfall, store, zone, chart, top/bottom, wake greeting)
+  if (SUPPORTED_ANALYTICS_QUERY_REGEX.test(effectiveText)) {
+    return {
+      recognized: true,
+      requiresConfirmation: false,
+      confirmationPrompt: null,
+      route: {
+        id: 'dynamic_analytics_query',
+        label: 'Dynamic Dataset Analytics Query',
+        actionType: 'analytics',
+        birdMotion: 'orbiting',
+        confirmationNote: 'Task committed. Updated the dashboard analysis for your query.'
+      },
+      matchedTrigger: 'analytics_query',
+      cleanCommand: strippedCommand || normalizedRaw
+    };
+  }
+
+  // 5. Honest Unrecognized Request fallback — never claim or invent a completed action!
+  return {
+    recognized: false,
+    requiresConfirmation: false,
+    honestReason: `I didn't recognize "${strippedCommand || normalizedRaw}" as a real InsightBoard action. I never invent completed actions—try asking me to "Switch to Hyderabad Metro", "Highlight top 3 leaders", "Show pie chart by category", "Open data table", or add a custom trigger in the Command Router below.`,
+    route: null,
+    cleanCommand: strippedCommand || normalizedRaw
+  };
+}
 
 /**
  * Autonomous Virus, Malware, Hacking, XSS & Developer Legal/Compliance Scanner
@@ -433,7 +818,7 @@ export function createInsiController(dispatchFn) {
     size: 'md',
     auraColor: '#00F0FF',
     message: '',
-    corner: 'bottom-right'
+    corner: 'active-tab-perch'
   };
 
   const notify = (patch) => {
@@ -497,7 +882,31 @@ export function createInsiController(dispatchFn) {
       return notify({ visible: false, sound: 'disappear' });
     },
     idle(message = '') {
-      return transitionTo('idle', message, { prop: 'chair_laptop', size: 'md' });
+      return transitionTo('idle', message, { prop: 'chair_laptop', size: 'md', corner: 'active-tab-perch' });
+    },
+    perch(message = '') {
+      return transitionTo('perched', message, { prop: 'chair_laptop', size: 'md', corner: 'active-tab-perch' });
+    },
+    listen(message = '') {
+      return transitionTo('listening', message, { prop: 'audio_deck', size: 'md', auraColor: '#00F0FF', corner: 'active-tab-perch', durationMs: 6000 });
+    },
+    speak(message = '') {
+      return transitionTo('speaking', message, { prop: 'audio_deck', size: 'md', auraColor: '#00F0FF', corner: 'active-tab-perch', durationMs: 5200 });
+    },
+    takeoff(message = '') {
+      return transitionTo('takeoff', message, { prop: 'chart_holo', size: 'md', auraColor: '#00F0FF', durationMs: 2400 });
+    },
+    fly(message = '') {
+      return transitionTo('flying', message, { prop: 'chart_holo', size: 'lg', auraColor: '#00F0FF', durationMs: 4800 });
+    },
+    orbit(message = '') {
+      return transitionTo('orbiting', message, { prop: 'magician_wand', size: 'lg', auraColor: '#00F0FF', durationMs: 5200, sound: 'celebrate' });
+    },
+    land(message = '') {
+      return transitionTo('landing', message, { prop: 'chair_laptop', size: 'md', corner: 'active-tab-perch', durationMs: 2800 });
+    },
+    hop(message = '') {
+      return transitionTo('hopping', message, { prop: 'chair_laptop', size: 'md', corner: 'active-tab-perch', durationMs: 3600 });
     },
     greet(message = '') {
       return transitionTo('greeting', message, { prop: 'chair_laptop', size: 'md' });

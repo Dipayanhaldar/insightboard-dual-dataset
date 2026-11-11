@@ -1,5 +1,7 @@
-/* insi.ai — Compact, Nimble 3D Website Guardian Robot
-   Real-time cursor tracking, full-body flexing, heading roaming, security gestures & zero text below mascot */
+/* ============================================================
+   INSI Dove Assistant — White/Silver-Gray & Electric-Blue Avian Rig,
+   Active Tab Perch, Flight Orbit, Listening Sonar & Local Command Router Panel
+   ============================================================ */
 
 .insi-pet-stage {
   position: fixed;
@@ -8,251 +10,286 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0;
-  filter: drop-shadow(0 12px 24px rgba(15, 23, 42, 0.28));
+  gap: 2px;
+  filter: drop-shadow(0 12px 24px rgba(15, 23, 42, 0.32));
   user-select: none;
   transform-origin: center bottom;
-  transition: top 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-              left 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-              right 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-              bottom 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: top 0.62s cubic-bezier(0.16, 1, 0.3, 1),
+              left 0.62s cubic-bezier(0.16, 1, 0.3, 1),
+              right 0.62s cubic-bezier(0.16, 1, 0.3, 1),
+              bottom 0.62s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Compact, Nimble Scale Variants */
+.insi-pet-stage:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 4px;
+  border-radius: 16px;
+}
+
+/* Scale Variants */
 .insi-pet-stage.size-sm {
-  --insi-scale: 0.78;
+  --insi-scale: 0.82;
 }
 .insi-pet-stage.size-md {
-  --insi-scale: 0.92;
+  --insi-scale: 0.94;
 }
 .insi-pet-stage.size-lg {
-  --insi-scale: 1.04;
+  --insi-scale: 1.06;
 }
 .insi-pet-stage.size-xl {
   --insi-scale: 1.14;
 }
 
 .insi-entering {
-  animation: insiAppearSmooth 0.58s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: insiAppearSmooth 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .insi-leaving {
-  animation: insiDisappearSmooth 0.45s cubic-bezier(0.55, 0.08, 0.68, 0.53) forwards;
+  animation: insiDisappearSmooth 0.42s cubic-bezier(0.55, 0.08, 0.68, 0.53) forwards;
 }
 
-/* Compact Main Robot Rig (94px instead of 138px so it never blocks UI controls) */
-.insi-robot-rig {
+/* Task Flight Orbit across the Active Workspace */
+.insi-pet-stage.insi-orbit-flight-active {
+  animation: insiWorkspaceOrbitFlight 2.4s cubic-bezier(0.32, 0, 0.24, 1) forwards;
+}
+
+/* Main Dove Rig Container */
+.insi-robot-rig.insi-dove-rig {
   position: relative;
-  width: 96px;
-  height: 94px;
+  width: 78px;
+  height: 74px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   pointer-events: auto;
   cursor: pointer;
-  transform: scale(var(--insi-scale, 0.92));
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: scale(var(--insi-scale, 0.94));
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.insi-robot-rig:hover {
-  transform: scale(calc(var(--insi-scale, 0.92) * 1.07));
+
+.insi-robot-rig.insi-dove-rig:hover {
+  transform: scale(calc(var(--insi-scale, 0.94) * 1.09)) translateY(-3px);
 }
 
 .insi-ambient-halo {
   position: absolute;
-  inset: 8px;
+  inset: 4px;
   border-radius: 999px;
   background: radial-gradient(
     circle,
-    color-mix(in srgb, var(--insi-aura, #00F0FF) 38%, transparent) 0%,
-    rgba(37, 99, 235, 0.12) 58%,
+    color-mix(in srgb, var(--insi-aura, #00F0FF) 42%, transparent) 0%,
+    rgba(14, 165, 233, 0.16) 58%,
     transparent 100%
   );
-  animation: insiHaloPulse 2.2s ease-in-out infinite;
+  animation: insiHaloPulse 2.4s ease-in-out infinite;
+}
+
+/* Active Listening Sonar Rings */
+.insi-listening-sonar {
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 2px solid #00f0ff;
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.55);
+  pointer-events: none;
+  animation: insiSonarExpand 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+.insi-listening-sonar.sonar-2 {
+  animation-delay: 0.9s;
 }
 
 .insi-quantum-ring-outer {
   position: absolute;
-  inset: 2px;
+  inset: 0px;
   border-radius: 999px;
   border: 2px dashed var(--insi-aura, #38bdf8);
   box-shadow: 0 0 18px var(--insi-aura, rgba(56, 189, 248, 0.45));
-  animation: insiSpinRing 3.6s linear infinite;
+  animation: insiSpinRing 3.4s linear infinite;
 }
 
-.insi-robot-svg {
-  width: 94px;
-  height: 92px;
+/* Dove Artwork & Motion Layers */
+.insi-dove-body-wrap {
   position: relative;
+  width: 72px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 2;
-  overflow: visible;
+  transform: scaleX(var(--insi-facing-dir, 1)) rotate(var(--insi-head-tilt, 0deg));
+  transition: transform 0.22s ease-out;
 }
 
-.insi-robot-head {
-  transform-origin: 91px 66px;
-  transform: rotate(var(--insi-head-tilt, 0deg));
-  transition: transform 0.15s ease-out;
+.insi-dove-artwork {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 2px;
+  filter: drop-shadow(0 6px 14px rgba(14, 165, 233, 0.35));
+  transform-origin: 50% 62%;
+  animation: insiDoveIdleBreathe 2.8s ease-in-out infinite;
+}
+
+.insi-dove-fallback-svg {
+  width: 66px;
+  height: 66px;
+}
+
+/* Periodic Natural Eye Blink Overlay */
+.insi-dove-eye-blink {
+  position: absolute;
+  top: 41%;
+  right: 22%;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.92);
+  box-shadow: 0 0 4px rgba(56, 189, 248, 0.8);
+  pointer-events: none;
+  animation: insiDoveEyeBlink 4.2s infinite;
+}
+
+.insi-dove-prop-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 0px;
+  font-size: 15px;
+  filter: drop-shadow(0 2px 6px rgba(15, 23, 42, 0.5));
+  animation: insiSparkleTwinkle 0.7s ease-in-out infinite alternate;
+}
+
+/* Perch Bar Under Dove Claws */
+.insi-dove-perch-bar {
+  width: 38px;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.9), rgba(56, 189, 248, 0.25));
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.55);
+  margin-top: -5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.perch-glow-dot {
+  width: 8px;
+  height: 3px;
+  border-radius: 999px;
+  background: #e0f2fe;
+}
+
+/* Compact Live Status Pill Beneath Dove */
+.insi-dove-status-pill {
+  pointer-events: auto;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  color: #e2e8f0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  max-width: 175px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.35);
+}
+
+.insi-dove-status-pill.is-listening {
+  background: rgba(6, 78, 59, 0.92);
+  border-color: #10b981;
+  color: #ecfdf5;
+}
+
+.insi-dove-status-pill.is-speaking {
+  background: rgba(12, 74, 110, 0.94);
+  border-color: #38bdf8;
+  color: #f0f9ff;
+}
+
+.insi-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #38bdf8;
+  flex-shrink: 0;
+}
+
+.insi-dove-status-pill.is-listening .insi-status-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: insiHaloPulse 1s infinite;
 }
 
 /* ============================================================
-   FULL-BODY FLEXING, ROAMING HEADINGS, PULLING DASHBOARD & SECURITY GESTURES
+   DOVE STATE ANIMATIONS (Takeoff, Flight, Orbit, Hopping, Listening, Dancing, Magic, Error)
    ============================================================ */
 
-/* Roaming / Walking Across Main Headings */
-.state-roaming_heading .insi-robot-rig {
-  animation: insiRoamAcrossHeading 4.6s ease-in-out infinite alternate;
-}
-.state-roaming_heading .insi-leg-left,
-.state-walking .insi-leg-left {
-  transform-origin: 80px 124px;
-  animation: insiStepLeg 0.32s ease-in-out infinite alternate;
-}
-.state-roaming_heading .insi-leg-right,
-.state-walking .insi-leg-right {
-  transform-origin: 104px 124px;
-  animation: insiStepLeg 0.32s ease-in-out infinite alternate-reverse;
-}
-.state-roaming_heading .insi-arm-left,
-.state-walking .insi-arm-left {
-  transform-origin: 63px 86px;
-  animation: insiSwingArm 0.32s ease-in-out infinite alternate-reverse;
-}
-.state-roaming_heading .insi-arm-right,
-.state-walking .insi-arm-right {
-  transform-origin: 118px 86px;
-  animation: insiSwingArm 0.32s ease-in-out infinite alternate;
+/* Takeoff & Flight Wing Flap */
+.state-takeoff .insi-dove-artwork,
+.state-flying .insi-dove-artwork,
+.state-orbiting .insi-dove-artwork {
+  animation: insiDoveWingFlap 0.34s ease-in-out infinite alternate;
 }
 
-/* Full-Body Robotic Flexing */
-.state-flexing .insi-robot-rig {
-  animation: insiPowerSquat 0.55s ease-in-out infinite alternate;
-}
-.state-flexing .insi-arm-left {
-  transform-origin: 63px 86px;
-  animation: insiFlexLeftArm 0.55s ease-in-out infinite alternate;
-}
-.state-flexing .insi-arm-right {
-  transform-origin: 118px 86px;
-  animation: insiFlexRightArm 0.55s ease-in-out infinite alternate;
+.state-landing .insi-dove-artwork {
+  animation: insiDoveSettleLand 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Pulling / Tugging the Dashboard */
-.state-pulling_dashboard .insi-robot-rig {
-  animation: insiPullTug 0.65s ease-in-out infinite alternate;
-}
-.state-pulling_dashboard .insi-arm-left,
-.state-pulling_dashboard .insi-arm-right {
-  transform-origin: 90px 86px;
-  animation: insiWaveGreeting 0.45s ease-in-out infinite alternate;
+/* Hopping / Walking */
+.state-hopping .insi-dove-rig,
+.state-walking .insi-dove-rig,
+.state-roaming_heading .insi-dove-rig {
+  animation: insiDoveHopWalk 0.42s ease-in-out infinite alternate;
 }
 
-/* Malware / Virus / Hacking Alert & Legal Compliance Alert */
-.state-malware_alert .insi-robot-rig {
-  animation: insiSecurityAlertShake 0.38s ease-in-out infinite alternate;
-}
-.state-legal_alert .insi-robot-rig {
-  animation: insiHappyBob 0.8s ease-in-out infinite alternate;
-}
-.insi-prop-security-shield,
-.insi-prop-legal {
-  transform-origin: 140px 96px;
-  animation: insiShieldPulse 0.7s ease-in-out infinite alternate;
+/* Listening Attention Posture */
+.state-listening .insi-dove-artwork {
+  animation: insiDoveListeningAlert 1.1s ease-in-out infinite alternate;
 }
 
-/* Idle & Greeting */
-.state-idle .insi-robot-torso,
-.state-greeting .insi-robot-torso {
-  animation: insiBreathe 2.8s ease-in-out infinite;
-}
-.state-idle .insi-digital-eyes,
-.state-greeting .insi-digital-eyes {
-  transform-origin: 91px 45px;
-  animation: insiNaturalBlink 3.8s infinite;
+/* Speaking Rhythm */
+.state-speaking .insi-dove-artwork,
+.state-audio_sync .insi-dove-artwork {
+  animation: insiDoveSpeakingBob 0.36s ease-in-out infinite alternate;
 }
 
-/* Waving */
-.state-waving .insi-arm-right,
-.state-greeting .insi-arm-right {
-  transform-origin: 118px 86px;
-  animation: insiWaveGreeting 0.48s ease-in-out infinite alternate;
+/* Dancing Groove */
+.state-dancing .insi-dove-rig {
+  animation: insiDanceGroove 0.44s ease-in-out infinite alternate;
 }
 
-/* Magician Stick Import */
-.state-magic_import .insi-robot-rig {
-  animation: insiCelebrateJump 0.6s cubic-bezier(0.28, 0.84, 0.42, 1) infinite alternate;
-}
-.state-magic_import .insi-arm-right {
-  transform-origin: 118px 86px;
-  animation: insiCastWand 0.55s ease-in-out infinite alternate;
-}
-.insi-wand-star {
-  transform-origin: 158px 66px;
-  animation: insiSpinStar 1.5s linear infinite;
+/* Magic & Celebrating */
+.state-magic_import .insi-dove-rig,
+.state-celebrating .insi-dove-rig,
+.state-flexing .insi-dove-rig {
+  animation: insiCelebrateJump 0.52s cubic-bezier(0.28, 0.84, 0.42, 1) infinite alternate;
 }
 
-/* Heavy AI Computation */
-.state-heavy_ai .insi-robot-rig {
-  animation: insiLevitatePower 1.1s ease-in-out infinite alternate;
-}
-.insi-quantum-orb {
-  transform-origin: 91px 105px;
-  animation: insiPulseOrb 0.65s ease-in-out infinite alternate;
-}
-
-/* Audio Sync & Dancing */
-.state-audio_sync .insi-robot-rig,
-.state-dancing .insi-robot-rig {
-  animation: insiDanceGroove 0.48s ease-in-out infinite alternate;
-}
-.state-audio_sync .insi-arm-left,
-.state-dancing .insi-arm-left {
-  transform-origin: 63px 86px;
-  animation: insiFlexLeftArm 0.48s ease-in-out infinite alternate;
-}
-.state-audio_sync .insi-arm-right,
-.state-dancing .insi-arm-right {
-  transform-origin: 118px 86px;
-  animation: insiFlexRightArm 0.48s ease-in-out infinite alternate-reverse;
-}
-.eq-bar {
-  transform-origin: center bottom;
-  animation: insiEqBounce 0.32s ease-in-out infinite alternate;
-}
-.eq-bar.eq2 { animation-delay: 0.1s; }
-.eq-bar.eq3 { animation-delay: 0.2s; }
-.eq-bar.eq4 { animation-delay: 0.05s; }
-.eq-bar.eq5 { animation-delay: 0.18s; }
-.eq-bar.eq6 { animation-delay: 0.26s; }
-
-/* Reading & Typing */
-.state-typing .insi-arm-left,
-.state-exporting .insi-arm-left {
-  transform-origin: 63px 86px;
-  animation: insiTypeTap 0.24s ease-in-out infinite alternate;
-}
-.state-typing .insi-arm-right,
-.state-exporting .insi-arm-right {
-  transform-origin: 118px 86px;
-  animation: insiTypeTap 0.24s 0.12s ease-in-out infinite alternate;
-}
-
-.state-celebrating .insi-robot-rig {
-  animation: insiCelebrateJump 0.6s cubic-bezier(0.28, 0.84, 0.42, 1) infinite alternate;
-}
-.state-walking .insi-robot-rig {
-  animation: insiPlayfulWalk 0.9s ease-in-out infinite alternate;
+/* Error / Security Alert */
+.state-confused .insi-dove-rig,
+.state-error .insi-dove-rig,
+.state-malware_alert .insi-dove-rig {
+  animation: insiSecurityAlertShake 0.36s ease-in-out infinite alternate;
 }
 
 /* ============================================================
-   NON-VERBAL EMOTIVE FX LAYER
+   EMOTIVE FX LAYER ABOVE DOVE
    ============================================================ */
 .insi-fx-layer {
   position: relative;
-  height: 18px;
-  width: 96px;
+  height: 16px;
+  width: 82px;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: -6px;
+  margin-bottom: -4px;
   z-index: 4;
 }
 
@@ -271,12 +308,12 @@
 .insi-z.z3 { font-size: 13px; animation-delay: 0.7s; }
 
 .insi-question-bubble {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
   background: linear-gradient(135deg, #f59e0b, #d97706);
   color: #ffffff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -287,11 +324,11 @@
 
 .insi-ai-energy-crown {
   display: flex;
-  gap: 6px;
+  gap: 5px;
 }
 .energy-orb {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
   background: #38bdf8;
   box-shadow: 0 0 8px #38bdf8;
@@ -310,120 +347,810 @@
 
 .insi-music-notes {
   display: flex;
-  gap: 7px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 12px;
   font-weight: 800;
   color: #38bdf8;
 }
 .m-note {
   display: inline-block;
-  animation: insiNoteFloat 0.85s ease-in-out infinite alternate;
+  animation: insiNoteFloat 0.8s ease-in-out infinite alternate;
 }
-.m-note.n2 { color: #f472b6; animation-delay: 0.25s; }
-.m-note.n3 { color: #facc15; animation-delay: 0.5s; }
+.m-note.n2 { color: #f472b6; animation-delay: 0.22s; }
+.m-note.n3 { color: #facc15; animation-delay: 0.45s; }
 
 .insi-sparkles {
   display: flex;
-  gap: 7px;
+  gap: 6px;
   color: #facc15;
   font-size: 12px;
 }
 .insi-sparkles .spark {
-  animation: insiSparkleTwinkle 0.7s ease-in-out infinite alternate;
+  animation: insiSparkleTwinkle 0.65s ease-in-out infinite alternate;
 }
-.insi-sparkles .s2 { color: #38bdf8; animation-delay: 0.25s; }
+.insi-sparkles .s2 { color: #38bdf8; animation-delay: 0.22s; }
+
+/* ============================================================
+   FLOATING BOTTOM-RIGHT INSI DOCK & ASSISTANT PANEL
+   ============================================================ */
+.insi-floating-dock {
+  position: fixed;
+  bottom: 16px;
+  right: 174px;
+  z-index: 9992;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.insi-dock-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: #f8fafc;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.38);
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.insi-dock-toggle-btn:hover {
+  transform: translateY(-2px);
+  border-color: #38bdf8;
+}
+
+.insi-dock-toggle-btn.listening {
+  border-color: #10b981;
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.35);
+}
+
+.insi-dock-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.28), transparent 70%);
+}
+
+.insi-dock-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.insi-dock-text strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.insi-dock-text small {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.insi-dock-chevron {
+  font-size: 11px;
+  color: #38bdf8;
+  margin-left: 2px;
+}
+
+.insi-dock-mic-btn {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.32);
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+.insi-dock-mic-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.insi-dock-mic-btn.active {
+  background: linear-gradient(135deg, #059669, #10b981);
+  border-color: #34d399;
+}
+
+/* Assistant Panel Drawer */
+.insi-assistant-panel {
+  position: fixed;
+  bottom: 66px;
+  right: 16px;
+  width: min(430px, calc(100vw - 24px));
+  max-height: min(620px, calc(100vh - 96px));
+  z-index: 9995;
+  background: #0f172a;
+  color: #f1f5f9;
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(2, 6, 23, 0.65);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: insiAppearSmooth 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.insi-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(30, 41, 59, 0.92));
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.insi-panel-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.insi-panel-avatar-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.28), rgba(15, 23, 42, 0.8));
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.insi-panel-avatar {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.insi-panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.insi-local-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+}
+
+.insi-panel-subtitle {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #cbd5e1;
+  line-height: 1.35;
+}
+
+.insi-panel-subtitle code {
+  background: rgba(30, 41, 59, 0.9);
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: #7dd3fc;
+  font-size: 10px;
+}
+
+.insi-panel-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(30, 41, 59, 0.8);
+  color: #e2e8f0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.insi-panel-close-btn:hover {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* Scope & Honesty Banner */
+.insi-scope-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.38;
+}
+
+.insi-scope-banner p {
+  margin: 0;
+}
+
+/* Voice Controls Section */
+.insi-voice-controls-card {
+  padding: 10px 14px;
+  background: rgba(30, 41, 59, 0.55);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insi-voice-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.insi-voice-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.insi-voice-indicator .pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #64748b;
+}
+
+.insi-voice-indicator.status-listening_wake .pulse-dot,
+.insi-voice-indicator.status-push_to_talk .pulse-dot {
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+  animation: insiHaloPulse 1s infinite;
+}
+
+.insi-voice-indicator.status-permission_denied .pulse-dot,
+.insi-voice-indicator.status-error .pulse-dot {
+  background: #ef4444;
+}
+
+.insi-last-heard {
+  font-size: 10px;
+  color: #7dd3fc;
+  background: rgba(15, 23, 42, 0.75);
+  padding: 2px 7px;
+  border-radius: 6px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insi-voice-error-box {
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fecaca;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.insi-voice-btn-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.insi-ctrl-btn {
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.85);
+  color: #f1f5f9;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.insi-ctrl-btn:hover:not(:disabled) {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.insi-ctrl-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.insi-ctrl-btn.primary {
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.insi-ctrl-btn.danger {
+  background: rgba(220, 38, 38, 0.24);
+  border-color: #f87171;
+  color: #fecaca;
+}
+
+.insi-ctrl-btn.active {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #34d399;
+  color: #d1fae5;
+}
+
+.insi-ctrl-btn.warning {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: #fbbf24;
+  color: #fde68a;
+}
+
+.insi-voice-prefs-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.insi-pref-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.insi-voice-select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 11px;
+}
+
+.insi-motion-toggles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.insi-mini-toggle {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.75);
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.insi-mini-toggle.on {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.2);
+  color: #e0f2fe;
+}
+
+/* Confirmation Gate */
+.insi-confirm-gate {
+  margin: 10px 14px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  color: #fef3c7;
+}
+
+.insi-confirm-header {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.insi-confirm-desc {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.38;
+  color: #fde68a;
+}
+
+.insi-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.insi-confirm-btn {
+  padding: 5px 11px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.insi-confirm-btn.confirm {
+  background: #10b981;
+  color: #022c22;
+}
+
+.insi-confirm-btn.cancel {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(148, 163, 184, 0.4);
+  color: #e2e8f0;
+}
+
+/* Panel Tabs */
+.insi-panel-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.9);
+}
+
+.insi-panel-tab {
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.insi-panel-tab.active {
+  color: #38bdf8;
+  border-bottom-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.08);
+}
+
+/* Panel Body */
+.insi-panel-body {
+  padding: 12px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 310px;
+}
+
+.insi-command-form {
+  display: flex;
+  gap: 6px;
+}
+
+.insi-command-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  background: #020617;
+  color: #f8fafc;
+  font-size: 12px;
+}
+
+.insi-command-send-btn {
+  padding: 7px 13px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.insi-quick-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.insi-section-caption {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+}
+
+.insi-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.insi-action-chip {
+  padding: 5px 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(30, 41, 59, 0.75);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.insi-action-chip:hover {
+  border-color: #38bdf8;
+  background: rgba(14, 165, 233, 0.18);
+}
+
+.insi-action-chip.warning {
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fde68a;
+}
+
+/* Activity & Honest Response Log */
+.insi-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.insi-log-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.55);
+  border-left: 3px solid #38bdf8;
+  font-size: 11px;
+}
+
+.insi-log-item.kind-success {
+  border-left-color: #10b981;
+}
+
+.insi-log-item.kind-warning {
+  border-left-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.insi-log-item.kind-honest_unrecognized,
+.insi-log-item.kind-error {
+  border-left-color: #f43f5e;
+  background: rgba(244, 63, 94, 0.12);
+}
+
+.insi-log-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.insi-log-top strong {
+  color: #f8fafc;
+  font-size: 11px;
+}
+
+.insi-log-top small {
+  color: #64748b;
+  font-size: 10px;
+}
+
+.insi-log-item p {
+  margin: 0;
+  color: #cbd5e1;
+  line-height: 1.38;
+}
+
+/* Editable Command Router Styles */
+.insi-router-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.insi-router-help {
+  margin: 0;
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
+.insi-new-route-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px;
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.65);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.insi-route-input {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 11px;
+}
+
+.insi-new-route-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.insi-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+.insi-router-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.insi-router-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.insi-router-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.insi-router-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.insi-route-badge {
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.7);
+  color: #94a3b8;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.insi-route-badge.confirm-on {
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fde68a;
+}
+
+.insi-route-run-btn,
+.insi-route-edit-btn,
+.insi-route-save-btn {
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(14, 165, 233, 0.15);
+  color: #7dd3fc;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.insi-route-triggers-row,
+.insi-route-edit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.insi-route-triggers-row code {
+  color: #bae6fd;
+  background: rgba(15, 23, 42, 0.7);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
 
 /* ============================================================
    KEYFRAMES
    ============================================================ */
 @keyframes insiAppearSmooth {
-  0% { opacity: 0; transform: translate3d(0, 18px, 0) scale(0.68); }
-  70% { opacity: 1; transform: translate3d(0, -4px, 0) scale(1.03); }
+  0% { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.75); }
+  70% { opacity: 1; transform: translate3d(0, -3px, 0) scale(1.03); }
   100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
 @keyframes insiDisappearSmooth {
   0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-  100% { opacity: 0; transform: translate3d(0, 16px, 0) scale(0.7); }
+  100% { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.72); }
 }
 
-@keyframes insiRoamAcrossHeading {
-  0% { transform: scale(var(--insi-scale, 0.78)) translateX(-90px) translateY(0px); }
-  25% { transform: scale(var(--insi-scale, 0.78)) translateX(-30px) translateY(-6px); }
-  50% { transform: scale(var(--insi-scale, 0.78)) translateX(30px) translateY(0px); }
-  75% { transform: scale(var(--insi-scale, 0.78)) translateX(90px) translateY(-6px); }
-  100% { transform: scale(var(--insi-scale, 0.78)) translateX(140px) translateY(0px); }
+@keyframes insiWorkspaceOrbitFlight {
+  0% { transform: translate3d(0, 0, 0) scale(0.95); }
+  25% { transform: translate3d(-180px, -45px, 0) rotate(-8deg) scale(1.08); }
+  50% { transform: translate3d(0px, 65px, 0) rotate(5deg) scale(1.12); }
+  75% { transform: translate3d(180px, -35px, 0) rotate(8deg) scale(1.06); }
+  100% { transform: translate3d(0, 0, 0) scale(0.95); }
 }
 
-@keyframes insiPowerSquat {
-  0% { transform: scale(var(--insi-scale, 0.92)) translateY(0px); }
-  100% { transform: scale(var(--insi-scale, 0.92)) translateY(-7px) scaleX(1.05); }
+@keyframes insiDoveIdleBreathe {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-3.5px) rotate(-1.5deg); }
 }
 
-@keyframes insiFlexLeftArm {
-  0% { transform: rotate(10deg); }
-  100% { transform: rotate(62deg) translateY(-6px); }
+@keyframes insiDoveWingFlap {
+  0% { transform: translateY(2px) scaleY(0.92) rotate(-5deg); }
+  100% { transform: translateY(-7px) scaleY(1.08) rotate(6deg); }
 }
 
-@keyframes insiFlexRightArm {
-  0% { transform: rotate(-10deg); }
-  100% { transform: rotate(-62deg) translateY(-6px); }
+@keyframes insiDoveSettleLand {
+  0% { transform: translateY(-10px) scale(1.08); }
+  65% { transform: translateY(2px) scale(0.96); }
+  100% { transform: translateY(0) scale(1); }
 }
 
-@keyframes insiSwingArm {
-  0% { transform: rotate(-24deg); }
-  100% { transform: rotate(24deg); }
+@keyframes insiDoveHopWalk {
+  0% { transform: scale(var(--insi-scale, 0.94)) translateX(-6px) translateY(0px); }
+  50% { transform: scale(var(--insi-scale, 0.94)) translateX(0px) translateY(-7px); }
+  100% { transform: scale(var(--insi-scale, 0.94)) translateX(6px) translateY(0px); }
 }
 
-@keyframes insiPullTug {
-  0% { transform: scale(var(--insi-scale, 0.92)) translateX(0px) rotate(0deg); }
-  100% { transform: scale(var(--insi-scale, 0.92)) translateX(-12px) rotate(-8deg); }
+@keyframes insiDoveListeningAlert {
+  0% { transform: translateY(0px) rotate(-3deg) scale(1); }
+  100% { transform: translateY(-4px) rotate(4deg) scale(1.04); }
 }
 
-@keyframes insiSecurityAlertShake {
-  0% { transform: scale(var(--insi-scale, 1.04)) translateX(-5px); }
-  100% { transform: scale(var(--insi-scale, 1.04)) translateX(5px); }
+@keyframes insiDoveSpeakingBob {
+  0% { transform: translateY(0px) scale(0.98); }
+  100% { transform: translateY(-4px) scale(1.04); }
 }
 
-@keyframes insiShieldPulse {
-  0% { transform: scale(0.92); }
-  100% { transform: scale(1.08); }
+@keyframes insiDoveEyeBlink {
+  0%, 44%, 48%, 100% { transform: scaleY(1); opacity: 0.85; }
+  46% { transform: scaleY(0.1); opacity: 0.2; }
 }
 
-@keyframes insiBreathe {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-3px); }
-}
-
-@keyframes insiNaturalBlink {
-  0%, 45%, 49%, 100% { transform: scaleY(1); }
-  47% { transform: scaleY(0.1); }
-}
-
-@keyframes insiWaveGreeting {
-  0% { transform: rotate(-18deg); }
-  100% { transform: rotate(-52deg) translateY(-4px); }
-}
-
-@keyframes insiCastWand {
-  0% { transform: rotate(-12deg); }
-  100% { transform: rotate(22deg) translateY(-5px); }
-}
-
-@keyframes insiSpinStar {
-  0% { transform: rotate(0deg) scale(0.95); }
-  50% { transform: rotate(180deg) scale(1.2); }
-  100% { transform: rotate(360deg) scale(0.95); }
-}
-
-@keyframes insiLevitatePower {
-  0% { transform: scale(var(--insi-scale, 1.14)) translateY(0px); }
-  100% { transform: scale(var(--insi-scale, 1.14)) translateY(-8px); }
-}
-
-@keyframes insiPulseOrb {
-  0% { transform: scale(0.88); opacity: 0.75; }
-  100% { transform: scale(1.16); opacity: 1; }
+@keyframes insiSonarExpand {
+  0% { transform: scale(0.85); opacity: 0.85; }
+  100% { transform: scale(1.45); opacity: 0; }
 }
 
 @keyframes insiSpinRing {
@@ -432,23 +1159,8 @@
 }
 
 @keyframes insiDanceGroove {
-  0% { transform: scale(var(--insi-scale, 0.92)) translateY(0px) rotate(-7deg); }
-  100% { transform: scale(var(--insi-scale, 0.92)) translateY(-8px) rotate(7deg); }
-}
-
-@keyframes insiEqBounce {
-  0% { transform: scaleY(0.45); }
-  100% { transform: scaleY(1.15); }
-}
-
-@keyframes insiHappyBob {
-  0%, 100% { transform: translateY(0px) rotate(-2deg); }
-  50% { transform: translateY(-4px) rotate(2deg); }
-}
-
-@keyframes insiTypeTap {
-  0% { transform: rotate(-10deg) translateY(0px); }
-  100% { transform: rotate(-22deg) translateY(-3px); }
+  0% { transform: scale(var(--insi-scale, 0.94)) translateY(0px) rotate(-8deg); }
+  100% { transform: scale(var(--insi-scale, 0.94)) translateY(-9px) rotate(8deg); }
 }
 
 @keyframes insiCelebrateJump {
@@ -456,15 +1168,9 @@
   100% { transform: scale(var(--insi-scale, 1.04)) translateY(-10px); }
 }
 
-@keyframes insiPlayfulWalk {
-  0% { transform: scale(var(--insi-scale, 0.78)) translateX(-8px) translateY(0px); }
-  50% { transform: scale(var(--insi-scale, 0.78)) translateX(0px) translateY(-4px); }
-  100% { transform: scale(var(--insi-scale, 0.78)) translateX(8px) translateY(0px); }
-}
-
-@keyframes insiStepLeg {
-  0% { transform: rotate(-16deg); }
-  100% { transform: rotate(16deg); }
+@keyframes insiSecurityAlertShake {
+  0% { transform: scale(var(--insi-scale, 1.02)) translateX(-5px); }
+  100% { transform: scale(var(--insi-scale, 1.02)) translateX(5px); }
 }
 
 @keyframes insiHaloPulse {
@@ -497,17 +1203,39 @@
   100% { transform: scale(1.25); opacity: 1; }
 }
 
+/* Reduced Motion Accessibility Support */
+.insi-reduced-motion,
+.insi-reduced-motion * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .insi-entering,
   .insi-leaving,
-  .insi-robot-rig,
-  .insi-robot-head,
-  .insi-robot-torso,
-  .insi-arm-left,
-  .insi-arm-right,
-  .insi-leg-left,
-  .insi-leg-right,
-  .insi-digital-eyes {
+  .insi-pet-stage,
+  .insi-dove-rig,
+  .insi-dove-artwork,
+  .insi-dove-eye-blink,
+  .insi-listening-sonar {
     animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .insi-pet-stage {
+    bottom: 112px !important;
+    right: 14px !important;
+    top: auto !important;
+    left: auto !important;
+  }
+  .insi-floating-dock {
+    right: 12px;
+    bottom: 62px;
+  }
+  .insi-voice-btn-grid {
+    grid-template-columns: 1fr;
   }
 }

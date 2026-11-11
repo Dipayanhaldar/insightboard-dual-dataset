@@ -1,12 +1,15 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './InsiPetBot.css';
 import {
   insi,
   INSI_CORNERS,
   INSI_SIZES,
-  INSI_STATES
+  INSI_STATES,
+  DEFAULT_INSI_COMMAND_ROUTER,
+  matchLocalCommandRouter
 } from './insiController.js';
 import {
+  normalizeSpeechTranscript,
   detectWakeWordAndCommand,
   executeInsiCommand
 } from './insiOperatorEngine.js';
@@ -17,27 +20,32 @@ import {
   playInsiSnore
 } from './uiSound.js';
 
+const DOVE_IMAGE_URL = '/assets/aistudio/rock-dove-columbidae-bird-ai-generated-free-png_0065e921.webp';
+const ROUTER_STORAGE_KEY = 'insightboard_insi_command_router_v1';
+
 const CORNER_POSITIONS = {
-  'bottom-right': { bottom: '72px', right: '16px', top: 'auto', left: 'auto' },
-  'bottom-left': { bottom: '20px', left: '16px', top: 'auto', right: 'auto' },
-  'top-right': { top: '62px', right: '16px', bottom: 'auto', left: 'auto' },
-  'mid-right': { bottom: '190px', right: '14px', top: 'auto', left: 'auto' },
-  'top-left': { top: '62px', left: '16px', bottom: 'auto', right: 'auto' },
-  'mid-left': { bottom: '190px', left: '14px', top: 'auto', right: 'auto' },
-  'heading-perch': { top: '66px', left: '34%', bottom: 'auto', right: 'auto' },
-  'kpi-perch': { top: '192px', right: '26%', bottom: 'auto', left: 'auto' }
+  'bottom-right': { bottom: '78px', right: '22px', top: 'auto', left: 'auto' },
+  'bottom-left': { bottom: '28px', left: '22px', top: 'auto', right: 'auto' },
+  'top-right': { top: '68px', right: '24px', bottom: 'auto', left: 'auto' },
+  'mid-right': { bottom: '195px', right: '18px', top: 'auto', left: 'auto' },
+  'top-left': { top: '68px', left: '24px', bottom: 'auto', right: 'auto' },
+  'mid-left': { bottom: '195px', left: '18px', top: 'auto', right: 'auto' },
+  'heading-perch': { top: '64px', left: '34%', bottom: 'auto', right: 'auto' },
+  'kpi-perch': { top: '188px', right: '26%', bottom: 'auto', left: 'auto' }
 };
 
-const AMBIENT_ACTIVITIES = [
-  { state: 'roaming_heading', prop: 'chair_laptop', size: 'sm', corner: 'heading-perch' },
-  { state: 'flexing', prop: 'flex_muscles', size: 'md', corner: 'bottom-right' },
-  { state: 'dancing', prop: 'audio_deck', size: 'md', corner: 'top-right' },
-  { state: 'pulling_dashboard', prop: 'flex_muscles', size: 'sm', corner: 'kpi-perch' },
-  { state: 'reading', prop: 'chair_laptop', size: 'sm', corner: 'bottom-left' },
-  { state: 'drinking', prop: 'coffee_chair', size: 'sm', corner: 'mid-right' },
-  { state: 'viewing_charts', prop: 'chart_holo', size: 'md', corner: 'bottom-right' },
-  { state: 'security_pass', prop: 'security_shield', size: 'sm', corner: 'top-left' }
-];
+function loadSavedCommandRouter() {
+  if (typeof window === 'undefined') return [...DEFAULT_INSI_COMMAND_ROUTER];
+  try {
+    const raw = window.localStorage.getItem(ROUTER_STORAGE_KEY);
+    if (!raw) return [...DEFAULT_INSI_COMMAND_ROUTER];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+  } catch {}
+  return [...DEFAULT_INSI_COMMAND_ROUTER];
+}
 
 export default function InsiPetBot({
   rows = [],
@@ -46,49 +54,231 @@ export default function InsiPetBot({
   emptyDashboard = false,
   onVoiceCommandAction
 }) {
-  const [visible, setVisible] = useState(false);
+  // Visual Dove States
+  const [visible, setVisible] = useState(true);
   const [leaving, setLeaving] = useState(false);
-  const [animState, setAnimState] = useState('idle');
+  const [animState, setAnimState] = useState('perched');
   const [activeProp, setActiveProp] = useState('chair_laptop');
   const [sizeVariant, setSizeVariant] = useState('md');
   const [auraColor, setAuraColor] = useState('#00F0FF');
-  const [corner, setCorner] = useState('bottom-right');
-  const [eyeOffset, setEyeOffset] = useState({ x: 0, y: 0, headTilt: 0 });
+  const [corner, setCorner] = useState('active-tab-perch');
+  const [doveImgFailed, setDoveImgFailed] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(() => {
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+    return false;
+  });
 
+  // Active Tab Perch & Cursor Motion Tracking
+  const [activeTabCoords, setActiveTabCoords] = useState(null);
+  const [activeTabLabel, setActiveTabLabel] = useState('Active Tab');
+  const [followCursorMode, setFollowCursorMode] = useState(false);
+  const [cursorCoords, setCursorCoords] = useState({ x: 0, y: 0 });
+  const [pointerTrack, setPointerTrack] = useState({
+    headTilt: 0,
+    facingLeft: false,
+    eyeX: 0,
+    eyeY: 0
+  });
+  const [isOrbitingTask, setIsOrbitingTask] = useState(false);
+  const [statusBubbleText, setStatusBubbleText] = useState('Perched on active tab · Say "Hey, INSI"');
+
+  // Assistant Panel & Local Command Router States
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelTab, setPanelTab] = useState('assistant'); // 'assistant' | 'router'
+  const [commandInput, setCommandInput] = useState('');
+  const [commandRouter, setCommandRouter] = useState(loadSavedCommandRouter);
+  const [pendingConfirmation, setPendingConfirmation] = useState(null);
+  const [assistantLog, setAssistantLog] = useState([
+    {
+      id: 'welcome',
+      kind: 'info',
+      title: 'INSI Dove Assistant Ready',
+      detail:
+        'Browser-based voice & action router connected to InsightBoard. Click "Enable Voice" or "Push to Talk" below to use microphone commands, or type any command directly.'
+    }
+  ]);
+
+  // New Route Form inside Editable Command Router
+  const [editingRouteId, setEditingRouteId] = useState(null);
+  const [editingTriggersText, setEditingTriggersText] = useState('');
+  const [newRouteLabel, setNewRouteLabel] = useState('');
+  const [newRouteTriggers, setNewRouteTriggers] = useState('');
+  const [newRouteCommand, setNewRouteCommand] = useState('');
+  const [newRouteConfirm, setNewRouteConfirm] = useState(false);
+
+  // Voice & Speech Synthesis States (Strictly opt-in: no mic prompt until user clicks Enable Voice or Push-to-Talk)
+  const speechSupported = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }, []);
+
+  // 'idle' | 'requesting_permission' | 'listening_wake' | 'push_to_talk' | 'permission_denied' | 'unsupported' | 'error'
+  const [voiceStatus, setVoiceStatus] = useState(() => (speechSupported ? 'idle' : 'unsupported'));
+  const [voiceErrorMsg, setVoiceErrorMsg] = useState('');
+  const [voiceMuted, setVoiceMuted] = useState(false);
+  const [isSpeakingState, setIsSpeakingState] = useState(false);
+  const [lastHeardTranscript, setLastHeardTranscript] = useState('');
+  const [availableVoices, setAvailableVoices] = useState([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState('indian_distinct_auto');
+
+  // Refs for timers & SpeechRecognition lifecycle
   const fadeTimerRef = useRef(null);
   const hideTimerRef = useRef(null);
   const stepTimerRef = useRef(null);
-  const inactivityTimerRef = useRef(null);
-  const sleepingFromInactivityRef = useRef(false);
-  const cornerIdxRef = useRef(0);
-  const sizeIdxRef = useRef(0);
-  const activityIdxRef = useRef(0);
-
-  // Always-On Echo-Free "Hey INSI" / "Hey NCI" / "Wake up NCI" Voice Guardian Refs
+  const orbitTimerRef = useRef(null);
   const recognitionRef = useRef(null);
   const isListeningRef = useRef(false);
+  const voiceModeRef = useRef('off'); // 'off' | 'continuous' | 'ptt'
   const isSpeakingRef = useRef(false);
+  const voiceMutedRef = useRef(false);
   const ignoreMicUntilRef = useRef(0);
   const activeUtteranceRef = useRef(null);
   const maxSpeakTimerRef = useRef(null);
   const interimTimerRef = useRef(null);
-  const lastInterimWakeTimeRef = useRef(0);
   const lastTranscriptRef = useRef({ text: '', time: 0 });
   const lastSpokenReplyRef = useRef({ text: '', time: 0, count: 0 });
   const lastProcessedResultIdxRef = useRef(-1);
-  const wakeConversationUntilRef = useRef(0);
-  const micInitializedRef = useRef(false);
-  const micPermissionStateRef = useRef('unknown');
-  const startVoiceEnginesRef = useRef(null);
-  const hardwareAudioStreamRef = useRef(null);
-  const hardwareAudioCtxRef = useRef(null);
-  const hardwareVadRafRef = useRef(null);
-  const hardwareRecorderActiveRef = useRef(false);
   const latestContextRef = useRef({ rows, fields, datasetName, onVoiceCommandAction });
+  const commandRouterRef = useRef(commandRouter);
 
   useEffect(() => {
     latestContextRef.current = { rows, fields, datasetName, onVoiceCommandAction };
   }, [rows, fields, datasetName, onVoiceCommandAction]);
+
+  useEffect(() => {
+    voiceMutedRef.current = voiceMuted;
+  }, [voiceMuted]);
+
+  useEffect(() => {
+    commandRouterRef.current = commandRouter;
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(ROUTER_STORAGE_KEY, JSON.stringify(commandRouter));
+      } catch {}
+    }
+  }, [commandRouter]);
+
+  const appendLog = useCallback((entry) => {
+    setAssistantLog((prev) => [
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        ...entry
+      },
+      ...prev.slice(0, 14)
+    ]);
+  }, []);
+
+  // Load browser SpeechSynthesis voices and prioritize publicly available Indian voices (en-IN / hi-IN)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return undefined;
+    const updateVoices = () => {
+      try {
+        const list = window.speechSynthesis.getVoices() || [];
+        setAvailableVoices(list);
+      } catch {}
+    };
+    updateVoices();
+    window.speechSynthesis.addEventListener?.('voiceschanged', updateVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener?.('voiceschanged', updateVoices);
+    };
+  }, []);
+
+  // Measure and track the currently active workspace tab (`button.workspace-tab-btn.active`) so INSI perches right on it
+  const updateActiveTabPerchPosition = useCallback(() => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+    const activeTabEl = document.querySelector('.workspace-tab-btn.active');
+    if (!activeTabEl) {
+      setActiveTabCoords(null);
+      return;
+    }
+    const rect = activeTabEl.getBoundingClientRect();
+    // Only perch directly on the tab if it is visible in the viewport and viewport is wide enough
+    if (
+      window.innerWidth >= 640 &&
+      rect.width > 0 &&
+      rect.top >= -10 &&
+      rect.bottom <= window.innerHeight + 20
+    ) {
+      const clampedLeft = Math.max(48, Math.min(window.innerWidth - 96, rect.right - 38));
+      const clampedTop = Math.max(6, rect.top - 68);
+      setActiveTabCoords({
+        left: `${Math.round(clampedLeft)}px`,
+        top: `${Math.round(clampedTop)}px`,
+        bottom: 'auto',
+        right: 'auto'
+      });
+      const cleanLabel = String(activeTabEl.textContent || 'Active Tab')
+        .replace(/\s+/g, ' ')
+        .trim();
+      setActiveTabLabel(cleanLabel);
+    } else {
+      setActiveTabCoords(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    updateActiveTabPerchPosition();
+    const handleLayoutUpdate = () => updateActiveTabPerchPosition();
+    const handleTabClick = () => {
+      // When user clicks a tab, INSI takes flight briefly and lands on the newly active tab!
+      if (!reducedMotion) {
+        setAnimState('flying');
+        setTimeout(() => {
+          updateActiveTabPerchPosition();
+          setAnimState('landing');
+          setTimeout(() => {
+            setAnimState(isListeningRef.current ? 'listening' : 'perched');
+          }, 650);
+        }, 220);
+      } else {
+        setTimeout(updateActiveTabPerchPosition, 60);
+      }
+    };
+
+    window.addEventListener('resize', handleLayoutUpdate, { passive: true });
+    window.addEventListener('scroll', handleLayoutUpdate, { passive: true });
+    document.addEventListener('click', handleTabClick, { passive: true });
+    const interval = setInterval(updateActiveTabPerchPosition, 1800);
+
+    return () => {
+      window.removeEventListener('resize', handleLayoutUpdate);
+      window.removeEventListener('scroll', handleLayoutUpdate);
+      document.removeEventListener('click', handleTabClick);
+      clearInterval(interval);
+    };
+  }, [reducedMotion, updateActiveTabPerchPosition]);
+
+  // Real-Time Pointer Tracking: Dove head tilt, facing direction, and optional mouse-follow flight
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handlePointerMove = (e) => {
+      const vw = Math.max(1, window.innerWidth);
+      const vh = Math.max(1, window.innerHeight);
+      const nx = (e.clientX / vw) * 2 - 1;
+      const ny = (e.clientY / vh) * 2 - 1;
+
+      setPointerTrack({
+        headTilt: Math.max(-9, Math.min(9, Number((nx * 8).toFixed(2)))),
+        facingLeft: nx < -0.18,
+        eyeX: Math.max(-2.5, Math.min(2.5, Number((nx * 2.5).toFixed(2)))),
+        eyeY: Math.max(-2.0, Math.min(2.0, Number((ny * 2.0).toFixed(2))))
+      });
+
+      if (followCursorMode && !reducedMotion) {
+        setCursorCoords({
+          x: Math.max(60, Math.min(vw - 90, e.clientX + 26)),
+          y: Math.max(60, Math.min(vh - 110, e.clientY - 46))
+        });
+      }
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    return () => window.removeEventListener('pointermove', handlePointerMove);
+  }, [followCursorMode, reducedMotion]);
 
   const clearTimers = useCallback(() => {
     if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
@@ -96,28 +286,56 @@ export default function InsiPetBot({
     if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
   }, []);
 
+  const triggerTaskFlightOrbit = useCallback(
+    (statusNote = 'Flying across workspace & committing task…') => {
+      setStatusBubbleText(statusNote);
+      if (reducedMotion) {
+        setAnimState('celebrating');
+        if (orbitTimerRef.current) clearTimeout(orbitTimerRef.current);
+        orbitTimerRef.current = setTimeout(() => {
+          setAnimState(isListeningRef.current ? 'listening' : 'perched');
+        }, 2200);
+        return;
+      }
+
+      setIsOrbitingTask(true);
+      setAnimState('takeoff');
+      if (orbitTimerRef.current) clearTimeout(orbitTimerRef.current);
+
+      setTimeout(() => {
+        setAnimState('orbiting');
+      }, 280);
+
+      orbitTimerRef.current = setTimeout(() => {
+        setIsOrbitingTask(false);
+        updateActiveTabPerchPosition();
+        setAnimState('landing');
+        setTimeout(() => {
+          setAnimState(isListeningRef.current ? 'listening' : 'perched');
+        }, 650);
+      }, 2500);
+    },
+    [reducedMotion, updateActiveTabPerchPosition]
+  );
+
   const showInsi = useCallback(
-    (nextState = 'idle', options = {}) => {
+    (nextState = 'perched', options = {}) => {
       clearTimers();
 
-      const validState = INSI_STATES.includes(nextState) ? nextState : 'idle';
-      const durationMs = Number(options.durationMs) || 5000;
+      const validState = INSI_STATES.includes(nextState) ? nextState : 'perched';
+      const durationMs = Number(options.durationMs) || 5200;
 
       const chosenCorner =
-        options.corner && CORNER_POSITIONS[options.corner]
+        options.corner && (CORNER_POSITIONS[options.corner] || options.corner === 'active-tab-perch')
           ? options.corner
           : validState === 'roaming_heading'
           ? 'heading-perch'
           : validState === 'pulling_dashboard'
           ? 'kpi-perch'
-          : INSI_CORNERS[cornerIdxRef.current % INSI_CORNERS.length];
-      cornerIdxRef.current = (cornerIdxRef.current + 1) % INSI_CORNERS.length;
+          : 'active-tab-perch';
 
       const chosenSize =
-        options.size && INSI_SIZES.includes(options.size)
-          ? options.size
-          : INSI_SIZES[sizeIdxRef.current % INSI_SIZES.length];
-      sizeIdxRef.current = (sizeIdxRef.current + 1) % INSI_SIZES.length;
+        options.size && INSI_SIZES.includes(options.size) ? options.size : 'md';
 
       const resolvedProp =
         options.prop ||
@@ -125,18 +343,12 @@ export default function InsiPetBot({
           ? 'security_shield'
           : validState === 'legal_alert'
           ? 'legal_gavel'
-          : validState === 'flexing' || validState === 'pulling_dashboard'
-          ? 'flex_muscles'
-          : validState === 'magic_import' || validState === 'celebrating'
+          : validState === 'magic_import' || validState === 'celebrating' || validState === 'orbiting'
           ? 'magician_wand'
           : validState === 'heavy_ai' || validState === 'thinking'
           ? 'ai_power_core'
-          : validState === 'audio_sync' || validState === 'dancing'
+          : validState === 'audio_sync' || validState === 'dancing' || validState === 'listening' || validState === 'speaking'
           ? 'audio_deck'
-          : validState === 'viewing_charts' || validState === 'observing'
-          ? 'chart_holo'
-          : validState === 'drinking'
-          ? 'coffee_chair'
           : 'chair_laptop');
 
       setCorner(chosenCorner);
@@ -146,771 +358,649 @@ export default function InsiPetBot({
       setAnimState(validState);
       setLeaving(false);
       setVisible(true);
+      if (options.message) {
+        setStatusBubbleText(options.message);
+      }
 
       const soundType = options.sound || 'appear';
       if (soundType === 'celebrate') {
         playInsiChime('signin');
+      } else if (soundType === 'error') {
+        playInsiChime('error');
       } else if (soundType === 'snore') {
         playInsiSnore();
       } else {
         playInsiAppear();
       }
 
-      if (!options.persist) {
-        fadeTimerRef.current = setTimeout(() => {
-          setLeaving(true);
-          playInsiDisappear();
-        }, Math.max(2200, durationMs - 650));
-
-        hideTimerRef.current = setTimeout(() => {
-          setVisible(false);
-          setLeaving(false);
+      if (options.autoReturnToPerch !== false) {
+        stepTimerRef.current = setTimeout(() => {
+          setAnimState(isListeningRef.current ? 'listening' : 'perched');
+          setCorner('active-tab-perch');
         }, durationMs);
       }
     },
     [clearTimers]
   );
 
-  // Real-Time Pointer & Motion Tracking: Eyes and head smoothly track the user's cursor across the screen
-  useEffect(() => {
-    const handlePointerMove = (e) => {
-      if (typeof window === 'undefined') return;
-      const nx = (e.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
-      const ny = (e.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
-      setEyeOffset({
-        x: Math.max(-3.2, Math.min(3.2, Number((nx * 3.2).toFixed(2)))),
-        y: Math.max(-2.4, Math.min(2.4, Number((ny * 2.4).toFixed(2)))),
-        headTilt: Math.max(-5, Math.min(5, Number((nx * 4.5).toFixed(2))))
-      });
-    };
-
-    window.addEventListener('pointermove', handlePointerMove, { passive: true });
-    return () => window.removeEventListener('pointermove', handlePointerMove);
-  }, []);
-
-  // Half-Duplex Echo-Free Speech Output with Strict Anti-Repetition & V8 GC Protection
-  // IMPORTANT: Never call `recognition.abort()` during speech — keeping the SpeechRecognition stream
-  // open preserves the browser's microphone permission/gesture session while ignoring self-echo via `isSpeakingRef`.
-  const speakWithoutEcho = useCallback((textToSpeak) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !textToSpeak) return;
-
-    let finalSpeech = String(textToSpeak).trim();
-    if (!finalSpeech) return;
-
-    // Never repeat the exact same sentence twice in a row
-    if (lastSpokenReplyRef.current.text === finalSpeech) {
-      lastSpokenReplyRef.current.count += 1;
-      const variations = [
-        `Action confirmed! ${finalSpeech.split('.').slice(1).join('.').trim() || finalSpeech}`,
-        `Updated on your live board. ${finalSpeech.split('.')[0]}.`,
-        `Task complete! All charts and KPIs are synchronized.`
-      ];
-      finalSpeech = variations[lastSpokenReplyRef.current.count % variations.length];
-    } else {
-      lastSpokenReplyRef.current = { text: finalSpeech, time: Date.now(), count: 0 };
-    }
-
-    if (maxSpeakTimerRef.current) clearTimeout(maxSpeakTimerRef.current);
-    if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
-
-    // Gate incoming STT transcripts while speaking so INSI never hears its own voice
-    isSpeakingRef.current = true;
-    ignoreMicUntilRef.current = Date.now() + 7000;
-
-    const finishSpeechAndResumeMic = () => {
-      if (maxSpeakTimerRef.current) {
-        clearTimeout(maxSpeakTimerRef.current);
-        maxSpeakTimerRef.current = null;
-      }
-      isSpeakingRef.current = false;
-      ignoreMicUntilRef.current = Date.now() + 1300;
+  /**
+   * Distinct Indian Voice Output for INSI Task Completion:
+   * Uses free browser Indian voices (`en-IN` / `hi-IN`) with a voice selection, pitch (1.18), and rate (1.07)
+   * that is distinctly different from the "Generate Summary" voice (`GnaniVoiceStudio.jsx` uses Kaveri/default at pitch 1.0, rate 1.0).
+   */
+  const speakWithoutEcho = useCallback(
+    (textToSpeak) => {
       if (
-        !isListeningRef.current &&
-        (micPermissionStateRef.current === 'granted' || micInitializedRef.current) &&
-        typeof startVoiceEnginesRef.current === 'function'
+        typeof window === 'undefined' ||
+        !('speechSynthesis' in window) ||
+        !textToSpeak ||
+        voiceMutedRef.current
       ) {
-        startVoiceEnginesRef.current({ fromUserGesture: false });
-      }
-    };
-
-    try {
-      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
-        window.speechSynthesis.cancel();
-      }
-      if (typeof window.speechSynthesis.resume === 'function') {
-        window.speechSynthesis.resume();
+        return;
       }
 
-      const utterance = new SpeechSynthesisUtterance(finalSpeech);
-      // Keep strong reference so Chromium V8 never garbage-collects utterance before onend fires
-      activeUtteranceRef.current = utterance;
-      utterance.lang = 'en-IN';
-      utterance.rate = 1.04;
-      utterance.pitch = 1.05;
+      let finalSpeech = String(textToSpeak).trim();
+      if (!finalSpeech) return;
 
-      const voices = window.speechSynthesis.getVoices?.() || [];
-      const preferredVoice =
-        voices.find((v) => /en[-_]IN/i.test(v.lang)) ||
-        voices.find((v) => /en[-_](GB|US)/i.test(v.lang)) ||
-        voices.find((v) => /^en/i.test(v.lang));
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
+      // Avoid repeating identical wording back-to-back
+      if (lastSpokenReplyRef.current.text === finalSpeech) {
+        lastSpokenReplyRef.current.count += 1;
+        const variations = [
+          `Done! ${finalSpeech.split('.').slice(1).join('.').trim() || finalSpeech}`,
+          `Committed on your board. ${finalSpeech.split('.')[0]}.`,
+          `INSI completed that task—your charts and metrics are updated.`
+        ];
+        finalSpeech = variations[lastSpokenReplyRef.current.count % variations.length];
+      } else {
+        lastSpokenReplyRef.current = { text: finalSpeech, time: Date.now(), count: 0 };
       }
 
-      utterance.onstart = () => {
-        isSpeakingRef.current = true;
-        ignoreMicUntilRef.current = Date.now() + 6500;
-        insi.audioSync();
+      if (maxSpeakTimerRef.current) clearTimeout(maxSpeakTimerRef.current);
+      if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
+
+      isSpeakingRef.current = true;
+      setIsSpeakingState(true);
+      ignoreMicUntilRef.current = Date.now() + 6500;
+
+      const finishSpeech = () => {
+        if (maxSpeakTimerRef.current) {
+          clearTimeout(maxSpeakTimerRef.current);
+          maxSpeakTimerRef.current = null;
+        }
+        isSpeakingRef.current = false;
+        setIsSpeakingState(false);
+        ignoreMicUntilRef.current = Date.now() + 900;
+        setAnimState(isListeningRef.current ? 'listening' : 'perched');
       };
 
-      utterance.onend = finishSpeechAndResumeMic;
-      utterance.onerror = finishSpeechAndResumeMic;
+      try {
+        if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+          window.speechSynthesis.cancel();
+        }
+        if (typeof window.speechSynthesis.resume === 'function') {
+          window.speechSynthesis.resume();
+        }
 
-      // Safety watchdog: never allow isSpeakingRef to remain stuck true if browser drops onend
-      maxSpeakTimerRef.current = setTimeout(finishSpeechAndResumeMic, 6500);
+        const utterance = new SpeechSynthesisUtterance(finalSpeech);
+        activeUtteranceRef.current = utterance;
+        utterance.lang = 'en-IN';
+        // Distinctly brighter avian assistant cadence vs the deeper formal Executive Summary voice
+        utterance.pitch = 1.18;
+        utterance.rate = 1.07;
 
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      finishSpeechAndResumeMic();
-    }
-  }, []);
+        const voices = window.speechSynthesis.getVoices?.() || [];
+        const indianVoices = voices.filter(
+          (v) => /en[-_]IN|hi[-_]IN/i.test(v.lang) || /india|hindi|heera|swara|rishi|lekha|neerja|prabhat|google\s+हिन्दी/i.test(v.name)
+        );
 
-  // Process a spoken or typed command across the entire application shell
-  const handleSpokenTranscript = useCallback(
-    (rawTranscript, { requireWakeWord = false, speakReply = true } = {}) => {
-      if ((isSpeakingRef.current || Date.now() < ignoreMicUntilRef.current) && requireWakeWord) return null;
-      const cleaned = String(rawTranscript || '').trim();
-      if (!cleaned || cleaned.length < 2) return null;
+        let chosenVoice = null;
+        if (selectedVoiceURI !== 'indian_distinct_auto') {
+          chosenVoice = voices.find((v) => v.voiceURI === selectedVoiceURI || v.name === selectedVoiceURI);
+        }
+        if (!chosenVoice) {
+          // Pick the 2nd Indian voice if multiple exist so it differs from the default 1st voice used by Summary,
+          // or prefer Heera / Rishi / Lekha / Google Hindi
+          chosenVoice =
+            indianVoices.find((v) => /rishi|heera|lekha|neerja|swara|हिन्दी/i.test(v.name)) ||
+            indianVoices[1] ||
+            indianVoices[0] ||
+            voices.find((v) => /en[-_](GB|AU|US)/i.test(v.lang)) ||
+            voices[0];
+        }
 
-      // Ignore 1-word ambient filler noises ("uh", "um", "hmm", "ah")
-      if (/^(?:uh+|um+|hm+|ah+|er+|oh+)$/i.test(cleaned)) return null;
+        if (chosenVoice) {
+          utterance.voice = chosenVoice;
+        }
 
-      const now = Date.now();
-      const lowerCleaned = cleaned.toLowerCase();
+        utterance.onstart = () => {
+          isSpeakingRef.current = true;
+          setIsSpeakingState(true);
+          ignoreMicUntilRef.current = Date.now() + 6500;
+          setAnimState('speaking');
+        };
 
-      // Guard 1: Ignore speaker echo if the microphone picked up INSI's own recent spoken sentence
-      const lastSpokenLower = lastSpokenReplyRef.current.text.toLowerCase();
-      if (
-        lastSpokenLower &&
-        now - lastSpokenReplyRef.current.time < 9500 &&
-        (lastSpokenLower.includes(lowerCleaned) ||
-          (lowerCleaned.length >= 12 && lowerCleaned.includes(lastSpokenLower.slice(0, 20))))
-      ) {
-        return null;
+        utterance.onend = finishSpeech;
+        utterance.onerror = finishSpeech;
+
+        maxSpeakTimerRef.current = setTimeout(finishSpeech, 6500);
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        finishSpeech();
       }
+    },
+    [selectedVoiceURI]
+  );
 
-      // Guard 2: Deduplicate identical STT transcripts within 3.5 seconds
-      if (
-        lastTranscriptRef.current.text.toLowerCase() === lowerCleaned &&
-        now - lastTranscriptRef.current.time < 3500
-      ) {
-        return null;
-      }
-
-      const wake = detectWakeWordAndCommand(cleaned);
-      lastTranscriptRef.current = { text: cleaned, time: now };
-      wakeConversationUntilRef.current = now + 30000;
-
-      const cmd = (wake.wakeWordDetected ? wake.cleanCommand : cleaned).toLowerCase();
+  /**
+   * Executes a verified command (after passing the local command router & confirmation check)
+   */
+  const executeVerifiedAction = useCallback(
+    (rawCommandText, routeInfo = null, { speakReply = true } = {}) => {
       const ctx = latestContextRef.current;
+      const cleanCmd = String(rawCommandText || '').trim();
+      const lowerCmd = cleanCmd.toLowerCase();
 
-      // 0. Explicit wake-up / check-in ("Hey NCI, wake up NCI", "Wake up", "Can you hear me", "Are you listening")
-      if (
-        /^(?:wake\s+up.*|hey\s+nci.*|nci|insi|are\s+you\s+listening.*|can\s+you\s+hear\s+me.*|can\s+you\s+do\s+something.*|do\s+something.*|talk\s+to\s+me.*|hello|hi|hey)$/i.test(
-          cmd.trim()
-        ) &&
-        !/\b(metro|mall|top|bottom|chart|table|export|pdf|excel|csv|calendar|dark|light|filter)\b/i.test(cmd)
-      ) {
-        showInsi('waving', {
-          prop: 'chair_laptop',
-          size: 'md',
-          corner: 'bottom-right',
-          auraColor: '#00F0FF',
-          durationMs: 6500,
-          sound: 'celebrate'
+      // Play crisp avian task-commit chime
+      playInsiChime('signin');
+
+      // 1. Bird motion-only routes (fly around, dance, magic)
+      if (routeInfo?.actionType === 'bird_motion') {
+        if (routeInfo.birdMotion === 'dancing') {
+          showInsi('dancing', {
+            prop: 'audio_deck',
+            size: 'lg',
+            auraColor: '#00F0FF',
+            message: routeInfo.confirmationNote,
+            durationMs: 5200,
+            sound: 'celebrate'
+          });
+        } else if (routeInfo.birdMotion === 'magic_import') {
+          showInsi('magic_import', {
+            prop: 'magician_wand',
+            size: 'lg',
+            auraColor: '#00FF88',
+            message: routeInfo.confirmationNote,
+            durationMs: 5200,
+            sound: 'celebrate'
+          });
+        } else {
+          triggerTaskFlightOrbit(routeInfo.confirmationNote);
+        }
+        if (speakReply && routeInfo.confirmationNote) {
+          speakWithoutEcho(routeInfo.confirmationNote);
+        }
+        appendLog({
+          kind: 'success',
+          title: routeInfo.label,
+          detail: routeInfo.confirmationNote
         });
-        const wakeMsg = `Hey! INSI is wide awake and listening across ${ctx.rows.length} records in ${ctx.datasetName}. Tell me to switch to Hyderabad Metro, show top stores, open the table, or export a PDF report!`;
-        if (speakReply) speakWithoutEcho(wakeMsg);
         if (ctx.onVoiceCommandAction) {
-          ctx.onVoiceCommandAction({ type: 'security_scan', spoken: `🟢 INSI Voice Active: "${cleaned}" — ${wakeMsg}` });
+          ctx.onVoiceCommandAction({
+            type: 'security_scan',
+            spoken: `🕊️ INSI Dove Assistant: ${routeInfo.confirmationNote}`
+          });
         }
         return null;
       }
 
-      // 1. Security / Virus / Malware / Legal scan command
-      if (/\b(virus|malware|security|scan|hack|legal|compliance)\b/.test(cmd)) {
+      // 2. Security Scan Route
+      if (routeInfo?.actionType === 'security' || /\b(virus|malware|security\s+scan|audit\s+security)\b/.test(lowerCmd)) {
+        triggerTaskFlightOrbit('Scanning dataset for malware, XSS & compliance…');
         const sec = insi.scanSecurity({ rows: ctx.rows, fields: ctx.fields });
         const spoken =
           sec.status === 'clean'
-            ? `Security scan complete across ${ctx.rows.length} records in ${ctx.datasetName}. Zero malware, formula injections, or legal compliance issues detected.`
-            : `Security alert! Flagged ${sec.threatsFound.length + sec.legalFlags.length} potential risks. Check the dashboard notice.`;
+            ? `Task committed. Security scan complete across ${ctx.rows.length} records in ${ctx.datasetName}. Zero threats detected.`
+            : `Security alert! Flagged ${sec.threatsFound.length + sec.legalFlags.length} potential issues.`;
         if (speakReply) speakWithoutEcho(spoken);
+        appendLog({
+          kind: sec.status === 'clean' ? 'success' : 'error',
+          title: 'Local Zero-Trust Security Audit',
+          detail: spoken
+        });
         if (ctx.onVoiceCommandAction) {
           ctx.onVoiceCommandAction({ type: 'security_scan', report: sec, spoken });
         }
         return null;
       }
 
-      // 2. Robot physical action commands
-      if (/\b(dance|breakdance|groove)\b/.test(cmd)) {
-        insi.dance();
-        const msg = 'Dancing live on your dashboard!';
-        if (speakReply) speakWithoutEcho(msg);
-        if (ctx.onVoiceCommandAction) {
-          ctx.onVoiceCommandAction({ type: 'security_scan', spoken: `🟢 INSI Voice Action: ${msg}` });
-        }
-        return null;
-      }
-      if (/\b(flex|muscle|strong|power)\b/.test(cmd)) {
-        insi.flex();
-        const msg = 'Flexing full robotic power for your analytics!';
-        if (speakReply) speakWithoutEcho(msg);
-        if (ctx.onVoiceCommandAction) {
-          ctx.onVoiceCommandAction({ type: 'security_scan', spoken: `🟢 INSI Voice Action: ${msg}` });
-        }
-        return null;
-      }
-      if (/\b(roam|walk|run|patrol)\b/.test(cmd)) {
-        insi.roamHeading();
-        const msg = 'Patrolling across your main dashboard headings now.';
-        if (speakReply) speakWithoutEcho(msg);
-        if (ctx.onVoiceCommandAction) {
-          ctx.onVoiceCommandAction({ type: 'security_scan', spoken: `🟢 INSI Voice Action: ${msg}` });
-        }
-        return null;
-      }
+      // 3. Fly & orbit across active workspace while executing real dashboard action
+      triggerTaskFlightOrbit(routeInfo?.confirmationNote || `Executing "${cleanCmd}"…`);
 
-      // 3. Execute full INSI data operator + full-website automation plan
       const result = executeInsiCommand({
         rows: ctx.rows,
         fields: ctx.fields,
         datasetName: ctx.datasetName,
-        command: wake.wakeWordDetected ? cleaned : `Hey INSI, ${cleaned}`,
+        command: `Hey, INSI, ${cleanCmd}`,
         activeMode: 'demo_sandbox'
       });
 
-      insi.applyMascotState(result.mascot_state);
-      // When switching to Hyderabad Metro, let the authentic Metro MP3 announcement play without TTS overlap
-      if (speakReply && result.voice_reply && result.automation_plan?.switchPreset !== 'metro') {
-        speakWithoutEcho(result.voice_reply);
+      const spokenNote =
+        routeInfo?.confirmationNote && routeInfo.id !== 'dynamic_analytics_query'
+          ? `${routeInfo.confirmationNote} ${result.voice_reply || ''}`.trim()
+          : `Task committed. ${result.voice_reply || ''}`.trim();
+
+      // When switching to Hyderabad Metro, allow the authentic Metro MP3 announcement to play clearly without TTS overlap
+      if (speakReply && result.automation_plan?.switchPreset !== 'metro') {
+        speakWithoutEcho(spokenNote);
       }
+
+      appendLog({
+        kind: 'success',
+        title: routeInfo?.label || 'Dashboard Action Committed',
+        detail: result.executive_summary?.headline || spokenNote
+      });
 
       if (ctx.onVoiceCommandAction) {
         ctx.onVoiceCommandAction({
           type: 'automate_all',
           result,
-          rawCommand: cleaned
+          rawCommand: cleanCmd
         });
       }
 
       return result;
     },
-    [showInsi, speakWithoutEcho]
+    [appendLog, showInsi, speakWithoutEcho, triggerTaskFlightOrbit]
   );
 
-  // Direct click on the INSI Robot (or Alt+I / Ctrl+Space shortcut):
-  // Immediately wakes INSI, speaks out loud, and requests hardware microphone permission on a trusted user gesture
-  const handleRobotDirectWake = useCallback(
-    async (e) => {
-      if (e && typeof e.stopPropagation === 'function') {
-        e.stopPropagation();
+  /**
+   * Primary Command Handler for both Voice ("Hey, INSI") and Text Input:
+   * 1. Normalizes speech transcript ("Hey, INSI", "Hey I N S I", "Hey Insee", "Wake up Insee")
+   * 2. Evaluates against the Local Editable Command Router (`matchLocalCommandRouter`)
+   * 3. Handles unrecognized commands honestly (never fakes or invents a completed action)
+   * 4. Prompts for confirmation before consequential actions
+   */
+  const handleSpokenTranscript = useCallback(
+    (rawTranscript, { requireWakeWord = false, speakReply = true, bypassConfirmation = false } = {}) => {
+      if ((isSpeakingRef.current || Date.now() < ignoreMicUntilRef.current) && requireWakeWord) {
+        return null;
       }
-      showInsi('waving', {
-        prop: 'chair_laptop',
-        size: 'md',
-        corner: 'bottom-right',
-        auraColor: '#00F0FF',
-        durationMs: 7000,
-        sound: 'celebrate'
-      });
 
+      const normalized = normalizeSpeechTranscript(rawTranscript);
+      if (!normalized || normalized.length < 2) return null;
+      if (/^(?:uh+|um+|hm+|ah+|er+|oh+)$/i.test(normalized)) return null;
+
+      const now = Date.now();
+      const lowerNorm = normalized.toLowerCase();
+
+      // Deduplicate identical STT transcripts within 2.5s
+      if (
+        requireWakeWord &&
+        lastTranscriptRef.current.text.toLowerCase() === lowerNorm &&
+        now - lastTranscriptRef.current.time < 2500
+      ) {
+        return null;
+      }
+
+      const wake = detectWakeWordAndCommand(normalized);
+      if (requireWakeWord && !wake.wakeWordDetected) {
+        return null;
+      }
+
+      lastTranscriptRef.current = { text: normalized, time: now };
+      setLastHeardTranscript(normalized);
+
+      const strippedCmd = (wake.wakeWordDetected ? wake.cleanCommand : normalized).trim();
       const ctx = latestContextRef.current;
 
-      // Explicitly request hardware microphone access on this direct user click gesture
-      let hardwareAllowed = false;
+      // Check bare wake greeting ("Hey, INSI", "Hey I N S I", "Hey Insee", "Wake up Insee", "Are you listening")
+      if (
+        /^(?:give me an executive overview of the active dataset|wake\s+up.*|hey.*|insi|are\s+you\s+listening.*|can\s+you\s+hear\s+me.*|hello|hi)$/i.test(
+          strippedCmd
+        ) &&
+        !/\b(metro|mall|top|bottom|chart|table|export|pdf|excel|csv|calendar|dark|light|filter|reset|delete|pizza|email|dance|magic|fly)\b/i.test(
+          normalized.replace(/hey[,\s]*insi/i, '')
+        )
+      ) {
+        triggerTaskFlightOrbit('Awake & flying across your active workspace!');
+        const wakeReply = `INSI is awake and perched on your ${activeTabLabel} tab with ${ctx.rows.length} records in ${ctx.datasetName}. Say "Hey, INSI, switch to Hyderabad Metro", "Highlight top 3 leaders", or "Open data table".`;
+        if (speakReply) speakWithoutEcho(wakeReply);
+        appendLog({
+          kind: 'info',
+          title: `Wake Phrase Recognized ("${wake.matchedWakePhrase || 'Hey, INSI'}")`,
+          detail: wakeReply
+        });
+        if (ctx.onVoiceCommandAction) {
+          ctx.onVoiceCommandAction({
+            type: 'security_scan',
+            spoken: `🕊️ INSI Awake ("${normalized}"): ${wakeReply}`
+          });
+        }
+        return null;
+      }
+
+      // Evaluate against the Local Editable Command Router
+      const routerMatch = matchLocalCommandRouter(strippedCmd, commandRouterRef.current);
+
+      // Honest Unrecognized Request Handling — NEVER invent a completed action!
+      if (!routerMatch.recognized) {
+        playInsiChime('error');
+        showInsi('confused', {
+          prop: 'chair_laptop',
+          size: 'md',
+          auraColor: '#FFB800',
+          message: 'Unrecognized or unsupported action — see INSI panel',
+          durationMs: 4800,
+          sound: 'error'
+        });
+        setPanelOpen(true);
+        appendLog({
+          kind: 'honest_unrecognized',
+          title: `Cannot Perform: "${strippedCmd}"`,
+          detail: routerMatch.honestReason
+        });
+        if (speakReply) {
+          speakWithoutEcho(
+            `I cannot perform "${strippedCmd}" because InsightBoard does not support that action. I only run real dashboard actions like switching datasets, filtering charts, or exporting reports.`
+          );
+        }
+        if (ctx.onVoiceCommandAction) {
+          ctx.onVoiceCommandAction({
+            type: 'security_scan',
+            spoken: `⚠️ INSI Honest Notice: ${routerMatch.honestReason}`
+          });
+        }
+        return null;
+      }
+
+      // Consequential Action Confirmation Gate — Ask before resetting, deleting, clearing, etc.
+      if (routerMatch.requiresConfirmation && !bypassConfirmation) {
+        playInsiAppear();
+        showInsi('thinking', {
+          prop: 'security_shield',
+          size: 'md',
+          auraColor: '#FFB800',
+          message: 'Confirmation needed before executing action',
+          durationMs: 6000
+        });
+        setPanelOpen(true);
+        setPendingConfirmation({
+          rawTranscript: normalized,
+          cleanCommand: routerMatch.cleanCommand,
+          route: routerMatch.route,
+          prompt: routerMatch.confirmationPrompt
+        });
+        const confirmSpeech = `Please confirm in the INSI panel before I execute: ${routerMatch.route?.label || routerMatch.cleanCommand}.`;
+        if (speakReply) speakWithoutEcho(confirmSpeech);
+        appendLog({
+          kind: 'warning',
+          title: `Confirmation Required: ${routerMatch.route?.label || 'Consequential Action'}`,
+          detail: routerMatch.confirmationPrompt
+        });
+        return null;
+      }
+
+      // Execute verified local command
+      return executeVerifiedAction(routerMatch.cleanCommand, routerMatch.route, { speakReply });
+    },
+    [activeTabLabel, appendLog, executeVerifiedAction, showInsi, speakWithoutEcho, triggerTaskFlightOrbit]
+  );
+
+  /**
+   * Stops browser SpeechRecognition cleanly when user clicks "Stop Listening"
+   */
+  const stopVoiceListening = useCallback(() => {
+    voiceModeRef.current = 'off';
+    isListeningRef.current = false;
+    if (interimTimerRef.current) {
+      clearTimeout(interimTimerRef.current);
+      interimTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.abort();
+      } catch {}
+      recognitionRef.current = null;
+    }
+    setVoiceStatus(speechSupported ? 'idle' : 'unsupported');
+    setAnimState('perched');
+    setStatusBubbleText('Voice listening stopped · Click Enable Voice anytime');
+    appendLog({
+      kind: 'info',
+      title: 'Microphone Listening Stopped',
+      detail: 'Wake-word listening is now off. You can re-enable voice or use text commands anytime.'
+    });
+  }, [appendLog, speechSupported]);
+
+  /**
+   * Starts browser SpeechRecognition ONLY when explicitly triggered by the user
+   * ("Enable Voice" for continuous "Hey, INSI" wake-word mode, or "Push to Talk" for single command)
+   */
+  const startExplicitVoiceSession = useCallback(
+    async (mode = 'continuous') => {
+      if (typeof window === 'undefined') return;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setVoiceStatus('unsupported');
+        setVoiceErrorMsg(
+          'This browser does not support the Web Speech API (SpeechRecognition). Please use the text command input or quick action buttons below, or open in Chrome/Edge.'
+        );
+        setPanelOpen(true);
+        return;
+      }
+
+      setVoiceErrorMsg('');
+      setVoiceStatus('requesting_permission');
+      voiceModeRef.current = mode;
+
+      // Request microphone permission ONLY now, after explicit user opt-in
       if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
           });
-          hardwareAllowed = true;
-          micPermissionStateRef.current = 'granted';
-          micInitializedRef.current = true;
-          try {
-            localStorage.setItem('insightboard-mic-granted', 'true');
-          } catch {}
-          // Release temporary probe tracks if SpeechRecognition is supported so SpeechRecognition has clean access
-          if (window.SpeechRecognition || window.webkitSpeechRecognition) {
-            stream.getTracks().forEach((t) => t.stop());
-          } else {
-            hardwareAudioStreamRef.current = stream;
-          }
+          // Immediately release probe stream so SpeechRecognition has exclusive mic access
+          stream.getTracks().forEach((t) => t.stop());
         } catch (err) {
           const errName = String(err?.name || '');
           if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-            micPermissionStateRef.current = 'denied';
+            voiceModeRef.current = 'off';
+            isListeningRef.current = false;
+            setVoiceStatus('permission_denied');
+            setVoiceErrorMsg(
+              'Microphone permission was denied by the browser. Allow microphone access in the address bar settings, or use the text command input and buttons below.'
+            );
+            setPanelOpen(true);
+            appendLog({
+              kind: 'error',
+              title: 'Microphone Permission Denied',
+              detail: 'Allow microphone permission in your browser address bar, or use text commands below.'
+            });
+            return;
           }
         }
       }
 
-      if (typeof startVoiceEnginesRef.current === 'function') {
-        startVoiceEnginesRef.current({ fromUserGesture: true });
-      }
+      const launchRecognitionInstance = () => {
+        if (voiceModeRef.current === 'off') return;
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.onend = null;
+            recognitionRef.current.onerror = null;
+            recognitionRef.current.onresult = null;
+            recognitionRef.current.abort();
+          } catch {}
+          recognitionRef.current = null;
+        }
 
-      if (micPermissionStateRef.current === 'denied' && !hardwareAllowed) {
-        const blockedMsg =
-          'I am awake! Your browser tab currently has Microphone set to Blocked. Click the tune or lock icon next to the address bar to allow Microphone, or type any Hey NCI command right into the top search bar!';
-        speakWithoutEcho(blockedMsg);
-        if (ctx.onVoiceCommandAction) {
-          ctx.onVoiceCommandAction({
-            type: 'security_scan',
-            spoken:
-              '🎙️ Browser Mic Blocked in Address Bar: Click the Lock/Tune icon next to the URL -> Allow Microphone (or open the app in a new tab), OR type "hey nci switch to hyderabad metro" in the top search bar and press Enter!'
-          });
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.lang = 'en-IN';
+          recognition.continuous = voiceModeRef.current === 'continuous';
+          recognition.interimResults = true;
+          recognition.maxAlternatives = 5;
+
+          recognition.onstart = () => {
+            isListeningRef.current = true;
+            lastProcessedResultIdxRef.current = -1;
+            setVoiceStatus(voiceModeRef.current === 'ptt' ? 'push_to_talk' : 'listening_wake');
+            setAnimState('listening');
+            setStatusBubbleText(
+              voiceModeRef.current === 'ptt'
+                ? 'Push-to-Talk active · Speak your command now…'
+                : 'Listening for "Hey, INSI"…'
+            );
+          };
+
+          recognition.onresult = (event) => {
+            const now = Date.now();
+            const mutedForSelfSpeech = isSpeakingRef.current || now < ignoreMicUntilRef.current;
+
+            for (let i = event.resultIndex; i < event.results.length; i += 1) {
+              if (i <= lastProcessedResultIdxRef.current) continue;
+              const res = event.results[i];
+              if (!res) continue;
+
+              if (mutedForSelfSpeech) {
+                if (res.isFinal) {
+                  lastProcessedResultIdxRef.current = i;
+                }
+                continue;
+              }
+
+              const alternatives = [];
+              for (let a = 0; a < res.length; a += 1) {
+                const t = String(res[a]?.transcript || '').trim();
+                if (t) alternatives.push(t);
+              }
+              if (!alternatives.length) continue;
+
+              const matchedAlt = alternatives.find((alt) => detectWakeWordAndCommand(alt).wakeWordDetected);
+              const chosenTranscript = matchedAlt || alternatives[0];
+              if (!chosenTranscript) continue;
+
+              setLastHeardTranscript(normalizeSpeechTranscript(chosenTranscript));
+
+              if (res.isFinal) {
+                if (interimTimerRef.current) {
+                  clearTimeout(interimTimerRef.current);
+                  interimTimerRef.current = null;
+                }
+                lastProcessedResultIdxRef.current = i;
+                const isPtt = voiceModeRef.current === 'ptt';
+                handleSpokenTranscript(chosenTranscript, {
+                  requireWakeWord: !isPtt,
+                  speakReply: true
+                });
+                if (isPtt) {
+                  voiceModeRef.current = 'off';
+                  isListeningRef.current = false;
+                  setVoiceStatus('idle');
+                }
+              } else {
+                if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
+                const settledIdx = i;
+                const settledText = chosenTranscript;
+                interimTimerRef.current = setTimeout(() => {
+                  interimTimerRef.current = null;
+                  if (
+                    !isSpeakingRef.current &&
+                    Date.now() >= ignoreMicUntilRef.current &&
+                    settledIdx > lastProcessedResultIdxRef.current
+                  ) {
+                    lastProcessedResultIdxRef.current = settledIdx;
+                    const isPtt = voiceModeRef.current === 'ptt';
+                    handleSpokenTranscript(settledText, {
+                      requireWakeWord: !isPtt,
+                      speakReply: true
+                    });
+                  }
+                }, 650);
+              }
+            }
+          };
+
+          recognition.onerror = (err) => {
+            const errCode = String(err?.error || '');
+            isListeningRef.current = false;
+            recognitionRef.current = null;
+
+            if (errCode === 'aborted' || errCode === 'no-speech') {
+              return;
+            }
+            if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
+              voiceModeRef.current = 'off';
+              setVoiceStatus('permission_denied');
+              setVoiceErrorMsg(
+                'Microphone access was blocked by the browser. Please allow microphone permission in your browser settings or use text commands.'
+              );
+              setAnimState('perched');
+            } else {
+              setVoiceStatus('error');
+              setVoiceErrorMsg(`Speech recognition notice (${errCode}). You can retry or use text commands.`);
+            }
+          };
+
+          recognition.onend = () => {
+            isListeningRef.current = false;
+            lastProcessedResultIdxRef.current = -1;
+            recognitionRef.current = null;
+            if (voiceModeRef.current === 'continuous') {
+              setTimeout(() => {
+                if (voiceModeRef.current === 'continuous' && !isListeningRef.current) {
+                  launchRecognitionInstance();
+                }
+              }, 260);
+            } else {
+              setVoiceStatus('idle');
+              setAnimState('perched');
+            }
+          };
+
+          recognitionRef.current = recognition;
+          recognition.start();
+        } catch (err) {
+          isListeningRef.current = false;
+          recognitionRef.current = null;
+          setVoiceStatus('error');
+          setVoiceErrorMsg('Could not start browser speech recognition. Use text commands below.');
         }
-      } else {
-        const readyMsg = `Hey! INSI is wide awake and listening across ${ctx.rows.length} records. Say switch to Hyderabad Metro, show top 5 stores, open table, or export PDF!`;
-        speakWithoutEcho(readyMsg);
-        if (ctx.onVoiceCommandAction) {
-          ctx.onVoiceCommandAction({
-            type: 'security_scan',
-            spoken: '🟢 INSI Voice Assistant is AWAKE & LISTENING — Speak any command ("Hey NCI, switch to Hyderabad Metro", "Show top 5 stores", "Open table", "Export PDF")'
-          });
-        }
-      }
+      };
+
+      launchRecognitionInstance();
+      appendLog({
+        kind: 'info',
+        title: mode === 'ptt' ? 'Push-to-Talk Activated' : 'Wake-Word Listening Enabled ("Hey, INSI")',
+        detail:
+          mode === 'ptt'
+            ? 'Speak your command now—no wake phrase required during Push-to-Talk.'
+            : 'Listening while this tab is open. Say "Hey, INSI", "Hey I N S I", or "Hey Insee" followed by your command.'
+      });
     },
-    [showInsi, speakWithoutEcho]
+    [appendLog, handleSpokenTranscript]
   );
 
-  // Expose `window.insiSpeak`, `window.insiExecuteCommand`, and `window.insiWakeUp` globally across the app shell
+  // Clean up SpeechRecognition on unmount
+  useEffect(() => {
+    return () => {
+      voiceModeRef.current = 'off';
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.onend = null;
+          recognitionRef.current.abort();
+        } catch {}
+      }
+      if (orbitTimerRef.current) clearTimeout(orbitTimerRef.current);
+      if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
+      if (maxSpeakTimerRef.current) clearTimeout(maxSpeakTimerRef.current);
+    };
+  }, []);
+
+  // Expose global helpers (`window.insiSpeak`, `window.insiExecuteCommand`, `window.insiWakeUp`)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.insiSpeak = speakWithoutEcho;
       window.insiExecuteCommand = (cmdText, opts = {}) =>
         handleSpokenTranscript(cmdText, { requireWakeWord: false, speakReply: true, ...opts });
-      window.insiWakeUp = handleRobotDirectWake;
+      window.insiWakeUp = () => {
+        setPanelOpen(true);
+        triggerTaskFlightOrbit('INSI Dove Assistant Ready!');
+      };
     }
-  }, [speakWithoutEcho, handleSpokenTranscript, handleRobotDirectWake]);
-
-  // Triple-Engine Universal Voice & Acoustic Bypass ("Hey INSI", "Hey NCI", "Wake up NCI")
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    // Unlock browser AudioContext & SpeechSynthesis on any user gesture to bypass site-wide audio restrictions
-    const unlockSiteWideAudio = () => {
-      try {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (Ctx) {
-          const ctx = new Ctx();
-          if (ctx.state === 'suspended') {
-            ctx.resume().catch(() => {});
-          }
-          setTimeout(() => {
-            try {
-              ctx.close();
-            } catch {}
-          }, 300);
-        }
-        if ('speechSynthesis' in window && typeof window.speechSynthesis.resume === 'function') {
-          window.speechSynthesis.resume();
-        }
-      } catch {}
-    };
-
-    // Engine 2 Fallback: Hardware Web Audio API Acoustic Voice Detector + MediaRecorder -> /api/ai/transcribe
-    // Automatically activates when webkitSpeechRecognition is unavailable or blocked (e.g. Brave, Firefox, iframe)
-    const startHardwareAudioFallback = async () => {
-      if (hardwareAudioCtxRef.current || typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-        return;
-      }
-      try {
-        const stream =
-          hardwareAudioStreamRef.current ||
-          (await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-          }));
-        hardwareAudioStreamRef.current = stream;
-        micPermissionStateRef.current = 'granted';
-        micInitializedRef.current = true;
-
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return;
-        const audioCtx = new Ctx();
-        hardwareAudioCtxRef.current = audioCtx;
-        if (audioCtx.state === 'suspended') {
-          await audioCtx.resume().catch(() => {});
-        }
-
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.65;
-        source.connect(analyser);
-
-        const freqData = new Uint8Array(analyser.frequencyBinCount);
-        let consecutiveVoiceFrames = 0;
-        let lastAcousticTrigger = 0;
-
-        const monitorVoiceActivity = () => {
-          if (!hardwareAudioCtxRef.current) return;
-          analyser.getByteFrequencyData(freqData);
-
-          const now = Date.now();
-          const muted = isSpeakingRef.current || now < ignoreMicUntilRef.current;
-
-          if (!muted && !hardwareRecorderActiveRef.current) {
-            // Measure average energy in human fundamental & formant voice band (~100 Hz - 3000 Hz)
-            let sum = 0;
-            const startBin = 2;
-            const endBin = Math.min(40, freqData.length);
-            for (let b = startBin; b < endBin; b += 1) {
-              sum += freqData[b];
-            }
-            const avgEnergy = sum / Math.max(1, endBin - startBin);
-
-            if (avgEnergy > 48) {
-              consecutiveVoiceFrames += 1;
-            } else {
-              consecutiveVoiceFrames = Math.max(0, consecutiveVoiceFrames - 1);
-            }
-
-            // When ~180ms of clear human speech is heard and SpeechRecognition isn't actively handling it
-            if (consecutiveVoiceFrames >= 9 && !isListeningRef.current && now - lastAcousticTrigger > 4500) {
-              consecutiveVoiceFrames = 0;
-              lastAcousticTrigger = now;
-
-              // Instant Visual & Sonic Wake-Up (<80ms)
-              showInsi('waving', {
-                prop: 'chair_laptop',
-                size: 'md',
-                corner: 'bottom-right',
-                auraColor: '#00F0FF',
-                durationMs: 6500
-              });
-
-              // Record 2.4s voice command and send to /api/ai/transcribe
-              if (typeof window.MediaRecorder !== 'undefined') {
-                try {
-                  hardwareRecorderActiveRef.current = true;
-                  const recorder = new window.MediaRecorder(stream);
-                  const chunks = [];
-                  recorder.ondataavailable = (ev) => {
-                    if (ev.data && ev.data.size > 0) chunks.push(ev.data);
-                  };
-                  recorder.onstop = async () => {
-                    hardwareRecorderActiveRef.current = false;
-                    if (!chunks.length || isSpeakingRef.current) return;
-                    const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-                    const reader = new FileReader();
-                    reader.onloadend = async () => {
-                      const base64 = String(reader.result || '').split(',')[1] || '';
-                      if (!base64) return;
-                      try {
-                        const res = await fetch('/api/ai/transcribe', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            audio: base64,
-                            mimeType: blob.type || 'audio/webm',
-                            datasetName: latestContextRef.current.datasetName,
-                            isWakeListener: true
-                          })
-                        });
-                        if (res.ok) {
-                          const data = await res.json();
-                          if (data?.transcript) {
-                            handleSpokenTranscript(data.transcript, { requireWakeWord: false, speakReply: true });
-                          }
-                        }
-                      } catch {}
-                    };
-                    reader.readAsDataURL(blob);
-                  };
-                  recorder.start();
-                  setTimeout(() => {
-                    if (recorder.state === 'recording') {
-                      try {
-                        recorder.stop();
-                      } catch {}
-                    }
-                  }, 2400);
-                } catch {
-                  hardwareRecorderActiveRef.current = false;
-                }
-              }
-            }
-          }
-
-          hardwareVadRafRef.current = window.requestAnimationFrame(monitorVoiceActivity);
-        };
-
-        hardwareVadRafRef.current = window.requestAnimationFrame(monitorVoiceActivity);
-      } catch (err) {
-        const errName = String(err?.name || '');
-        if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-          micPermissionStateRef.current = 'denied';
-        }
-      }
-    };
-
-    // Always create a FRESH SpeechRecognition instance when starting (reusing a failed instance in Chromium stays broken)
-    const startFreshSpeechRecognition = ({ fromUserGesture = false } = {}) => {
-      if (!SpeechRecognition) {
-        if (fromUserGesture || micPermissionStateRef.current === 'granted') {
-          void startHardwareAudioFallback();
-        }
-        return;
-      }
-      if (isListeningRef.current) return;
-
-      // CRITICAL CHROMIUM FIX: Never call recognition.start() outside a user gesture unless permission is ALREADY granted!
-      if (!fromUserGesture && micPermissionStateRef.current !== 'granted' && !micInitializedRef.current) {
-        return;
-      }
-
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.onend = null;
-          recognitionRef.current.onerror = null;
-          recognitionRef.current.onresult = null;
-          recognitionRef.current.abort();
-        } catch {}
-        recognitionRef.current = null;
-      }
-
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.lang =
-          (typeof navigator !== 'undefined' && /^en/i.test(navigator.language || '') ? navigator.language : '') ||
-          'en-IN';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 5;
-
-        recognition.onstart = () => {
-          isListeningRef.current = true;
-          micInitializedRef.current = true;
-          micPermissionStateRef.current = 'granted';
-          lastProcessedResultIdxRef.current = -1;
-          try {
-            localStorage.setItem('insightboard-mic-granted', 'true');
-          } catch {}
-        };
-
-        recognition.onresult = (event) => {
-          const now = Date.now();
-          const mutedForSelfSpeech = isSpeakingRef.current || now < ignoreMicUntilRef.current;
-
-          for (let i = event.resultIndex; i < event.results.length; i += 1) {
-            if (i <= lastProcessedResultIdxRef.current) continue;
-            const res = event.results[i];
-            if (!res) continue;
-
-            if (mutedForSelfSpeech) {
-              if (res.isFinal) {
-                lastProcessedResultIdxRef.current = i;
-              }
-              continue;
-            }
-
-            const alternatives = [];
-            for (let a = 0; a < res.length; a += 1) {
-              const t = String(res[a]?.transcript || '').trim();
-              if (t) alternatives.push(t);
-            }
-            if (!alternatives.length) continue;
-
-            // Prefer whichever alternative matches the wake word / direct intent, or fall back to top alternative
-            const matchedAlt = alternatives.find((alt) => detectWakeWordAndCommand(alt).wakeWordDetected);
-            const chosenTranscript = matchedAlt || alternatives[0];
-            if (!chosenTranscript) continue;
-
-            // Instant Visual & Sonic Wake-Up (<120ms) the moment any speech is heard
-            if (now - lastInterimWakeTimeRef.current > 2200) {
-              lastInterimWakeTimeRef.current = now;
-              wakeConversationUntilRef.current = now + 30000;
-              showInsi('waving', {
-                prop: 'chair_laptop',
-                size: 'md',
-                corner: 'bottom-right',
-                auraColor: '#00F0FF',
-                durationMs: 6500
-              });
-            }
-
-            if (res.isFinal) {
-              if (interimTimerRef.current) {
-                clearTimeout(interimTimerRef.current);
-                interimTimerRef.current = null;
-              }
-              lastProcessedResultIdxRef.current = i;
-              handleSpokenTranscript(chosenTranscript, { requireWakeWord: false, speakReply: true });
-            } else {
-              // Interim settlement debounce (600ms): responds immediately even if ambient noise delays isFinal
-              if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
-              const settledIdx = i;
-              const settledText = chosenTranscript;
-              interimTimerRef.current = setTimeout(() => {
-                interimTimerRef.current = null;
-                if (
-                  !isSpeakingRef.current &&
-                  Date.now() >= ignoreMicUntilRef.current &&
-                  settledIdx > lastProcessedResultIdxRef.current
-                ) {
-                  lastProcessedResultIdxRef.current = settledIdx;
-                  handleSpokenTranscript(settledText, { requireWakeWord: false, speakReply: true });
-                }
-              }, 600);
-            }
-          }
-        };
-
-        recognition.onerror = (err) => {
-          const errCode = String(err?.error || '');
-          isListeningRef.current = false;
-          recognitionRef.current = null;
-
-          if (errCode === 'aborted' || errCode === 'no-speech') {
-            return;
-          }
-          if (errCode === 'not-allowed' || errCode === 'service-not-allowed' || errCode === 'network') {
-            micInitializedRef.current = false;
-            // If SpeechRecognition service is blocked (e.g. Brave, Firefox, or iframe restriction),
-            // automatically engage Hardware Web Audio API + Gemini Transcribe fallback!
-            if (fromUserGesture || micPermissionStateRef.current === 'granted') {
-              void startHardwareAudioFallback();
-            }
-          }
-        };
-
-        recognition.onend = () => {
-          isListeningRef.current = false;
-          lastProcessedResultIdxRef.current = -1;
-          recognitionRef.current = null;
-          if (micPermissionStateRef.current === 'granted' || micInitializedRef.current) {
-            setTimeout(() => {
-              if (!isListeningRef.current && (micPermissionStateRef.current === 'granted' || micInitializedRef.current)) {
-                startFreshSpeechRecognition({ fromUserGesture: false });
-              }
-            }, 220);
-          }
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
-      } catch {
-        recognitionRef.current = null;
-        isListeningRef.current = false;
-      }
-    };
-
-    startVoiceEnginesRef.current = startFreshSpeechRecognition;
-
-    // Query Browser Permissions API without triggering an un-gestured prompt
-    let permissionStatus = null;
-    const handlePermissionChange = () => {
-      if (!permissionStatus) return;
-      micPermissionStateRef.current = permissionStatus.state;
-      if (permissionStatus.state === 'granted') {
-        micInitializedRef.current = true;
-        startFreshSpeechRecognition({ fromUserGesture: false });
-      }
-    };
-
-    if (typeof navigator !== 'undefined' && navigator.permissions && typeof navigator.permissions.query === 'function') {
-      navigator.permissions
-        .query({ name: 'microphone' })
-        .then((status) => {
-          permissionStatus = status;
-          micPermissionStateRef.current = status.state;
-          if (status.state === 'granted') {
-            micInitializedRef.current = true;
-            startFreshSpeechRecognition({ fromUserGesture: false });
-          }
-          status.onchange = handlePermissionChange;
-        })
-        .catch(() => {});
-    }
-
-    // Watchdog ONLY restarts if permission has ALREADY been granted (never spams un-gestured prompts)
-    const watchdogInterval = setInterval(() => {
-      if (
-        !isListeningRef.current &&
-        (micPermissionStateRef.current === 'granted' || micInitializedRef.current)
-      ) {
-        startFreshSpeechRecognition({ fromUserGesture: false });
-      }
-    }, 2500);
-
-    // Trusted user gesture handler: starts recognition cleanly on click / tap / keydown
-    const onTrustedUserGesture = (e) => {
-      unlockSiteWideAudio();
-      // Global keyboard shortcut: Alt+I or Ctrl+Space wakes INSI immediately
-      if (e?.type === 'keydown' && ((e.altKey && (e.key === 'i' || e.key === 'I')) || (e.ctrlKey && e.code === 'Space'))) {
-        e.preventDefault();
-        void handleRobotDirectWake(e);
-        return;
-      }
-      if (!isListeningRef.current) {
-        startFreshSpeechRecognition({ fromUserGesture: true });
-      }
-    };
-
-    const onVisibilityOrFocus = () => {
-      if (
-        document.visibilityState === 'visible' &&
-        !isListeningRef.current &&
-        (micPermissionStateRef.current === 'granted' || micInitializedRef.current)
-      ) {
-        startFreshSpeechRecognition({ fromUserGesture: false });
-      }
-    };
-
-    window.addEventListener('pointerdown', onTrustedUserGesture, { passive: true });
-    window.addEventListener('touchend', onTrustedUserGesture, { passive: true });
-    window.addEventListener('click', onTrustedUserGesture, { passive: true });
-    window.addEventListener('keydown', onTrustedUserGesture);
-    window.addEventListener('focus', onVisibilityOrFocus);
-    document.addEventListener('visibilitychange', onVisibilityOrFocus);
-
-    return () => {
-      clearInterval(watchdogInterval);
-      if (permissionStatus) {
-        permissionStatus.onchange = null;
-      }
-      if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
-      if (maxSpeakTimerRef.current) clearTimeout(maxSpeakTimerRef.current);
-      if (hardwareVadRafRef.current) window.cancelAnimationFrame(hardwareVadRafRef.current);
-      if (hardwareAudioCtxRef.current) {
-        try {
-          hardwareAudioCtxRef.current.close();
-        } catch {}
-        hardwareAudioCtxRef.current = null;
-      }
-      if (hardwareAudioStreamRef.current) {
-        try {
-          hardwareAudioStreamRef.current.getTracks().forEach((t) => t.stop());
-        } catch {}
-        hardwareAudioStreamRef.current = null;
-      }
-      window.removeEventListener('pointerdown', onTrustedUserGesture);
-      window.removeEventListener('touchend', onTrustedUserGesture);
-      window.removeEventListener('click', onTrustedUserGesture);
-      window.removeEventListener('keydown', onTrustedUserGesture);
-      window.removeEventListener('focus', onVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', onVisibilityOrFocus);
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.onend = null;
-          recognitionRef.current.abort();
-        } catch {}
-        recognitionRef.current = null;
-      }
-      isListeningRef.current = false;
-    };
-  }, [handleRobotDirectWake, handleSpokenTranscript, showInsi]);
+  }, [handleSpokenTranscript, speakWithoutEcho, triggerTaskFlightOrbit]);
 
   // Subscribe to `insi` controller events & legacy `insi:summon` events
   useEffect(() => {
@@ -925,16 +1015,17 @@ export default function InsiPetBot({
           hideTimerRef.current = setTimeout(() => {
             setVisible(false);
             setLeaving(false);
-          }, 550);
+          }, 500);
           return;
         }
-        showInsi(detail.state || 'idle', {
+        showInsi(detail.state || 'perched', {
           prop: detail.prop,
           size: detail.size,
           auraColor: detail.auraColor,
           durationMs: detail.durationMs,
           corner: detail.corner,
-          sound: detail.sound
+          sound: detail.sound,
+          message: detail.message
         });
       });
     };
@@ -944,7 +1035,7 @@ export default function InsiPetBot({
       if (action === 'signin') {
         insi.react('signin');
       } else if (action === 'dataset') {
-        insi.react('charts_ready');
+        triggerTaskFlightOrbit('Dataset synchronized · Flying over active charts');
       } else if (action === 'voice' || action === 'audio') {
         insi.react('audio_sync');
       } else if (action === 'quota') {
@@ -964,41 +1055,28 @@ export default function InsiPetBot({
       }
     };
 
-    const onAudioPlay = () => {
-      insi.audioSync();
-    };
-
     window.addEventListener('insi:state', onControllerState);
     window.addEventListener('insi:summon', onLegacySummon);
-    document.addEventListener('play', onAudioPlay, true);
 
     return () => {
       window.removeEventListener('insi:state', onControllerState);
       window.removeEventListener('insi:summon', onLegacySummon);
-      document.removeEventListener('play', onAudioPlay, true);
     };
-  }, [clearTimers, showInsi]);
+  }, [clearTimers, showInsi, triggerTaskFlightOrbit]);
 
-  // Initial website load: insi appears in compact form, waves, flexes, and roams
+  // Keyboard accessibility: Alt+I toggles INSI Assistant Panel; Escape closes panel
   useEffect(() => {
-    const bootTimer = setTimeout(() => {
-      showInsi('waving', {
-        prop: 'chair_laptop',
-        size: 'sm',
-        corner: 'bottom-right',
-        durationMs: 4400
-      });
-      stepTimerRef.current = setTimeout(() => {
-        setAnimState('flexing');
-        setActiveProp('flex_muscles');
-      }, 1600);
-    }, 1400);
-
-    return () => {
-      clearTimeout(bootTimer);
-      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+    const onKeyDown = (e) => {
+      if (e.altKey && (e.key === 'i' || e.key === 'I')) {
+        e.preventDefault();
+        setPanelOpen((prev) => !prev);
+      } else if (e.key === 'Escape' && panelOpen) {
+        setPanelOpen(false);
+      }
     };
-  }, [showInsi]);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [panelOpen]);
 
   useEffect(() => {
     if (emptyDashboard) {
@@ -1006,618 +1084,843 @@ export default function InsiPetBot({
     }
   }, [emptyDashboard]);
 
-  // Long inactivity (60s): sleeps quietly, wakes up surprised when user moves/clicks
-  useEffect(() => {
-    const scheduleInactivitySleep = () => {
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      inactivityTimerRef.current = setTimeout(() => {
-        sleepingFromInactivityRef.current = true;
-        showInsi('sleeping', {
-          prop: 'chair_laptop',
-          size: 'sm',
-          corner: 'bottom-right',
-          durationMs: 6800,
-          sound: 'snore'
-        });
-      }, 60000);
+  // Handle text command form submit
+  const handleCommandFormSubmit = (e) => {
+    e.preventDefault();
+    const trimmed = commandInput.trim();
+    if (!trimmed) return;
+    setCommandInput('');
+    handleSpokenTranscript(trimmed, { requireWakeWord: false, speakReply: true });
+  };
+
+  // Handle Consequential Action Confirmation Gate
+  const handleConfirmPendingAction = () => {
+    if (!pendingConfirmation) return;
+    const { cleanCommand, route } = pendingConfirmation;
+    setPendingConfirmation(null);
+    executeVerifiedAction(cleanCommand, route, { speakReply: true });
+  };
+
+  const handleCancelPendingAction = () => {
+    if (!pendingConfirmation) return;
+    const cancelledLabel = pendingConfirmation.route?.label || pendingConfirmation.cleanCommand;
+    setPendingConfirmation(null);
+    setAnimState(isListeningRef.current ? 'listening' : 'perched');
+    appendLog({
+      kind: 'info',
+      title: 'Action Cancelled',
+      detail: `Cancelled "${cancelledLabel}". No changes were made.`
+    });
+  };
+
+  // Editable Command Router handlers
+  const handleSaveEditedTriggers = (routeId) => {
+    const triggers = editingTriggersText
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    if (!triggers.length) return;
+    setCommandRouter((prev) =>
+      prev.map((r) => (r.id === routeId ? { ...r, triggers } : r))
+    );
+    setEditingRouteId(null);
+    setEditingTriggersText('');
+  };
+
+  const handleToggleRouteConfirmation = (routeId) => {
+    setCommandRouter((prev) =>
+      prev.map((r) => (r.id === routeId ? { ...r, requiresConfirmation: !r.requiresConfirmation } : r))
+    );
+  };
+
+  const handleAddCustomRoute = (e) => {
+    e.preventDefault();
+    const label = newRouteLabel.trim();
+    const triggers = newRouteTriggers
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    const cmd = newRouteCommand.trim();
+    if (!label || !triggers.length || !cmd) return;
+
+    const customRoute = {
+      id: `custom_${Date.now()}`,
+      label,
+      triggers,
+      actionType: 'analytics',
+      commandText: cmd,
+      birdMotion: 'orbiting',
+      requiresConfirmation: newRouteConfirm,
+      confirmationNote: `Task committed. Executed custom route "${label}".`
     };
+    setCommandRouter((prev) => [customRoute, ...prev]);
+    setNewRouteLabel('');
+    setNewRouteTriggers('');
+    setNewRouteCommand('');
+    setNewRouteConfirm(false);
+    appendLog({
+      kind: 'success',
+      title: 'Added Custom Command Route',
+      detail: `"${label}" now triggers on [${triggers.join(', ')}].`
+    });
+  };
 
-    const handleUserActivity = () => {
-      if (sleepingFromInactivityRef.current) {
-        sleepingFromInactivityRef.current = false;
-        showInsi('surprised', {
-          prop: 'chair_laptop',
-          size: 'sm',
-          corner: 'bottom-right',
-          durationMs: 2800
-        });
-      }
-      scheduleInactivitySleep();
-    };
+  const handleResetRouterDefaults = () => {
+    setCommandRouter([...DEFAULT_INSI_COMMAND_ROUTER]);
+    appendLog({
+      kind: 'info',
+      title: 'Command Router Reset',
+      detail: 'Restored default InsightBoard command routes.'
+    });
+  };
 
-    scheduleInactivitySleep();
-    window.addEventListener('pointerdown', handleUserActivity, { passive: true });
-    window.addEventListener('keydown', handleUserActivity, { passive: true });
+  // Resolve Dove Stage Coordinates (Orbiting Flight vs Cursor-Follow vs Active Tab Perch vs Corner)
+  const resolvedStageStyle = useMemo(() => {
+    if (isOrbitingTask && !reducedMotion) {
+      return {
+        top: '22%',
+        left: '48%',
+        bottom: 'auto',
+        right: 'auto'
+      };
+    }
+    if (followCursorMode && cursorCoords.x > 0 && !reducedMotion) {
+      return {
+        left: `${cursorCoords.x}px`,
+        top: `${cursorCoords.y}px`,
+        bottom: 'auto',
+        right: 'auto'
+      };
+    }
+    if (corner === 'active-tab-perch' && activeTabCoords) {
+      return activeTabCoords;
+    }
+    return CORNER_POSITIONS[corner] || CORNER_POSITIONS['bottom-right'];
+  }, [activeTabCoords, corner, cursorCoords, followCursorMode, isOrbitingTask, reducedMotion]);
 
-    return () => {
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      window.removeEventListener('pointerdown', handleUserActivity);
-      window.removeEventListener('keydown', handleUserActivity);
-    };
-  }, [showInsi]);
+  const isListeningActive = voiceStatus === 'listening_wake' || voiceStatus === 'push_to_talk';
 
-  // Ambient roaming guardian cycle: roams headings, flexes, dances, pulls dashboard, checks security
-  useEffect(() => {
-    const ambientInterval = setInterval(() => {
-      if (sleepingFromInactivityRef.current) return;
-      const pick = AMBIENT_ACTIVITIES[activityIdxRef.current % AMBIENT_ACTIVITIES.length];
-      activityIdxRef.current += 1;
-      showInsi(pick.state, {
-        prop: pick.prop,
-        size: pick.size,
-        corner: pick.corner,
-        durationMs: 4800
-      });
-    }, 45000);
-
-    return () => clearInterval(ambientInterval);
-  }, [showInsi]);
-
-  if (!visible) return null;
-
-  const posStyle = CORNER_POSITIONS[corner] || CORNER_POSITIONS['bottom-right'];
-  const showChairAndBooks =
-    (activeProp === 'chair_laptop' || activeProp === 'coffee_chair') &&
-    animState !== 'roaming_heading' &&
-    animState !== 'walking' &&
-    animState !== 'dancing' &&
-    animState !== 'flexing' &&
-    animState !== 'pulling_dashboard' &&
-    animState !== 'malware_alert' &&
-    animState !== 'legal_alert';
+  // Filter Indian & English voices for selector
+  const selectableVoices = useMemo(() => {
+    const indian = availableVoices.filter(
+      (v) => /en[-_]IN|hi[-_]IN/i.test(v.lang) || /india|hindi|heera|swara|rishi|lekha|neerja/i.test(v.name)
+    );
+    const others = availableVoices.filter((v) => /^en/i.test(v.lang) && !indian.includes(v)).slice(0, 6);
+    return [...indian, ...others];
+  }, [availableVoices]);
 
   return (
-    <div
-      className={`insi-pet-stage ${leaving ? 'insi-leaving' : 'insi-entering'} state-${animState} prop-${activeProp} size-${sizeVariant} corner-${corner}`}
-      style={{
-        ...posStyle,
-        '--insi-aura': auraColor,
-        '--insi-head-tilt': `${eyeOffset.headTilt}deg`
-      }}
-      data-testid="insi-ai-mascot"
-      data-insi-state={animState}
-      data-insi-prop={activeProp}
-      data-insi-size={sizeVariant}
-      data-insi-aura={auraColor}
-      aria-hidden="true"
-    >
-      {/* Pure Emotive Non-Verbal Expressions Layer (Zero Text Below Mascot) */}
-      <div className="insi-fx-layer">
-        {animState === 'sleeping' && (
-          <div className="insi-zzz-group">
-            <span className="insi-z z1">z</span>
-            <span className="insi-z z2">Z</span>
-            <span className="insi-z z3">Z</span>
+    <>
+      {/* 1. Animated INSI Dove Avatar (Perched on Active Tab or Flying Across Workspace) */}
+      {visible && (
+        <div
+          className={`insi-pet-stage ${leaving ? 'insi-leaving' : 'insi-entering'} state-${animState} prop-${activeProp} size-${sizeVariant} corner-${corner} ${
+            isOrbitingTask ? 'insi-orbit-flight-active' : ''
+          } ${reducedMotion ? 'insi-reduced-motion' : ''}`}
+          style={{
+            ...resolvedStageStyle,
+            '--insi-aura': auraColor,
+            '--insi-head-tilt': `${pointerTrack.headTilt}deg`,
+            '--insi-facing-dir': pointerTrack.facingLeft ? -1 : 1
+          }}
+          data-testid="insi-ai-mascot"
+          data-insi-state={animState}
+          data-insi-prop={activeProp}
+          data-insi-size={sizeVariant}
+          data-insi-aura={auraColor}
+          data-insi-corner={corner}
+          data-insi-voice-status={voiceStatus}
+          role="button"
+          tabIndex={0}
+          aria-label={`INSI Dove Assistant (${animState}). Click to open or close INSI Assistant Panel.`}
+          title={`INSI Dove Assistant — Perched on ${activeTabLabel}. Click to open controls or say "Hey, INSI"`}
+          onClick={() => setPanelOpen((prev) => !prev)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setPanelOpen((prev) => !prev);
+            }
+          }}
+        >
+          {/* Emotive FX Layer Above Dove (Musical Notes, Sparkles, Sleep Zzz, Confused ?, Listening Waves) */}
+          <div className="insi-fx-layer" aria-hidden="true">
+            {animState === 'sleeping' && (
+              <div className="insi-zzz-group">
+                <span className="insi-z z1">z</span>
+                <span className="insi-z z2">Z</span>
+                <span className="insi-z z3">Z</span>
+              </div>
+            )}
+
+            {(animState === 'confused' || animState === 'error' || animState === 'malware_alert' || animState === 'legal_alert') && (
+              <div className="insi-question-bubble">!</div>
+            )}
+
+            {(animState === 'thinking' || animState === 'heavy_ai') && (
+              <div className="insi-ai-energy-crown">
+                <span className="energy-orb o1" />
+                <span className="energy-orb o2" />
+                <span className="energy-orb o3" />
+              </div>
+            )}
+
+            {(animState === 'audio_sync' || animState === 'dancing' || animState === 'speaking' || isSpeakingState) && (
+              <div className="insi-music-notes">
+                <span className="m-note n1">♪</span>
+                <span className="m-note n2">♫</span>
+                <span className="m-note n3">♬</span>
+              </div>
+            )}
+
+            {(animState === 'celebrating' ||
+              animState === 'magic_import' ||
+              animState === 'orbiting' ||
+              animState === 'security_pass') && (
+              <div className="insi-sparkles">
+                <span className="spark s1">✦</span>
+                <span className="spark s2">★</span>
+                <span className="spark s3">✦</span>
+              </div>
+            )}
           </div>
-        )}
-        {(animState === 'confused' || animState === 'malware_alert' || animState === 'legal_alert') && (
-          <div className="insi-emotive-bubbles">
-            <span
-              className="insi-question-bubble"
-              style={{
-                background:
-                  animState === 'malware_alert'
-                    ? 'linear-gradient(135deg, #ef4444, #b91c1c)'
-                    : animState === 'legal_alert'
-                    ? 'linear-gradient(135deg, #f59e0b, #b45309)'
-                    : undefined
-              }}
-            >
-              {animState === 'malware_alert' ? '!' : animState === 'legal_alert' ? '§' : '?'}
+
+          {/* Main Dove Rig */}
+          <div className="insi-robot-rig insi-dove-rig">
+            <div className="insi-ambient-halo" />
+
+            {/* Active Listening Sonar Rings */}
+            {(isListeningActive || animState === 'listening') && (
+              <>
+                <div className="insi-listening-sonar sonar-1" />
+                <div className="insi-listening-sonar sonar-2" />
+              </>
+            )}
+
+            {(animState === 'heavy_ai' ||
+              animState === 'magic_import' ||
+              animState === 'orbiting' ||
+              animState === 'malware_alert' ||
+              animState === 'legal_alert') && <div className="insi-quantum-ring-outer" />}
+
+            <div className="insi-dove-body-wrap">
+              {!doveImgFailed ? (
+                <img
+                  src={DOVE_IMAGE_URL}
+                  alt="INSI white and silver-gray dove assistant with vivid blue wing feathers"
+                  className="insi-dove-artwork"
+                  draggable={false}
+                  onError={() => setDoveImgFailed(true)}
+                />
+              ) : (
+                /* Vector Dove Fallback (Zero-Broken-Image Policy) */
+                <svg viewBox="0 0 120 120" className="insi-dove-fallback-svg" aria-hidden="true">
+                  <path
+                    d="M28 74 C22 52, 42 32, 68 38 C78 22, 98 18, 106 32 C94 42, 88 52, 92 64 C102 66, 108 72, 102 78 C86 84, 54 88, 28 74 Z"
+                    fill="#f8fafc"
+                    stroke="#38bdf8"
+                    strokeWidth="3"
+                  />
+                  <path d="M44 54 C56 32, 78 26, 94 34 C78 48, 66 58, 44 54 Z" fill="#0ea5e9" />
+                  <circle cx="84" cy="48" r="3.5" fill="#0f172a" />
+                  <polygon points="94,48 106,51 94,54" fill="#334155" />
+                </svg>
+              )}
+
+              {/* Natural Eye-Blink & Cursor-Tracking Glint Overlay */}
+              <div
+                className="insi-dove-eye-blink"
+                style={{
+                  transform: `translate(${pointerTrack.eyeX}px, ${pointerTrack.eyeY}px)`
+                }}
+                aria-hidden="true"
+              />
+
+              {/* Avian Props (Magic Wand Sparkle, Security Shield, Speaking Waveform) */}
+              {(animState === 'magic_import' || animState === 'celebrating') && (
+                <span className="insi-dove-prop-badge prop-magic" aria-hidden="true">
+                  ✨
+                </span>
+              )}
+              {(animState === 'malware_alert' || animState === 'security_scan' || animState === 'security_pass') && (
+                <span className="insi-dove-prop-badge prop-shield" aria-hidden="true">
+                  🛡️
+                </span>
+              )}
+            </div>
+
+            {/* Perch Branch / Tab Grip Shadow under Dove Claws */}
+            <div className="insi-dove-perch-bar" aria-hidden="true">
+              <span className="perch-glow-dot" />
+            </div>
+          </div>
+
+          {/* Live Status Pill under Dove */}
+          <div className={`insi-dove-status-pill ${isListeningActive ? 'is-listening' : ''} ${isSpeakingState ? 'is-speaking' : ''}`}>
+            <span className="insi-status-dot" />
+            <span className="insi-status-label">
+              {voiceStatus === 'listening_wake'
+                ? 'Listening: "Hey, INSI"'
+                : voiceStatus === 'push_to_talk'
+                ? 'Push-to-Talk Active'
+                : isSpeakingState
+                ? 'INSI Speaking…'
+                : isOrbitingTask
+                ? 'Flying Task Round…'
+                : `INSI · ${activeTabLabel}`}
             </span>
           </div>
-        )}
-        {(animState === 'heavy_ai' || animState === 'thinking' || animState === 'flexing') && (
-          <div className="insi-ai-energy-crown">
-            <span className="energy-orb o1" />
-            <span className="energy-orb o2" />
-            <span className="energy-orb o3" />
-          </div>
-        )}
-        {(animState === 'audio_sync' || animState === 'dancing') && (
-          <div className="insi-music-notes">
-            <span className="m-note n1">♪</span>
-            <span className="m-note n2">♫</span>
-            <span className="m-note n3">♬</span>
-          </div>
-        )}
-        {(animState === 'magic_import' || animState === 'celebrating' || animState === 'happy' || animState === 'security_pass') && (
-          <div className="insi-sparkles">
-            <span className="spark s1">✦</span>
-            <span className="spark s2">★</span>
-            <span className="spark s3">✦</span>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Compact, Nimble 3D Futuristic White & Metallic-Blue Robot Guardian Rig */}
-      <div
-        className="insi-robot-rig"
-        onClick={handleRobotDirectWake}
-        title="Click INSI (or press Alt+I) to wake & activate voice assistant"
-      >
-        <div className="insi-ambient-halo" />
-        {(animState === 'heavy_ai' || activeProp === 'ai_power_core' || animState === 'malware_alert') && (
-          <div className="insi-quantum-ring-outer" />
-        )}
-
-        <svg
-          className="insi-robot-svg"
-          viewBox="0 0 180 176"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+      {/* 2. Floating Bottom-Right INSI Control Dock Button (Always Accessible to Open/Close Panel & Toggle Voice) */}
+      <div className="insi-floating-dock" role="region" aria-label="INSI Dove Assistant Controls">
+        <button
+          type="button"
+          className={`insi-dock-toggle-btn ${panelOpen ? 'active' : ''} ${isListeningActive ? 'listening' : ''}`}
+          onClick={() => setPanelOpen((prev) => !prev)}
+          aria-expanded={panelOpen}
+          aria-controls="insi-assistant-panel"
+          aria-label={panelOpen ? 'Close INSI Assistant Panel' : 'Open INSI Assistant Panel'}
         >
-          <defs>
-            <linearGradient id="insi-white-shell" x1="15%" y1="5%" x2="85%" y2="95%">
-              <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="55%" stopColor="#f1f5f9" />
-              <stop offset="100%" stopColor="#cbd5e1" />
-            </linearGradient>
-
-            <radialGradient id="insi-head-dome" cx="35%" cy="25%" r="72%">
-              <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="60%" stopColor="#f8fafc" />
-              <stop offset="100%" stopColor="#cbd5e1" />
-            </radialGradient>
-
-            <linearGradient id="insi-sky-bezel" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#93c5fd" />
-              <stop offset="45%" stopColor="#3b82f6" />
-              <stop offset="100%" stopColor="#1d4ed8" />
-            </linearGradient>
-
-            <linearGradient id="insi-metallic-blue" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#60a5fa" />
-              <stop offset="50%" stopColor="#2563eb" />
-              <stop offset="100%" stopColor="#1e3a8a" />
-            </linearGradient>
-
-            <linearGradient id="insi-visor-glass" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#0f172a" />
-              <stop offset="55%" stopColor="#060b16" />
-              <stop offset="100%" stopColor="#1e293b" />
-            </linearGradient>
-
-            <linearGradient id="insi-eye-glow" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#e0f2fe" />
-              <stop offset="45%" stopColor="#38bdf8" />
-              <stop offset="100%" stopColor="#0284c7" />
-            </linearGradient>
-
-            <linearGradient id="insi-chair-leather" x1="10%" y1="0%" x2="90%" y2="100%">
-              <stop offset="0%" stopColor="#d97706" />
-              <stop offset="48%" stopColor="#b45309" />
-              <stop offset="100%" stopColor="#78350f" />
-            </linearGradient>
-
-            <linearGradient id="insi-chair-inner" x1="20%" y1="0%" x2="80%" y2="100%">
-              <stop offset="0%" stopColor="#f59e0b" />
-              <stop offset="40%" stopColor="#b45309" />
-              <stop offset="100%" stopColor="#451a03" />
-            </linearGradient>
-
-            <linearGradient id="insi-magic-gold" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#fef08a" />
-              <stop offset="50%" stopColor="#facc15" />
-              <stop offset="100%" stopColor="#eab308" />
-            </linearGradient>
-          </defs>
-
-          <ellipse
-            className="insi-floor-shadow"
-            cx="95"
-            cy="164"
-            rx="46"
-            ry="6.5"
-            fill="rgba(15, 23, 42, 0.28)"
+          <img
+            src={DOVE_IMAGE_URL}
+            alt=""
+            className="insi-dock-thumb"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
           />
+          <span className="insi-dock-text">
+            <strong>INSI Dove</strong>
+            <small>
+              {voiceStatus === 'listening_wake'
+                ? '● Listening ("Hey, INSI")'
+                : voiceStatus === 'push_to_talk'
+                ? '● Push-to-Talk'
+                : voiceStatus === 'permission_denied'
+                ? '⚠ Mic Blocked'
+                : 'Voice & Action Router'}
+            </small>
+          </span>
+          <span className="insi-dock-chevron" aria-hidden="true">
+            {panelOpen ? '✕' : '▲'}
+          </span>
+        </button>
 
-          {/* SCENE OBJECT 1: COGNAC-BROWN PEDESTAL ARMCHAIR & STACK OF BOOKS */}
-          {showChairAndBooks && (
-            <g className="insi-chair-and-books">
-              <g className="insi-book-stack">
-                <rect x="14" y="152" width="34" height="6" rx="1.5" fill="#cbd5e1" stroke="#475569" strokeWidth="1" />
-                <rect x="16" y="146" width="31" height="6" rx="1.5" fill="#94a3b8" stroke="#334155" strokeWidth="1" />
-                <rect x="15" y="140" width="30" height="6" rx="1.5" fill="#b45309" stroke="#78350f" strokeWidth="1" />
-                <rect x="18" y="134" width="27" height="6" rx="1.5" fill="#64748b" stroke="#1e293b" strokeWidth="1" />
-                <rect x="19" y="128" width="25" height="6" rx="1.5" fill="#d97706" stroke="#78350f" strokeWidth="1" />
-                <rect x="21" y="122" width="22" height="6" rx="1.5" fill="#e2e8f0" stroke="#475569" strokeWidth="1" />
-              </g>
-
-              <path
-                d="M78 138 L98 138 L108 156 C108 159, 68 159, 68 156 Z"
-                fill="url(#insi-chair-leather)"
-                stroke="#78350f"
-                strokeWidth="1.2"
-              />
-              <ellipse cx="88" cy="157" rx="22" ry="4" fill="#78350f" />
-
-              <path
-                d="M46 68 C44 54, 128 54, 130 70 L134 118 C134 134, 114 142, 90 142 C64 142, 48 132, 48 116 Z"
-                fill="url(#insi-chair-leather)"
-                stroke="#fbbf24"
-                strokeWidth="1.2"
-                strokeOpacity="0.45"
-              />
-              <path
-                d="M54 72 C54 60, 122 60, 122 72 L124 116 C124 128, 108 135, 89 135 C68 135, 55 127, 55 114 Z"
-                fill="url(#insi-chair-inner)"
-              />
-            </g>
-          )}
-
-          {/* ROBOT TORSO WITH FRIENDLY GEOMETRIC CHEST SMILEY (:U:) */}
-          <g className="insi-robot-torso">
-            <rect x="83" y="69" width="16" height="10" rx="4" fill="url(#insi-metallic-blue)" />
-            <line x1="84" y1="74" x2="98" y2="74" stroke="#93c5fd" strokeWidth="1.4" />
-            <ellipse cx="91" cy="80" rx="16" ry="4" fill="url(#insi-sky-bezel)" />
-
-            <path
-              d="M66 80 C66 75, 116 75, 116 80 L112 116 C112 122, 70 122, 70 116 Z"
-              fill="url(#insi-white-shell)"
-              stroke="#cbd5e1"
-              strokeWidth="1.4"
-            />
-
-            <g className="insi-chest-emblem" stroke="#1e293b" strokeWidth="1.6" strokeLinecap="round">
-              <path d="M84 89 Q86 86 89 88" fill="none" />
-              <path d="M94 88 Q97 86 99 89" fill="none" />
-              <circle cx="85" cy="95" r="1.2" fill="#1e293b" />
-              <circle cx="98" cy="95" r="1.2" fill="#1e293b" />
-              <path d="M88 94 L88 101 C88 104, 95 104, 95 101 L95 94" fill="none" />
-              <line x1="87" y1="107" x2="96" y2="107" strokeWidth="1.2" strokeDasharray="1.5 1.5" />
-            </g>
-          </g>
-
-          {/* ROBOT LEGS, METALLIC BLUE KNEE JOINTS & SCULPTED SHOES */}
-          <g className="insi-robot-legs">
-            <rect x="73" y="114" width="36" height="10" rx="5" fill="url(#insi-metallic-blue)" />
-
-            <g className="insi-leg-left">
-              <circle cx="80" cy="124" r="7.5" fill="url(#insi-sky-bezel)" stroke="#1e3a8a" strokeWidth="1.2" />
-              <path
-                d="M73 126 L87 126 L85 151 L75 151 Z"
-                fill="url(#insi-white-shell)"
-                stroke="#94a3b8"
-                strokeWidth="1.2"
-              />
-              <circle cx="73" cy="153" r="4.5" fill="#1e293b" stroke="#93c5fd" strokeWidth="1.2" />
-              <path
-                d="M72 149 C72 143, 95 143, 96 154 C96 159, 72 159, 72 154 Z"
-                fill="url(#insi-white-shell)"
-                stroke="#60a5fa"
-                strokeWidth="1.4"
-              />
-              <path d="M80 154 Q88 151 95 155" stroke="url(#insi-sky-bezel)" strokeWidth="3" strokeLinecap="round" />
-            </g>
-
-            <g className="insi-leg-right">
-              <circle cx="104" cy="124" r="7.5" fill="url(#insi-sky-bezel)" stroke="#1e3a8a" strokeWidth="1.2" />
-              <path
-                d="M97 126 L111 126 L109 151 L99 151 Z"
-                fill="url(#insi-white-shell)"
-                stroke="#94a3b8"
-                strokeWidth="1.2"
-              />
-              <circle cx="98" cy="153" r="4.5" fill="#1e293b" stroke="#93c5fd" strokeWidth="1.2" />
-              <path
-                d="M97 149 C97 143, 120 143, 121 154 C121 159, 97 159, 97 154 Z"
-                fill="url(#insi-white-shell)"
-                stroke="#60a5fa"
-                strokeWidth="1.4"
-              />
-              <path d="M105 154 Q113 151 120 155" stroke="url(#insi-sky-bezel)" strokeWidth="3" strokeLinecap="round" />
-            </g>
-          </g>
-
-          {/* LEFT ARM & ARTICULATED BLUE HAND */}
-          <g className="insi-arm-left">
-            <circle cx="63" cy="86" r="7.5" fill="url(#insi-sky-bezel)" stroke="#1e3a8a" strokeWidth="1.1" />
-            <ellipse cx="60" cy="86" rx="2.5" ry="4" fill="#e2e8f0" />
-            <rect
-              x="54"
-              y="91"
-              width="13"
-              height="22"
-              rx="6.5"
-              transform="rotate(-12 54 91)"
-              fill="url(#insi-white-shell)"
-              stroke="#94a3b8"
-              strokeWidth="1.1"
-            />
-            <circle cx="67" cy="110" r="5.5" fill="url(#insi-metallic-blue)" />
-            <path d="M70 108 L76 108 M70 111 L76 111" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" />
-          </g>
-
-          {/* LAPTOP WITH "101" ON LID */}
-          {showChairAndBooks && activeProp === 'chair_laptop' && (
-            <g className="insi-prop-laptop101">
-              <rect x="78" y="111" width="34" height="5" rx="2" fill="#92400e" stroke="#f59e0b" strokeWidth="0.9" />
-              <polygon
-                points="98,112 114,82 140,82 124,112"
-                fill="url(#insi-white-shell)"
-                stroke="#94a3b8"
-                strokeWidth="1.3"
-              />
-              <text
-                x="119"
-                y="103"
-                textAnchor="middle"
-                fill="#64748b"
-                fontSize="13"
-                fontWeight="700"
-                fontFamily="monospace"
-                transform="skewX(-24)"
-              >
-                101
-              </text>
-            </g>
-          )}
-
-          {/* RIGHT ARM + DYNAMIC OBJECT PROPS */}
-          <g className="insi-arm-right">
-            <circle cx="118" cy="86" r="7.5" fill="url(#insi-sky-bezel)" stroke="#1e3a8a" strokeWidth="1.1" />
-            <rect
-              x="114"
-              y="90"
-              width="13"
-              height="22"
-              rx="6.5"
-              fill="url(#insi-white-shell)"
-              stroke="#94a3b8"
-              strokeWidth="1.1"
-            />
-            <circle cx="121" cy="111" r="5.5" fill="url(#insi-metallic-blue)" />
-
-            {/* MAGICIAN STICK / MAGIC WAND (When Data is Imported) */}
-            {(activeProp === 'magician_wand' || animState === 'magic_import') && (
-              <g className="insi-prop-wand">
-                <line x1="121" y1="110" x2="156" y2="68" stroke="#0f172a" strokeWidth="4.2" strokeLinecap="round" />
-                <line x1="121" y1="110" x2="127" y2="103" stroke="#f8fafc" strokeWidth="4.2" strokeLinecap="round" />
-                <line x1="149" y1="76" x2="156" y2="68" stroke="#fef08a" strokeWidth="4.4" strokeLinecap="round" />
-                <polygon
-                  className="insi-wand-star"
-                  points="158,56 161,63 169,64 163,69 165,76 158,72 151,76 153,69 147,64 155,63"
-                  fill="url(#insi-magic-gold)"
-                  stroke="#ffffff"
-                  strokeWidth="1"
-                />
-                <path
-                  className="insi-magic-arc"
-                  d="M156 64 Q128 24 64 42"
-                  stroke="url(#insi-magic-gold)"
-                  strokeWidth="2.2"
-                  strokeDasharray="4 4"
-                  fill="none"
-                />
-              </g>
-            )}
-
-            {/* STEAMING ESPRESSO CUP */}
-            {(activeProp === 'coffee_chair' || animState === 'drinking') && (
-              <g className="insi-prop-coffee">
-                <rect x="116" y="96" width="15" height="16" rx="3.5" fill="#ffffff" stroke="#b45309" strokeWidth="1.5" />
-                <rect x="116" y="101" width="15" height="6" fill="#b45309" />
-                <path d="M131 99 C136 99, 136 108, 131 108" stroke="#ffffff" strokeWidth="1.8" fill="none" />
-              </g>
-            )}
-          </g>
-
-          {/* CYBER-GUARDIAN SECURITY / VIRUS / MALWARE SHIELD & DEVELOPER LEGAL GAVEL */}
-          {(activeProp === 'security_shield' ||
-            animState === 'malware_alert' ||
-            animState === 'security_pass' ||
-            animState === 'security_scan') && (
-            <g className="insi-prop-security-shield">
-              <path
-                d="M140 66 L164 74 L164 98 C164 114, 152 124, 140 130 C128 124, 116 114, 116 98 L116 74 Z"
-                fill={animState === 'malware_alert' ? 'rgba(239, 68, 68, 0.88)' : 'rgba(16, 185, 129, 0.88)'}
-                stroke="#ffffff"
-                strokeWidth="2"
-              />
-              {animState === 'malware_alert' ? (
-                <path
-                  d="M132 88 L148 104 M148 88 L132 104"
-                  stroke="#ffffff"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                />
-              ) : (
-                <path
-                  d="M131 96 L138 103 L151 89"
-                  stroke="#ffffff"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-              )}
-            </g>
-          )}
-
-          {(activeProp === 'legal_gavel' || animState === 'legal_alert') && (
-            <g className="insi-prop-legal">
-              <circle cx="142" cy="96" r="22" fill="rgba(245, 158, 11, 0.9)" stroke="#ffffff" strokeWidth="2" />
-              <line x1="142" y1="80" x2="142" y2="112" stroke="#ffffff" strokeWidth="2.5" />
-              <line x1="128" y1="88" x2="156" y2="88" stroke="#ffffff" strokeWidth="2.5" />
-              <polygon points="128,88 123,98 133,98" fill="#ffffff" />
-              <polygon points="156,88 151,98 161,98" fill="#ffffff" />
-            </g>
-          )}
-
-          {/* HEAVY AI QUANTUM CORE */}
-          {(activeProp === 'ai_power_core' || animState === 'heavy_ai') && (
-            <g className="insi-prop-aicore">
-              <circle
-                className="insi-quantum-orb"
-                cx="91"
-                cy="105"
-                r="16"
-                fill="rgba(56, 189, 248, 0.25)"
-                stroke="#38bdf8"
-                strokeWidth="2"
-              />
-              <circle cx="91" cy="105" r="6" fill="#e0f2fe" />
-            </g>
-          )}
-
-          {/* HOLOGRAPHIC 3D CHART SCANNER */}
-          {(activeProp === 'chart_holo' || animState === 'viewing_charts') && (
-            <g className="insi-prop-chartholo">
-              <rect x="118" y="70" width="46" height="34" rx="6" fill="rgba(15, 23, 42, 0.84)" stroke="#38bdf8" strokeWidth="1.5" />
-              <rect className="holo-bar b1" x="125" y="88" width="6" height="10" rx="1.5" fill="#38bdf8" />
-              <rect className="holo-bar b2" x="135" y="81" width="6" height="17" rx="1.5" fill="#2dd4bf" />
-              <rect className="holo-bar b3" x="145" y="75" width="6" height="23" rx="1.5" fill="#fbbf24" />
-            </g>
-          )}
-
-          {/* AUDIO EQUALIZER WAVE DECK */}
-          {(activeProp === 'audio_deck' || animState === 'audio_sync' || animState === 'dancing') && (
-            <g className="insi-prop-audiodeck">
-              <rect x="56" y="112" width="70" height="20" rx="10" fill="rgba(15, 23, 42, 0.88)" stroke="#38bdf8" strokeWidth="1.5" />
-              <line className="eq-bar eq1" x1="68" y1="127" x2="68" y2="117" stroke="#38bdf8" strokeWidth="3.2" strokeLinecap="round" />
-              <line className="eq-bar eq2" x1="77" y1="128" x2="77" y2="115" stroke="#2dd4bf" strokeWidth="3.2" strokeLinecap="round" />
-              <line className="eq-bar eq3" x1="86" y1="128" x2="86" y2="114" stroke="#a855f7" strokeWidth="3.2" strokeLinecap="round" />
-              <line className="eq-bar eq4" x1="95" y1="128" x2="95" y2="116" stroke="#facc15" strokeWidth="3.2" strokeLinecap="round" />
-              <line className="eq-bar eq5" x1="104" y1="128" x2="104" y2="114" stroke="#f43f5e" strokeWidth="3.2" strokeLinecap="round" />
-              <line className="eq-bar eq6" x1="113" y1="127" x2="113" y2="118" stroke="#38bdf8" strokeWidth="3.2" strokeLinecap="round" />
-            </g>
-          )}
-
-          {/* SMOOTH ROUNDED WHITE DOME HEAD, BLUE VISOR BEZEL & MOTION-TRACKING EYES */}
-          <g className="insi-robot-head">
-            {(activeProp === 'audio_deck' || animState === 'audio_sync' || animState === 'dancing') && (
-              <path
-                d="M52 44 C52 10, 130 10, 130 44"
-                stroke="#38bdf8"
-                strokeWidth="4.5"
-                strokeLinecap="round"
-                fill="none"
-              />
-            )}
-
-            <rect
-              x="54"
-              y="18"
-              width="74"
-              height="54"
-              rx="27"
-              fill="url(#insi-head-dome)"
-              stroke="#cbd5e1"
-              strokeWidth="1.5"
-            />
-
-            <g className="insi-ear-left">
-              <ellipse cx="54" cy="45" rx="6" ry="11" fill="url(#insi-sky-bezel)" stroke="#1e3a8a" strokeWidth="1.1" />
-              <ellipse cx="53" cy="45" rx="3" ry="6" fill="#e2e8f0" />
-            </g>
-            <g className="insi-ear-right">
-              <ellipse cx="128" cy="45" rx="6" ry="11" fill="url(#insi-sky-bezel)" stroke="#1e3a8a" strokeWidth="1.1" />
-              <ellipse cx="129" cy="45" rx="3" ry="6" fill="#e2e8f0" />
-            </g>
-
-            <path
-              d="M68 24 Q91 20 114 24"
-              stroke="#ffffff"
-              strokeWidth="2.6"
-              strokeLinecap="round"
-              opacity="0.92"
-            />
-
-            <rect
-              x="63"
-              y="29"
-              width="56"
-              height="33"
-              rx="15"
-              fill="url(#insi-sky-bezel)"
-              stroke="#1d4ed8"
-              strokeWidth="1.2"
-            />
-
-            <rect
-              x="67"
-              y="33"
-              width="48"
-              height="25"
-              rx="12"
-              fill="url(#insi-visor-glass)"
-            />
-
-            <path
-              d="M79 66 Q91 68 103 66"
-              stroke="#334155"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeDasharray="2 2"
-            />
-
-            {/* HUMAN FEELINGS & MOTION-TRACKING DIGITAL EYES */}
-            <g
-              className="insi-digital-eyes"
-              transform={`translate(${eyeOffset.x}, ${eyeOffset.y})`}
-            >
-              {animState === 'sleeping' ? (
-                <>
-                  <path d="M73 46 Q80 52 87 46" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" fill="none" />
-                  <path d="M95 46 Q102 52 109 46" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" fill="none" />
-                </>
-              ) : animState === 'malware_alert' ? (
-                <>
-                  {/* High-Risk Malware / Hacking Alert Crimson Visor Eyes */}
-                  <path d="M74 40 L86 50 M86 40 L74 50" stroke="#ef4444" strokeWidth="3.4" strokeLinecap="round" />
-                  <path d="M96 40 L108 50 M108 40 L96 50" stroke="#ef4444" strokeWidth="3.4" strokeLinecap="round" />
-                </>
-              ) : animState === 'legal_alert' ? (
-                <>
-                  {/* Developer Legal / Compliance Caution Amber Eyes */}
-                  <circle cx="80" cy="45" r="7" fill="#f59e0b" />
-                  <circle cx="102" cy="45" r="7" fill="#f59e0b" />
-                  <circle cx="80" cy="45" r="2.8" fill="#ffffff" />
-                  <circle cx="102" cy="45" r="2.8" fill="#ffffff" />
-                </>
-              ) : animState === 'happy' ||
-                animState === 'celebrating' ||
-                animState === 'dancing' ||
-                animState === 'magic_import' ||
-                animState === 'audio_sync' ||
-                animState === 'security_pass' ? (
-                <>
-                  <path d="M73 48 Q80 37 87 48" stroke="url(#insi-eye-glow)" strokeWidth="3.6" strokeLinecap="round" fill="none" />
-                  <path d="M95 48 Q102 37 109 48" stroke="url(#insi-eye-glow)" strokeWidth="3.6" strokeLinecap="round" fill="none" />
-                  <ellipse cx="72" cy="52" rx="3.5" ry="1.8" fill="#f472b6" opacity="0.65" />
-                  <ellipse cx="110" cy="52" rx="3.5" ry="1.8" fill="#f472b6" opacity="0.65" />
-                </>
-              ) : animState === 'confused' ? (
-                <>
-                  <rect x="73" y="43" width="13" height="7" rx="3.5" fill="url(#insi-eye-glow)" />
-                  <circle cx="102" cy="45" r="6.5" fill="url(#insi-eye-glow)" />
-                  <circle cx="100" cy="43" r="2" fill="#ffffff" />
-                </>
-              ) : (
-                <>
-                  <ellipse cx="80" cy="45" rx="7.5" ry="7" fill="url(#insi-eye-glow)" />
-                  <ellipse cx="102" cy="45" rx="7.5" ry="7" fill="url(#insi-eye-glow)" />
-                  <circle cx="80" cy="45" r="4.2" fill="#090d16" />
-                  <circle cx="102" cy="45" r="4.2" fill="#090d16" />
-                  <circle className="insi-eye-glint" cx="77.5" cy="42.5" r="2.2" fill="#ffffff" />
-                  <circle className="insi-eye-glint" cx="99.5" cy="42.5" r="2.2" fill="#ffffff" />
-                </>
-              )}
-            </g>
-          </g>
-        </svg>
+        {speechSupported && (
+          <button
+            type="button"
+            className={`insi-dock-mic-btn ${isListeningActive ? 'active' : ''}`}
+            onClick={() => {
+              if (isListeningActive) {
+                stopVoiceListening();
+              } else {
+                void startExplicitVoiceSession('continuous');
+              }
+            }}
+            aria-label={isListeningActive ? 'Stop INSI Voice Listening' : 'Enable INSI Voice ("Hey, INSI")'}
+            title={
+              isListeningActive
+                ? 'Stop listening and release microphone'
+                : 'Enable microphone wake-word listening ("Hey, INSI")'
+            }
+          >
+            {isListeningActive ? '⏹ Stop Mic' : '🎙 Enable Voice'}
+          </button>
+        )}
       </div>
-    </div>
+
+      {/* 3. Open / Close INSI Assistant Panel (Modal / Drawer) */}
+      {panelOpen && (
+        <aside
+          id="insi-assistant-panel"
+          className="insi-assistant-panel"
+          role="dialog"
+          aria-modal="false"
+          aria-label="INSI Dove Assistant & Local Command Router"
+          data-testid="insi-assistant-panel"
+        >
+          {/* Panel Header */}
+          <header className="insi-panel-header">
+            <div className="insi-panel-brand">
+              <div className="insi-panel-avatar-wrap">
+                <img
+                  src={DOVE_IMAGE_URL}
+                  alt="INSI Dove Avatar"
+                  className="insi-panel-avatar"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+              <div>
+                <h2 className="insi-panel-title">
+                  INSI Dove Assistant
+                  <span className="insi-local-badge">100% Browser-Local</span>
+                </h2>
+                <p className="insi-panel-subtitle">
+                  Default wake phrase: <strong>&ldquo;Hey, INSI&rdquo;</strong> (also recognizes{' '}
+                  <code>Hey I N S I</code>, <code>Hey Insee</code>, <code>Wake up Insee</code>)
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="insi-panel-close-btn"
+              onClick={() => setPanelOpen(false)}
+              aria-label="Close INSI Assistant Panel"
+            >
+              ✕
+            </button>
+          </header>
+
+          {/* Honest Browser & Wake-Word Scope Notice */}
+          <div className="insi-scope-banner">
+            <span>ℹ️</span>
+            <p>
+              Wake-word listening works only while this site tab is open and your browser supports Web Speech API. No
+              external AI, Gemini API key, or paid backend is used—commands run through the local router below and ask
+              before consequential actions.
+            </p>
+          </div>
+
+          {/* Voice Status & Explicit Microphone Controls */}
+          <section className="insi-voice-controls-card" aria-label="Voice and Microphone Controls">
+            <div className="insi-voice-status-row">
+              <div className={`insi-voice-indicator status-${voiceStatus}`}>
+                <span className="pulse-dot" />
+                <span>
+                  {voiceStatus === 'idle' && 'Voice Idle (Mic Off — Click Enable Voice to start)'}
+                  {voiceStatus === 'requesting_permission' && 'Requesting Microphone Permission…'}
+                  {voiceStatus === 'listening_wake' && 'Listening Actively for "Hey, INSI"…'}
+                  {voiceStatus === 'push_to_talk' && 'Push-to-Talk Active — Speak Command Now…'}
+                  {voiceStatus === 'permission_denied' && 'Microphone Permission Blocked in Browser'}
+                  {voiceStatus === 'unsupported' && 'Browser Speech Recognition Unavailable (Use Text/Buttons)'}
+                  {voiceStatus === 'error' && 'Voice Recognition Paused'}
+                </span>
+              </div>
+              {lastHeardTranscript && (
+                <span className="insi-last-heard" title="Last normalized transcript">
+                  Heard: &ldquo;{lastHeardTranscript}&rdquo;
+                </span>
+              )}
+            </div>
+
+            {voiceErrorMsg && (
+              <div className="insi-voice-error-box" role="alert">
+                {voiceErrorMsg}
+              </div>
+            )}
+
+            <div className="insi-voice-btn-grid">
+              {!isListeningActive ? (
+                <button
+                  type="button"
+                  className="insi-ctrl-btn primary"
+                  disabled={!speechSupported || voiceStatus === 'requesting_permission'}
+                  onClick={() => void startExplicitVoiceSession('continuous')}
+                >
+                  🎙 Enable Voice (&ldquo;Hey, INSI&rdquo;)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="insi-ctrl-btn danger"
+                  onClick={stopVoiceListening}
+                >
+                  ⏹ Stop Listening
+                </button>
+              )}
+
+              <button
+                type="button"
+                className={`insi-ctrl-btn ${voiceStatus === 'push_to_talk' ? 'active' : ''}`}
+                disabled={!speechSupported || voiceStatus === 'requesting_permission'}
+                onClick={() => void startExplicitVoiceSession('ptt')}
+              >
+                🗣 Push to Talk
+              </button>
+
+              <button
+                type="button"
+                className={`insi-ctrl-btn ${voiceMuted ? 'warning' : ''}`}
+                onClick={() => {
+                  setVoiceMuted((prev) => {
+                    const next = !prev;
+                    if (next && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                      window.speechSynthesis.cancel();
+                    }
+                    return next;
+                  });
+                }}
+              >
+                {voiceMuted ? '🔇 Voice Muted' : '🔊 Spoken Reply On'}
+              </button>
+            </div>
+
+            {/* Distinct Indian Voice Selector + Motion Controls */}
+            <div className="insi-voice-prefs-row">
+              <label className="insi-pref-label">
+                <span>Task Voice (Distinct from Summary):</span>
+                <select
+                  value={selectedVoiceURI}
+                  onChange={(e) => setSelectedVoiceURI(e.target.value)}
+                  className="insi-voice-select"
+                  aria-label="Select Indian Voice for INSI Task Completion"
+                >
+                  <option value="indian_distinct_auto">
+                    🇮🇳 Auto Distinct Indian Voice (Pitch 1.18x · Avian Chime)
+                  </option>
+                  {selectableVoices.map((v) => (
+                    <option key={v.voiceURI || v.name} value={v.voiceURI || v.name}>
+                      {v.name} ({v.lang})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="insi-motion-toggles">
+                <button
+                  type="button"
+                  className={`insi-mini-toggle ${followCursorMode ? 'on' : ''}`}
+                  onClick={() => setFollowCursorMode((prev) => !prev)}
+                  title="Toggle between perching on the active tab or flying near your mouse cursor"
+                >
+                  {followCursorMode ? '🕊️ Following Cursor' : '📌 Perched on Active Tab'}
+                </button>
+                <button
+                  type="button"
+                  className={`insi-mini-toggle ${reducedMotion ? 'on' : ''}`}
+                  onClick={() => setReducedMotion((prev) => !prev)}
+                >
+                  {reducedMotion ? '⏸ Reduced Motion On' : '✨ Full Bird Motion'}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* Consequential Action Confirmation Gate */}
+          {pendingConfirmation && (
+            <div className="insi-confirm-gate" role="alertdialog" aria-label="Confirm Consequential Action">
+              <div className="insi-confirm-header">
+                <strong>⚠️ Confirm Before INSI Executes</strong>
+              </div>
+              <p className="insi-confirm-desc">{pendingConfirmation.prompt}</p>
+              <div className="insi-confirm-actions">
+                <button
+                  type="button"
+                  className="insi-confirm-btn confirm"
+                  onClick={handleConfirmPendingAction}
+                >
+                  ✓ Confirm & Execute
+                </button>
+                <button
+                  type="button"
+                  className="insi-confirm-btn cancel"
+                  onClick={handleCancelPendingAction}
+                >
+                  ✕ Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Panel Mode Tabs: Assistant & Quick Actions vs Editable Local Command Router */}
+          <div className="insi-panel-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={panelTab === 'assistant'}
+              className={`insi-panel-tab ${panelTab === 'assistant' ? 'active' : ''}`}
+              onClick={() => setPanelTab('assistant')}
+            >
+              🕊️ Assistant & Quick Controls
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={panelTab === 'router'}
+              className={`insi-panel-tab ${panelTab === 'router' ? 'active' : ''}`}
+              onClick={() => setPanelTab('router')}
+            >
+              ⚙️ Local Command Router ({commandRouter.length})
+            </button>
+          </div>
+
+          {panelTab === 'assistant' ? (
+            <div className="insi-panel-body">
+              {/* Text Command Input (Always available when voice is off or unsupported) */}
+              <form className="insi-command-form" onSubmit={handleCommandFormSubmit}>
+                <input
+                  type="text"
+                  value={commandInput}
+                  onChange={(e) => setCommandInput(e.target.value)}
+                  placeholder='Type a command (e.g., "Hey, INSI, switch to Hyderabad Metro" or "Top 3 leaders")…'
+                  className="insi-command-input"
+                  aria-label="Type a command for INSI Dove Assistant"
+                />
+                <button type="submit" className="insi-command-send-btn">
+                  Run
+                </button>
+              </form>
+
+              {/* Bird Animation & Action Chips */}
+              <div className="insi-quick-section">
+                <span className="insi-section-caption">Dove Motions & Website Actions:</span>
+                <div className="insi-chip-grid">
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, fly around workspace and perch on tab', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    🕊️ Fly Round & Perch
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, dance', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    🎵 Dove Dance
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, cast magic', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    ✨ Magic Sparkles
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, switch to Hyderabad Metro', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    🚇 Hyderabad Metro
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, switch to Shopping Mall', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    🛍️ Shopping Mall
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, highlight top 3 leaders', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    🏆 Top 3 Leaders
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, flag bottom 2 underperforming', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    🚨 Flag Bottom 2
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, open data table', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    📋 Open Data Table
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip warning"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, reset all filters', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    🔄 Reset Filters (Asks First)
+                  </button>
+                </div>
+              </div>
+
+              {/* Activity & Honest Feedback Log */}
+              <div className="insi-log-list" aria-live="polite">
+                {assistantLog.map((item) => (
+                  <div key={item.id} className={`insi-log-item kind-${item.kind || 'info'}`}>
+                    <div className="insi-log-top">
+                      <strong>{item.title}</strong>
+                      {item.timestamp && <small>{item.timestamp}</small>}
+                    </div>
+                    <p>{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* Editable Local Command Router Tab */
+            <div className="insi-panel-body">
+              <div className="insi-router-header-row">
+                <p className="insi-router-help">
+                  Customize wake trigger phrases or add new local routes mapped to real InsightBoard actions. Changes
+                  save locally in your browser.
+                </p>
+                <button
+                  type="button"
+                  className="insi-mini-toggle"
+                  onClick={handleResetRouterDefaults}
+                >
+                  ↺ Reset Defaults
+                </button>
+              </div>
+
+              {/* Add Custom Route Form */}
+              <form className="insi-new-route-form" onSubmit={handleAddCustomRoute}>
+                <input
+                  type="text"
+                  placeholder="Route label (e.g. Show Category Pie)"
+                  value={newRouteLabel}
+                  onChange={(e) => setNewRouteLabel(e.target.value)}
+                  className="insi-route-input"
+                  aria-label="New route label"
+                />
+                <input
+                  type="text"
+                  placeholder="Trigger phrases, comma-separated (e.g. category pie, zone share)"
+                  value={newRouteTriggers}
+                  onChange={(e) => setNewRouteTriggers(e.target.value)}
+                  className="insi-route-input"
+                  aria-label="New route trigger phrases"
+                />
+                <input
+                  type="text"
+                  placeholder="Target dashboard command (e.g. Show revenue share by category as a pie chart)"
+                  value={newRouteCommand}
+                  onChange={(e) => setNewRouteCommand(e.target.value)}
+                  className="insi-route-input"
+                  aria-label="Target dashboard command"
+                />
+                <div className="insi-new-route-footer">
+                  <label className="insi-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={newRouteConfirm}
+                      onChange={(e) => setNewRouteConfirm(e.target.checked)}
+                    />
+                    <span>Ask confirmation before executing</span>
+                  </label>
+                  <button type="submit" className="insi-command-send-btn">
+                    + Add Route
+                  </button>
+                </div>
+              </form>
+
+              {/* Existing Routes List */}
+              <div className="insi-router-list">
+                {commandRouter.map((route) => (
+                  <div key={route.id} className="insi-router-item">
+                    <div className="insi-router-item-head">
+                      <strong>{route.label}</strong>
+                      <div className="insi-router-item-actions">
+                        <button
+                          type="button"
+                          className={`insi-route-badge ${route.requiresConfirmation ? 'confirm-on' : ''}`}
+                          onClick={() => handleToggleRouteConfirmation(route.id)}
+                          title="Toggle whether INSI asks for confirmation before running this route"
+                        >
+                          {route.requiresConfirmation ? '🔒 Asks Confirmation' : '⚡ Instant'}
+                        </button>
+                        <button
+                          type="button"
+                          className="insi-route-run-btn"
+                          onClick={() =>
+                            handleSpokenTranscript(route.triggers[0] || route.commandText, {
+                              requireWakeWord: false,
+                              speakReply: true
+                            })
+                          }
+                        >
+                          ▶ Test
+                        </button>
+                      </div>
+                    </div>
+
+                    {editingRouteId === route.id ? (
+                      <div className="insi-route-edit-row">
+                        <input
+                          type="text"
+                          value={editingTriggersText}
+                          onChange={(e) => setEditingTriggersText(e.target.value)}
+                          className="insi-route-input"
+                          aria-label={`Edit triggers for ${route.label}`}
+                        />
+                        <button
+                          type="button"
+                          className="insi-route-save-btn"
+                          onClick={() => handleSaveEditedTriggers(route.id)}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="insi-route-triggers-row">
+                        <span className="triggers-text">
+                          Triggers: <code>{route.triggers.join(', ')}</code>
+                        </span>
+                        <button
+                          type="button"
+                          className="insi-route-edit-btn"
+                          onClick={() => {
+                            setEditingRouteId(route.id);
+                            setEditingTriggersText(route.triggers.join(', '));
+                          }}
+                        >
+                          ✎ Edit
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </aside>
+      )}
+    </>
   );
 }

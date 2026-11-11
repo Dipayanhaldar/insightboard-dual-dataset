@@ -27,11 +27,11 @@ export const VALID_CONNECTOR_MODES = Object.freeze([
   'awaiting_data'
 ]);
 
-// Phonetic variations of "Hey INSI" / "Hey NCI" / "Wake up NCI" / "Hey Incy" / "Hey Siri" produced by browser Speech-to-Text engines
+// Phonetic variations of "Hey, INSI" / "Hey I N S I" / "Hey Insee" / "Wake up Insee" / "Hey NCI" produced by browser Speech-to-Text engines
 const WAKE_TOKEN_PATTERN =
-  '(?:insi\\.ai|insi|incy|insee|insy|insa|in-see|in\\s+see|in\\s+sea|in\\s+si|in\\s+c|and\\s+see|and\\s+c|nci|n\\.c\\.i\\.|n\\s+c\\s+i|nsi|n\\s+s\\s+i|mci|m\\s+c\\s+i|nc|n\\.c\\.|n\\s+c|inc|i\\s+n\\s+c|ins|i\\s+n\\s+s|nse|n\\s+s\\s+e|nsc|n\\s+s\\s+c|ic|i\\s+c|ncc|nic|npc|nfc|nyc|unsee|hennessy|tennessee|aisi|emc|mvc|imc|ims|mc|m\\s+c|ec|e\\s+c|ac|a\\s+c|pc|vc|easy|izzy|issy|ancy|ansi|ency|enci|nancy|macy|messi|mercy|agency|fancy|infy|indy|envy|hainsi|hensy|heinsi|heynsi|ensi|insight\\s*bot|insight|inside|in\\s+sight|in\\s+side|i\\s+see|let\'?s\\s+see|siri|alexa|jarvis|bot|robot|assistant)';
+  '(?:insi\\.ai|insi|incy|insee|eensee|insy|insa|in-see|in\\s+see|in\\s+sea|in\\s+si|in\\s+c|i\\s+n\\s+s\\s+i|i\\.n\\.s\\.i\\.?|and\\s+see|and\\s+c|nci|n\\.c\\.i\\.|n\\s+c\\s+i|nsi|n\\s+s\\s+i|mci|m\\s+c\\s+i|nc|n\\.c\\.|n\\s+c|inc|i\\s+n\\s+c|ins|i\\s+n\\s+s|nse|n\\s+s\\s+e|nsc|n\\s+s\\s+c|ic|i\\s+c|ncc|nic|npc|nfc|nyc|unsee|hennessy|tennessee|aisi|emc|mvc|imc|ims|mc|m\\s+c|ec|e\\s+c|ac|a\\s+c|pc|vc|easy|izzy|issy|ancy|ansi|ency|enci|nancy|macy|messi|mercy|agency|fancy|infy|indy|envy|hainsi|hensy|heinsi|heynsi|ensi|insight\\s*bot|insight|inside|in\\s+sight|in\\s+side|i\\s+see|let\'?s\\s+see|dove|pigeon|bird|bot|robot|assistant)';
 
-const WAKE_VERB_PATTERN = '(?:hey|hi|hello|ok|okay|yo|listen|wake\\s+up|wake)';
+const WAKE_VERB_PATTERN = '(?:hey|hi|hello|ok|okay|yo|listen|wake\\s+up|wake|fly)';
 
 const WAKE_WORD_REGEX = new RegExp(
   `^\\s*(?:${WAKE_VERB_PATTERN}[\\s,:.\\-!?]*)*(?:${WAKE_TOKEN_PATTERN})(?:[\\s,:.\\-!?]+(?:${WAKE_VERB_PATTERN}|${WAKE_TOKEN_PATTERN}|bro|buddy|man|please|now))*\\b[\\s,:.\\-!?]*`,
@@ -39,17 +39,31 @@ const WAKE_WORD_REGEX = new RegExp(
 );
 
 const INLINE_WAKE_REGEX = new RegExp(
-  `\\b(?:${WAKE_VERB_PATTERN})\\s+${WAKE_TOKEN_PATTERN}\\b[\\s,:.\\-!?]*`,
+  `\\b(?:${WAKE_VERB_PATTERN})[\\s,:.\\-!?]+${WAKE_TOKEN_PATTERN}\\b[\\s,:.\\-!?]*`,
   'ig'
 );
 
 const DIRECT_VOICE_INTENT_REGEX =
-  /\b(switch\s+to|hyderabad\s+metro|metro\s+dataset|metro\s+rail|shopping\s+mall|mall\s+dataset|retail\s+sales|show\s+revenue|show\s+sales|show\s+footfall|show\s+ridership|show\s+top|show\s+bottom|top\s+\d+|bottom\s+\d+|pie\s+chart|bar\s+chart|line\s+chart|open\s+table|data\s+table|close\s+table|hide\s+table|export\s+pdf|export\s+excel|export\s+csv|export\s+summary|open\s+calendar|schedule\s+review|dark\s+mode|light\s+mode|reset\s+filter|security\s+scan|executive\s+summary|overview|wake\s+up|are\s+you\s+listening|can\s+you\s+hear\s+me|can\s+you\s+do\s+something|dance|flex|roam)\b/i;
+  /\b(switch\s+to|hyderabad\s+metro|metro\s+dataset|metro\s+rail|shopping\s+mall|mall\s+dataset|retail\s+sales|show\s+revenue|show\s+sales|show\s+footfall|show\s+ridership|show\s+top|show\s+bottom|top\s+\d+|bottom\s+\d+|pie\s+chart|bar\s+chart|line\s+chart|open\s+table|data\s+table|close\s+table|hide\s+table|export\s+pdf|export\s+excel|export\s+csv|export\s+summary|open\s+calendar|schedule\s+review|dark\s+mode|light\s+mode|reset\s+filter|security\s+scan|executive\s+summary|overview|wake\s+up|are\s+you\s+listening|can\s+you\s+hear\s+me|can\s+you\s+do\s+something|dance|flex|roam|fly|perch|magic)\b/i;
 
 const BARE_GREETING_REGEX =
   /^\s*(?:hey|hi|hello|hey\s+there|hi\s+there|hello\s+there|hey\s+in|hey\s+see|hey\s+c|hey\s+n|ok|okay|wake\s+up|wake\s+up\s+\w+|hey\s+\w+|are\s+you\s+there|are\s+you\s+listening|can\s+you\s+hear\s+me|can\s+you\s+do\s+something|test|testing|hello\s+\w+)\s*[.!?]*$/i;
 
-const HEY_PREFIX_COMMAND_REGEX = /^\s*(?:hey|hi|hello|ok|okay|wake\s+up|listen)(?:\s+(?:bro|bot|robot|assistant))?[\s,:.\-!?]+(.{3,})$/i;
+const HEY_PREFIX_COMMAND_REGEX = /^\s*(?:hey|hi|hello|ok|okay|wake\s+up|listen)(?:\s+(?:bro|bot|robot|assistant|bird|dove|pigeon))?[\s,:.\-!?]+(.{3,})$/i;
+
+/**
+ * Normalizes raw browser SpeechRecognition transcripts so spaced letters and phonetic variants
+ * like "Hey, I N S I", "Hey I.N.S.I.", "Hey Insee", "Wake up Insee", "Hey N C I" normalize cleanly.
+ */
+export function normalizeSpeechTranscript(rawInput = '') {
+  return String(rawInput || '')
+    .replace(/\bI[\s.\-_]*N[\s.\-_]*S[\s.\-_]*I\b/gi, 'INSI')
+    .replace(/\bN[\s.\-_]*C[\s.\-_]*I\b/gi, 'NCI')
+    .replace(/\bN[\s.\-_]*S[\s.\-_]*I\b/gi, 'NSI')
+    .replace(/\b(?:in[\s\-_]*see|in[\s\-_]*sea|eensee|insee|incy|insy)\b/gi, 'INSI')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 const FUZZY_SYNONYM_GROUPS = Object.freeze({
   revenue: [
@@ -152,11 +166,11 @@ const FUZZY_SYNONYM_GROUPS = Object.freeze({
 });
 
 /**
- * Detects whether a voice/text input starts with or contains "Hey INSI" / "Hey NCI" / "Wake up NCI"
+ * Detects whether a voice/text input starts with or contains "Hey, INSI" / "Hey I N S I" / "Hey Insee" / "Wake up Insee" / "Hey NCI"
  * (or phonetic STT transcriptions like "Hey NC", "Hey INC", "Hey INS", "Hey NSE", "Hey easy", "Hey insight")
  */
 export function detectWakeWordAndCommand(rawInput = '') {
-  const original = String(rawInput || '').trim();
+  const original = normalizeSpeechTranscript(rawInput);
   if (!original) {
     return {
       wakeWordDetected: false,
@@ -177,11 +191,11 @@ export function detectWakeWordAndCommand(rawInput = '') {
       wakeWordDetected: true,
       matchedWakePhrase: prefixMatch[0].trim().replace(/[,:.\-!?]+$/, ''),
       cleanCommand: stripped || 'Give me an executive overview of the active dataset',
-      normalizedTranscript: `Hey INSI${stripped ? ', ' + stripped : ''}`
+      normalizedTranscript: `Hey, INSI${stripped ? ', ' + stripped : ''}`
     };
   }
 
-  // Also check inline wake word e.g. "please hey NCI show revenue" or "wake up NCI"
+  // Also check inline wake word e.g. "please hey, INSI show revenue" or "wake up Insee"
   const inlineMatch = original.match(INLINE_WAKE_REGEX);
   if (inlineMatch) {
     const stripped = original
@@ -191,31 +205,31 @@ export function detectWakeWordAndCommand(rawInput = '') {
       .trim();
     return {
       wakeWordDetected: true,
-      matchedWakePhrase: inlineMatch[0].trim(),
+      matchedWakePhrase: inlineMatch[0].trim().replace(/[,:.\-!?]+$/, ''),
       cleanCommand: stripped || 'Give me an executive overview of the active dataset',
-      normalizedTranscript: `Hey INSI${stripped ? ', ' + stripped : ''}`
+      normalizedTranscript: `Hey, INSI${stripped ? ', ' + stripped : ''}`
     };
   }
 
-  // If user said "Hey <command>" or "Wake up <command>" and STT dropped or mangled "NCI/INSI"
+  // If user said "Hey <command>" or "Wake up <command>" and STT dropped or mangled "INSI"
   const heyPrefixMatch = original.match(HEY_PREFIX_COMMAND_REGEX);
   if (heyPrefixMatch && DIRECT_VOICE_INTENT_REGEX.test(heyPrefixMatch[1])) {
     const stripped = heyPrefixMatch[1].trim();
     return {
       wakeWordDetected: true,
-      matchedWakePhrase: 'Hey INSI',
+      matchedWakePhrase: 'Hey, INSI',
       cleanCommand: stripped,
-      normalizedTranscript: `Hey INSI, ${stripped}`
+      normalizedTranscript: `Hey, INSI, ${stripped}`
     };
   }
 
-  // If browser STT clipped "INSI/NCI" and heard bare "Hey" / "Wake up" / "Wake up [word]" / "Are you listening"
+  // If browser STT clipped "INSI" and heard bare "Hey" / "Wake up" / "Wake up [word]" / "Are you listening"
   if (BARE_GREETING_REGEX.test(original)) {
     return {
       wakeWordDetected: true,
       matchedWakePhrase: original,
       cleanCommand: 'Give me an executive overview of the active dataset',
-      normalizedTranscript: 'Hey INSI'
+      normalizedTranscript: 'Hey, INSI'
     };
   }
 
@@ -223,9 +237,9 @@ export function detectWakeWordAndCommand(rawInput = '') {
   if (DIRECT_VOICE_INTENT_REGEX.test(original)) {
     return {
       wakeWordDetected: true,
-      matchedWakePhrase: 'Hey INSI (Direct Voice Intent)',
+      matchedWakePhrase: 'Hey, INSI (Direct Voice Intent)',
       cleanCommand: original,
-      normalizedTranscript: `Hey INSI, ${original}`
+      normalizedTranscript: `Hey, INSI, ${original}`
     };
   }
 

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  normalizeSpeechTranscript,
   detectWakeWordAndCommand,
   extractConnectorRecords,
   resolveFuzzySchema,
@@ -18,9 +19,18 @@ const SAMPLE_MALL_RECORDS = [
   { store_name: 'Bistro Corner', mall_zone: 'Food Court', gross_sales: 910000, visitor_count: 7400, conversion_rate: 9.4 }
 ];
 
-test('detectWakeWordAndCommand recognizes "Hey INSI", "Hey NCI", "Wake up NCI" and all phonetic STT variants', () => {
+test('detectWakeWordAndCommand recognizes "Hey, INSI", "Hey I N S I", "Hey Insee", "Wake up Insee", "Hey NCI" and all phonetic STT variants', () => {
+  assert.equal(normalizeSpeechTranscript('Hey I N S I show revenue'), 'Hey INSI show revenue');
+  assert.equal(normalizeSpeechTranscript('Wake up Insee'), 'Wake up INSI');
+
   const variants = [
+    'Hey, INSI, show revenue by store',
     'Hey INSI, show revenue by store',
+    'Hey I N S I, show revenue by store',
+    'Hey I.N.S.I. show revenue by store',
+    'Hey Insee, show revenue by store',
+    'Wake up Insee, show revenue by store',
+    'Hey in see, show revenue by store',
     'Hey NCI, show revenue by store',
     'Wake up NCI, show revenue by store',
     'Hey NC show revenue by store',
@@ -43,6 +53,9 @@ test('detectWakeWordAndCommand recognizes "Hey INSI", "Hey NCI", "Wake up NCI" a
 
   const bareGreeting = detectWakeWordAndCommand('Hey');
   assert.equal(bareGreeting.wakeWordDetected, true);
+
+  const wakeUpInsee = detectWakeWordAndCommand('Wake up Insee');
+  assert.equal(wakeUpInsee.wakeWordDetected, true);
 
   const wakeUpNci = detectWakeWordAndCommand('Hey NCI, wake up NCI');
   assert.equal(wakeUpNci.wakeWordDetected, true);
