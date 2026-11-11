@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'node:path';
 import fs from 'node:fs';
+import http from 'node:http';
 import { randomUUID, createHash } from 'node:crypto';
 import { spawn, execFile } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -1739,10 +1740,12 @@ if (isDirectExecution) {
   } else {
     console.log('Firebase Firestore & portable session store active.');
   }
+  const server = http.createServer(app);
+
   if (!isProduction && !isVercelRuntime) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: { server } },
       appType: 'spa'
     });
     app.use(vite.middlewares);
@@ -1766,7 +1769,7 @@ if (isDirectExecution) {
     console.warn('Could not spawn background Python daemon (CLI bridge active):', err.message);
   }
 
-  const server = app.listen(PORT, '0.0.0.0', () => console.log(`InsightBoard V2 server listening on port ${PORT}`));
+  server.listen(PORT, '0.0.0.0', () => console.log(`InsightBoard V2 server listening on port ${PORT}`));
 
   // Real-time Gemini Live API WebSocket bridge (gemini-3.8-live) on /api/live
   const liveWss = new WebSocketServer({ noServer: true });

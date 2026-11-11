@@ -27,8 +27,8 @@ export const VALID_CONNECTOR_MODES = Object.freeze([
   'awaiting_data'
 ]);
 
-// Phonetic variations of "Hey INSI" produced by browser Speech-to-Text engines
-const WAKE_WORD_REGEX = /^\s*(?:hey|hi|hello|ok|okay)?\s*(?:insi\.ai|insi|in-see|in\s+see|in\s+c|nc|n\.c\.|easy|insight\s*bot|insight)\b[\s,:.\-!?]*/i;
+// Phonetic variations of "Hey INSI" (and "Hey Incy" / "Hey Siri") produced by browser Speech-to-Text engines
+const WAKE_WORD_REGEX = /^\s*(?:hey|hi|hello|ok|okay)?\s*(?:insi\.ai|insi|incy|in-see|in\s+see|in\s+c|nc|n\.c\.|easy|insight\s*bot|insight|siri)\b[\s,:.\-!?]*/i;
 
 const FUZZY_SYNONYM_GROUPS = Object.freeze({
   revenue: [
@@ -157,7 +157,7 @@ export function detectWakeWordAndCommand(rawInput = '') {
   }
 
   // Also check inline wake word e.g. "please hey NC show revenue"
-  const inlineRegex = /\b(?:hey|hi|ok|okay)\s+(?:insi\.ai|insi|in-see|in\s+see|in\s+c|nc|easy|insight)\b[\s,:.\-!?]*/i;
+  const inlineRegex = /\b(?:hey|hi|ok|okay)\s+(?:insi\.ai|insi|incy|in-see|in\s+see|in\s+c|nc|easy|insight|siri)\b[\s,:.\-!?]*/i;
   const inlineMatch = original.match(inlineRegex);
   if (inlineMatch) {
     const stripped = original.replace(inlineRegex, ' ').replace(/\s+/g, ' ').trim();
@@ -811,8 +811,12 @@ export function executeInsiCommand({
   const laggardVal = formatCompactNumber(laggard?.[valueKey] || 0);
   const secondLaggardName = secondLaggard?.[dimensionKey] || null;
   const totalFormatted = formatCompactNumber(totalMetricSum);
+  const spokenMetricName = String(valueKey || 'value')
+    .replace(/_inr\b|_pct\b|_usd\b/gi, '')
+    .replace(/[_-]+/g, ' ')
+    .trim();
 
-  // Crisp Spoken Voice Reply (Strictly <= 35 words)
+  // Crisp Spoken Voice Reply (Strictly <= 35 words, natural human speech without underscores)
   let rawVoiceReply = '';
   if (wantsReset) {
     rawVoiceReply = `Dashboard reset complete! All ${safeRows.length} records in ${datasetName} are active again across ${schema.detectedSchemaKeys.length} columns.`;
@@ -823,7 +827,7 @@ export function executeInsiCommand({
   } else if (wantsExport) {
     rawVoiceReply = `Analysis complete across ${safeRows.length} records. ${leaderName} leads with ${leaderVal} (${leader?.portfolio_share_pct || 0}% share). Your ${exportFormat.toUpperCase()} file is downloading now.`;
   } else {
-    rawVoiceReply = `Analyzed ${safeRows.length} records. ${leaderName} leads ${valueKey.replace(/_/g, ' ')} at ${leaderVal}, outperforming ${laggardName} at ${laggardVal}. Live chart updated on your board.`;
+    rawVoiceReply = `Analyzed ${safeRows.length} records. ${leaderName} leads ${spokenMetricName} at ${leaderVal}, outperforming ${laggardName} at ${laggardVal}. Live chart updated on your board.`;
   }
 
   const voiceReply = enforceVoiceBrevity(rawVoiceReply);

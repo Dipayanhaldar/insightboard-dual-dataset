@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ShieldCheck, CheckCircle2, RefreshCw, X, ExternalLink, Gauge, AlertOctagon } from 'lucide-react';
 import './ReleaseCenter.css';
 import { insi } from './insiController.js';
+import { getRealQuotaUsage } from './uiSound.js';
 
 const CLIENT_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '3.0.0';
 
@@ -35,18 +36,17 @@ export default function ReleaseCenter() {
   const [runtime, setRuntime] = useState(null);
   const [security, setSecurity] = useState(null);
   const [quotas, setQuotas] = useState(DEFAULT_QUOTAS);
-  const [simulateLimit, setSimulateLimit] = useState(false);
+  const [sessionDeltas, setSessionDeltas] = useState(() => getRealQuotaUsage());
   const [checking, setChecking] = useState(false);
 
-  const checkStatus = useCallback(async (simFlag = false) => {
+  const checkStatus = useCallback(async () => {
     setChecking(true);
     try {
-      const quotaUrl = simFlag ? '/api/quota/status?simulateLimit=true' : '/api/quota/status';
       const [releaseResponse, versionResponse, securityResponse, quotaResponse] = await Promise.all([
         fetch('/release-info.json', { cache: 'no-store' }).catch(() => null),
         fetch('/api/version', { cache: 'no-store' }).catch(() => null),
         fetch('/api/security/status', { cache: 'no-store' }).catch(() => null),
-        fetch(quotaUrl, { cache: 'no-store' }).catch(() => null)
+        fetch('/api/quota/status', { cache: 'no-store' }).catch(() => null)
       ]);
       if (releaseResponse?.ok) {
         const releaseData = await releaseResponse.json();
@@ -67,11 +67,17 @@ export default function ReleaseCenter() {
     } catch {
       // Keep fallback status silently
     } finally {
+      setSessionDeltas(getRealQuotaUsage());
       setChecking(false);
     }
   }, []);
 
-  useEffect(() => { void checkStatus(simulateLimit); }, [checkStatus, simulateLimit]);
+  useEffect(() => {
+    void checkStatus();
+    const onQuotaUpdate = () => setSessionDeltas(getRealQuotaUsage());
+    window.addEventListener('quota:updated', onQuotaUpdate);
+    return () => window.removeEventListener('quota:updated', onQuotaUpdate);
+  }, [checkStatus]);
 
   const currentWebsiteVersion = CLIENT_VERSION;
   const updateAvailable = useMemo(
@@ -81,7 +87,8 @@ export default function ReleaseCenter() {
   );
 
   const computedQuotas = quotas.map((q) => {
-    const used = simulateLimit ? q.limit : q.used;
+    const delta = Number(sessionDeltas?.[q.id]) || 0;
+    const used = Math.min(q.limit, (Number(q.used) || 0) + delta);
     const limitReached = used >= q.limit || Boolean(q.limitReached);
     return {
       ...q,
@@ -100,7 +107,7 @@ export default function ReleaseCenter() {
         className="release-center-trigger"
         onClick={() => {
           setOpen(value => !value);
-          void checkStatus(simulateLimit);
+          void checkStatus();
           insi.observe();
         }}
         aria-expanded={open}
@@ -121,19 +128,11 @@ export default function ReleaseCenter() {
           <div><span>Desktop &amp; Mobile</span><strong>{release.windowsPackageVersion} · APK v{release.androidApkVersion || release.websiteVersion}</strong><small>Platform-independent</small></div>
         </div>
 
-        {/* Connected Services Usage & Quotas Monitor inside Status Panel */}
         <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(15, 23, 42, 0.04)', border: '1px solid var(--line, #e2e8f0)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
             <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
-              <Gauge size={14} /> Usage &amp; Quotas ({anyLimitReached ? 'Limit Reached' : 'Within Free Tier'})
+              <Gauge size={14} /> Live Usage &amp; Quotas ({anyLimitReached ? 'Limit Reached' : 'Within Free Tier'})
             </strong>
-            <button
-              type="button"
-              onClick={() => setSimulateLimit(v => !v)}
-              style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--line, #cbd5e1)', cursor: 'pointer', background: 'var(--surface, #fff)' }}
-            >
-              {simulateLimit ? 'Reset Quota' : 'Simulate Limit Reached'}
-            </button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
             {computedQuotas.map((svc) => (
@@ -179,7 +178,7 @@ export default function ReleaseCenter() {
         </div>
         <footer className="release-panel-foot">
           <small>InsightBoard VDB v{currentWebsiteVersion}</small>
-          <button type="button" onClick={() => void checkStatus(simulateLimit)} disabled={checking}><RefreshCw size={14} className={checking ? 'spinning' : ''}/>{checking ? 'Verifying…' : 'Verify'}</button>
+          <button type="button" onClick={() => void checkStatus()} disabled={checking}><RefreshCw size={14} className={checking ? 'spinning' : ''}/>{checking ? 'Verifying…' : 'Sync'}</button>
           <a href="https://apps.microsoft.com/detail/9N20PQ3BJRSG" target="_blank" rel="noreferrer">Microsoft Store <ExternalLink size={12}/></a>
         </footer>
       </section>}

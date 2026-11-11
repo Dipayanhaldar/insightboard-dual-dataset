@@ -124,7 +124,7 @@ jobs:
           mkdir -p build-android
           cd build-android
           npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
           npx cap init "InsightBoard VDB" "com.insightboard.vdb" --web-dir ../dist
           npx cap add android
           cd android

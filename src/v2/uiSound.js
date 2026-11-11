@@ -1,8 +1,9 @@
-// Lightweight Web Audio API sound design for InsightBoard VDB & insi.ai
-// Muted-safe, respects browser autoplay policies and global sound preferences, never loops annoyingly.
+// Lightweight Web Audio API sound design & Real-Time Quota Telemetry for InsightBoard VDB & insi.ai
 
 let audioCtx = null;
 let lastSoundAt = 0;
+
+const QUOTA_STORAGE_KEY = 'insightboard-real-quota-telemetry-v3';
 
 export function isSoundMuted() {
   if (typeof window === 'undefined') return false;
@@ -20,10 +21,45 @@ export function setSoundMuted(muted) {
   } catch {}
 }
 
+export function getRealQuotaUsage() {
+  const today = new Date().toISOString().slice(0, 10);
+  const fallback = {
+    dateUtc: today,
+    mongodb: 0,
+    gemini: 0,
+    supabase: 0,
+    azure: 0,
+    browser_ai: 0
+  };
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(QUOTA_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    if (parsed.dateUtc !== today) return fallback;
+    return { ...fallback, ...parsed };
+  } catch {
+    return fallback;
+  }
+}
+
+export function recordRealQuotaUsage(serviceId = 'gemini', delta = 1) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getRealQuotaUsage();
+    const next = {
+      ...current,
+      [serviceId]: Math.max(0, (Number(current[serviceId]) || 0) + Number(delta || 1))
+    };
+    localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify(next));
+    window.dispatchEvent(new CustomEvent('quota:updated', { detail: next }));
+  } catch {}
+}
+
 function getAudioContext() {
   if (typeof window === 'undefined' || isSoundMuted()) return null;
   const nowMs = Date.now();
-  if (nowMs - lastSoundAt < 65) return null; // Prevent rapid overlapping audio
+  if (nowMs - lastSoundAt < 65) return null;
   lastSoundAt = nowMs;
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -32,7 +68,6 @@ function getAudioContext() {
     if (audioCtx.state === 'suspended') {
       audioCtx.resume().catch(() => {});
     }
-    if (audioCtx.state !== 'running') return null;
     return audioCtx;
   } catch {
     return null;
@@ -136,7 +171,30 @@ export function playInsiChime(kind = 'appear') {
   } catch {}
 }
 
-// 5. Sleeping: Optional subtle breath/snore
+// 5. Metro Station Announcement Chime (Authentic 3-Note Transit PA Chime)
+export function playMetroStationChime() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    const chimeNotes = [587.33, 739.99, 880.0]; // D5 - F#5 - A5 transit chime
+    chimeNotes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      const start = now + idx * 0.16;
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.045, start);
+      gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.42);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.45);
+    });
+  } catch {}
+}
+
+// 6. Sleeping: Optional subtle breath/snore
 export function playInsiSnore() {
   const ctx = getAudioContext();
   if (!ctx) return;

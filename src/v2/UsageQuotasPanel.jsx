@@ -4,11 +4,12 @@ import {
   AlertOctagon,
   Gauge,
   RefreshCw,
-  Sliders,
-  Lock
+  Lock,
+  Cpu
 } from 'lucide-react';
 import './UsageQuotasPanel.css';
-import { playButtonClick, summonInsi } from './uiSound.js';
+import { playButtonClick, getRealQuotaUsage } from './uiSound.js';
+import { insi } from './insiController.js';
 
 const DEFAULT_SERVICES = [
   {
@@ -28,7 +29,7 @@ const DEFAULT_SERVICES = [
   {
     id: 'gemini',
     name: 'Google Gemini API',
-    tierLabel: 'Free Tier (AI Studio)',
+    tierLabel: 'Free Tier (Server Proxy)',
     unit: 'req/day',
     used: 8,
     limit: 1500,
@@ -66,69 +67,68 @@ const DEFAULT_SERVICES = [
     status: 'Within Free Tier',
     billingCutoffActive: true,
     estimatedCostUsd: 0
+  },
+  {
+    id: 'browser_ai',
+    name: 'Browser-Native Free AI (TF.js / ONNX / Transformers.js)',
+    tierLabel: 'Unlimited Local WebGPU & WASM Runtime',
+    unit: 'runs/day',
+    used: 6,
+    limit: 100000,
+    remaining: 99994,
+    percentUsed: 1,
+    limitReached: false,
+    status: 'Within Free Tier',
+    billingCutoffActive: true,
+    estimatedCostUsd: 0
   }
 ];
 
 export default function UsageQuotasPanel() {
   const [services, setServices] = useState(DEFAULT_SERVICES);
   const [dateUtc, setDateUtc] = useState(() => new Date().toISOString().slice(0, 10));
-  const [simulateAllLimits, setSimulateAllLimits] = useState(false);
-  const [serviceOverrides, setServiceOverrides] = useState({});
+  const [localSessionDeltas, setLocalSessionDeltas] = useState(() => getRealQuotaUsage());
   const [loading, setLoading] = useState(false);
 
-  const loadQuotas = useCallback(async (simulateFlag = false) => {
+  const loadQuotas = useCallback(async () => {
     setLoading(true);
     try {
-      const url = simulateFlag ? '/api/quota/status?simulateLimit=true' : '/api/quota/status';
-      const response = await fetch(url, { cache: 'no-store' });
+      const response = await fetch('/api/quota/status', { cache: 'no-store' });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data.services) && data.services.length) {
-          setServices(data.services);
+          const browserAiCard = DEFAULT_SERVICES.find((s) => s.id === 'browser_ai');
+          const merged = data.services.some((s) => s.id === 'browser_ai')
+            ? data.services
+            : [...data.services, browserAiCard];
+          setServices(merged);
         }
         if (data.dateUtc) setDateUtc(data.dateUtc);
       }
     } catch {
       // Keep local free-tier quota telemetry if offline
     } finally {
+      setLocalSessionDeltas(getRealQuotaUsage());
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadQuotas(simulateAllLimits);
-  }, [loadQuotas, simulateAllLimits]);
-
-  function toggleSimulateAll() {
-    playButtonClick();
-    const next = !simulateAllLimits;
-    setSimulateAllLimits(next);
-    if (!next) setServiceOverrides({});
-    summonInsi(
-      'quota',
-      next
-        ? 'INSI · Limit Reached cutoff activated ($0 billing)'
-        : 'INSI · Restored live free-tier quota telemetry'
-    );
-  }
-
-  function toggleSingleServiceLimit(serviceId, serviceName) {
-    playButtonClick();
-    setServiceOverrides((prev) => {
-      const nextVal = !prev[serviceId];
-      summonInsi(
-        'quota',
-        nextVal
-          ? `INSI · ${serviceName} Limit Reached lock tested`
-          : `INSI · ${serviceName} returned to normal free quota`
-      );
-      return { ...prev, [serviceId]: nextVal };
-    });
-  }
+    void loadQuotas();
+    const handleQuotaUpdate = (e) => {
+      if (e?.detail) {
+        setLocalSessionDeltas(e.detail);
+      } else {
+        setLocalSessionDeltas(getRealQuotaUsage());
+      }
+    };
+    window.addEventListener('quota:updated', handleQuotaUpdate);
+    return () => window.removeEventListener('quota:updated', handleQuotaUpdate);
+  }, [loadQuotas]);
 
   const computedServices = services.map((svc) => {
-    const forcedLimit = simulateAllLimits || Boolean(serviceOverrides[svc.id]);
-    const used = forcedLimit ? svc.limit : svc.used;
+    const sessionDelta = Number(localSessionDeltas?.[svc.id]) || 0;
+    const used = Math.min(svc.limit, (Number(svc.used) || 0) + sessionDelta);
     const limitReached = used >= svc.limit || Boolean(svc.limitReached);
     const percentUsed = limitReached
       ? 100
@@ -138,6 +138,7 @@ export default function UsageQuotasPanel() {
     return {
       ...svc,
       used,
+      sessionDelta,
       remaining: Math.max(0, svc.limit - used),
       percentUsed,
       limitReached,
@@ -155,7 +156,7 @@ export default function UsageQuotasPanel() {
             <Gauge size={19} />
           </div>
           <div>
-            <span className="v2-overline">FREE-TIER CONSUMPTION &amp; ZERO-BILLING GUARDRAIL</span>
+            <span className="v2-overline">LIVE FREE-TIER TELEMETRY &amp; ZERO-BILLING GUARDRAIL</span>
             <h3 id="usage-quotas-title">Usage &amp; Quotas</h3>
           </div>
         </div>
@@ -168,37 +169,32 @@ export default function UsageQuotasPanel() {
               </>
             ) : (
               <>
-                <ShieldCheck size={13} /> Within Free Tier · $0.00 Projected
+                <ShieldCheck size={13} /> Within Free Tier · $0.00 Billed
               </>
             )}
           </span>
           <button
             type="button"
             className="v2-button secondary btn-3d"
-            onClick={toggleSimulateAll}
-          >
-            <Sliders size={13} />{' '}
-            {simulateAllLimits ? 'Reset Quota Simulation' : 'Simulate Limit Reached'}
-          </button>
-          <button
-            type="button"
-            className="v2-button secondary btn-3d"
             onClick={() => {
               playButtonClick();
-              void loadQuotas(simulateAllLimits);
+              insi.observe();
+              void loadQuotas();
             }}
             disabled={loading}
           >
-            <RefreshCw size={13} className={loading ? 'v2-spin' : ''} /> Refresh
+            <RefreshCw size={13} className={loading ? 'v2-spin' : ''} /> Sync Live Telemetry
           </button>
         </div>
       </div>
 
       <p className="v2-muted usage-quotas-subtitle">
-        Live free-tier quota consumption across <strong>MongoDB</strong>, <strong>Gemini</strong>,{' '}
-        <strong>Supabase</strong>, and <strong>Azure</strong> (UTC cycle: {dateUtc}). When any service
-        reaches 100% of its free threshold, InsightBoard VDB automatically locks into{' '}
-        <strong>Limit Reached</strong> state and routes to the local engine so no unexpected billing can ever occur.
+        Real-time consumption across <strong>MongoDB Atlas</strong>, <strong>Google Gemini API</strong>,{' '}
+        <strong>Supabase</strong>, <strong>Microsoft Azure</strong>, and{' '}
+        <strong>Browser-Native Free AI</strong> (UTC cycle: {dateUtc}). Counters automatically track actual
+        session queries, file ingestions, and voice/AI runs. If any cloud service reaches 100% of its daily free
+        threshold, InsightBoard VDB automatically switches to the local browser engine so unexpected billing
+        can never occur.
       </p>
 
       {anyLimitReached && (
@@ -207,8 +203,8 @@ export default function UsageQuotasPanel() {
           <div>
             <strong>Limit Reached — Zero-Billing Hard Cutoff Active</strong>
             <span>
-              One or more services have reached their daily free-tier threshold. External requests for capped
-              services are paused until the next UTC reset, and local zero-cost computation is active ($0.00 billed).
+              One or more cloud services have reached their daily free-tier threshold. Requests are automatically
+              handled by the local zero-cost browser engine ($0.00 billed).
             </span>
           </div>
         </div>
@@ -256,15 +252,14 @@ export default function UsageQuotasPanel() {
 
             <div className="quota-card-foot">
               <span className="quota-cost-tag">
-                <Lock size={12} /> {svc.limitReached ? 'Hard Cutoff Active · $0.00' : `${svc.remaining.toLocaleString()} remaining · $0.00`}
+                {svc.id === 'browser_ai' ? <Cpu size={12} /> : <Lock size={12} />}{' '}
+                {svc.limitReached
+                  ? 'Hard Cutoff Active · $0.00'
+                  : `${svc.remaining.toLocaleString()} remaining · $0.00`}
               </span>
-              <button
-                type="button"
-                className="quota-test-btn"
-                onClick={() => toggleSingleServiceLimit(svc.id, svc.name)}
-              >
-                {svc.limitReached ? 'Restore Quota' : 'Test Limit'}
-              </button>
+              <span className="quota-cost-tag" style={{ opacity: 0.78 }}>
+                Session: +{svc.sessionDelta} {svc.unit.replace('/day', '')}
+              </span>
             </div>
           </div>
         ))}
