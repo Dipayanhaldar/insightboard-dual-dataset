@@ -405,6 +405,19 @@
   color: #2563eb;
 }
 
+.uch-automation-log {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: var(--ink, #1e293b);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .uch-output-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));

@@ -68,6 +68,9 @@ export default function InsiPetBot({
   const recognitionRef = useRef(null);
   const isSpeakingRef = useRef(false);
   const lastTranscriptRef = useRef({ text: '', time: 0 });
+  const lastSpokenReplyRef = useRef({ text: '', time: 0, count: 0 });
+  const lastProcessedResultIdxRef = useRef(-1);
+  const wakeConversationUntilRef = useRef(0);
   const micInitializedRef = useRef(false);
   const latestContextRef = useRef({ rows, fields, datasetName, onVoiceCommandAction });
 
@@ -173,9 +176,25 @@ export default function InsiPetBot({
     return () => window.removeEventListener('pointermove', handlePointerMove);
   }, []);
 
-  // Half-Duplex Echo-Free Speech Output for INSI
+  // Half-Duplex Echo-Free Speech Output with Strict Anti-Repetition Guard
   const speakWithoutEcho = useCallback((textToSpeak) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window) || !textToSpeak) return;
+
+    let finalSpeech = String(textToSpeak).trim();
+    if (!finalSpeech) return;
+
+    // Never repeat the exact same sentence twice in a row
+    if (lastSpokenReplyRef.current.text === finalSpeech) {
+      lastSpokenReplyRef.current.count += 1;
+      const variations = [
+        `Action confirmed! ${finalSpeech.split('.').slice(1).join('.').trim() || finalSpeech}`,
+        `Updated on your live board. ${finalSpeech.split('.')[0]}.`,
+        `Task complete! All charts and KPIs are synchronized.`
+      ];
+      finalSpeech = variations[lastSpokenReplyRef.current.count % variations.length];
+    } else {
+      lastSpokenReplyRef.current = { text: finalSpeech, time: Date.now(), count: 0 };
+    }
 
     // 1. Immediately pause SpeechRecognition so INSI NEVER hears or repeats its own voice!
     isSpeakingRef.current = true;
@@ -187,10 +206,13 @@ export default function InsiPetBot({
 
     try {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(String(textToSpeak));
+      if (typeof window.speechSynthesis.resume === 'function') {
+        window.speechSynthesis.resume();
+      }
+      const utterance = new SpeechSynthesisUtterance(finalSpeech);
       utterance.lang = 'en-IN';
-      utterance.rate = 1.03;
-      utterance.pitch = 1.06;
+      utterance.rate = 1.04;
+      utterance.pitch = 1.05;
 
       utterance.onstart = () => {
         isSpeakingRef.current = true;
@@ -200,12 +222,13 @@ export default function InsiPetBot({
       const resumeMicAfterCooldown = () => {
         setTimeout(() => {
           isSpeakingRef.current = false;
+          lastProcessedResultIdxRef.current = -1;
           if (recognitionRef.current) {
             try {
               recognitionRef.current.start();
             } catch {}
           }
-        }, 750);
+        }, 900);
       };
 
       utterance.onend = resumeMicAfterCooldown;
@@ -217,128 +240,152 @@ export default function InsiPetBot({
     }
   }, []);
 
-  // Expose `window.insiSpeak` so any component can speak through the echo-free pipeline
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.insiSpeak = speakWithoutEcho;
-    }
-  }, [speakWithoutEcho]);
-
-  // Process a spoken phrase from the universal "Hey INSI" / "Hey Incy" / "Hey Siri" listener
+  // Process a spoken or typed command across the entire application shell
   const handleSpokenTranscript = useCallback(
-    (rawTranscript) => {
-      if (isSpeakingRef.current) return;
+    (rawTranscript, { requireWakeWord = true, speakReply = true } = {}) => {
+      if (isSpeakingRef.current && requireWakeWord) return null;
       const cleaned = String(rawTranscript || '').trim();
-      if (!cleaned || cleaned.length < 3) return;
+      if (!cleaned || cleaned.length < 2) return null;
 
       const now = Date.now();
-      // Deduplicate repeated STT transcripts within 5 seconds so INSI never repeats itself
+      const lowerCleaned = cleaned.toLowerCase();
+
+      // Guard 1: Ignore speaker echo if the microphone picked up INSI's own recent spoken sentence
+      const lastSpokenLower = lastSpokenReplyRef.current.text.toLowerCase();
       if (
-        lastTranscriptRef.current.text.toLowerCase() === cleaned.toLowerCase() &&
-        now - lastTranscriptRef.current.time < 5000
+        requireWakeWord &&
+        lastSpokenLower &&
+        now - lastSpokenReplyRef.current.time < 9000 &&
+        (lastSpokenLower.includes(lowerCleaned) || lowerCleaned.includes(lastSpokenLower.slice(0, 24)))
       ) {
-        return;
+        return null;
+      }
+
+      // Guard 2: Deduplicate identical STT transcripts within 4.5 seconds
+      if (
+        requireWakeWord &&
+        lastTranscriptRef.current.text.toLowerCase() === lowerCleaned &&
+        now - lastTranscriptRef.current.time < 4500
+      ) {
+        return null;
       }
 
       const wake = detectWakeWordAndCommand(cleaned);
-      if (!wake.wakeWordDetected) return;
+      const withinActiveWakeWindow = now < wakeConversationUntilRef.current;
+
+      if (requireWakeWord && !wake.wakeWordDetected && !withinActiveWakeWindow) {
+        return null;
+      }
 
       lastTranscriptRef.current = { text: cleaned, time: now };
-      const cmd = wake.cleanCommand.toLowerCase();
+      // Keep a 12-second active follow-up window after saying "Hey INSI"
+      if (wake.wakeWordDetected) {
+        wakeConversationUntilRef.current = now + 12000;
+      }
+
+      const cmd = (wake.wakeWordDetected ? wake.cleanCommand : cleaned).toLowerCase();
       const ctx = latestContextRef.current;
 
-      // Check security/malware/legal command first
+      // 1. Security / Virus / Malware / Legal scan command
       if (/\b(virus|malware|security|scan|hack|legal|compliance)\b/.test(cmd)) {
         const sec = insi.scanSecurity({ rows: ctx.rows, fields: ctx.fields });
         const spoken =
           sec.status === 'clean'
             ? `Security scan complete across ${ctx.rows.length} records in ${ctx.datasetName}. Zero malware, formula injections, or legal compliance issues detected.`
             : `Security alert! Flagged ${sec.threatsFound.length + sec.legalFlags.length} potential risks. Check the dashboard notice.`;
-        speakWithoutEcho(spoken);
+        if (speakReply) speakWithoutEcho(spoken);
         if (ctx.onVoiceCommandAction) {
           ctx.onVoiceCommandAction({ type: 'security_scan', report: sec, spoken });
         }
-        return;
+        return null;
       }
 
-      // Check dataset switch command
-      if (/\b(hyderabad|metro|train|rail|station)\b/.test(cmd)) {
-        speakWithoutEcho('Switching to the Hyderabad Metro Rail dataset now.');
-        if (ctx.onVoiceCommandAction) {
-          ctx.onVoiceCommandAction({ type: 'switch_preset', preset: 'metro' });
-        }
-        return;
-      }
-      if (/\b(shopping|mall|retail|store portfolio)\b/.test(cmd) && /\b(switch|load|open)\b/.test(cmd)) {
-        speakWithoutEcho('Switching to the Shopping Mall and Retail Sales portfolio.');
-        if (ctx.onVoiceCommandAction) {
-          ctx.onVoiceCommandAction({ type: 'switch_preset', preset: 'mall' });
-        }
-        return;
-      }
-
-      // Check calendar command
-      if (/\b(calendar|schedule|reminder|meeting|event)\b/.test(cmd)) {
-        insi.celebrate();
-        speakWithoutEcho(`Opening your Add to Calendar brief for ${ctx.datasetName} with title and KPI summary pre-filled.`);
-        if (ctx.onVoiceCommandAction) {
-          ctx.onVoiceCommandAction({ type: 'open_calendar' });
-        }
-        return;
-      }
-
-      // Check robot physical action commands
+      // 2. Robot physical action commands
       if (/\b(dance|breakdance|groove)\b/.test(cmd)) {
         insi.dance();
-        speakWithoutEcho('Watch me dance on your dashboard!');
-        return;
+        if (speakReply) speakWithoutEcho('Dancing live on your dashboard!');
+        return null;
       }
       if (/\b(flex|muscle|strong|power)\b/.test(cmd)) {
         insi.flex();
-        speakWithoutEcho('Flexing full robotic power for your analytics!');
-        return;
+        if (speakReply) speakWithoutEcho('Flexing full robotic power for your analytics!');
+        return null;
       }
-      if (/\b(roam|walk|run|heading)\b/.test(cmd)) {
+      if (/\b(roam|walk|run|patrol)\b/.test(cmd)) {
         insi.roamHeading();
-        speakWithoutEcho('Patrolling across your main dashboard headings now.');
-        return;
+        if (speakReply) speakWithoutEcho('Patrolling across your main dashboard headings now.');
+        return null;
       }
 
-      // Default: Execute full INSI data operator analysis on active dataset
+      // 3. Execute full INSI data operator + full-website automation plan
       const result = executeInsiCommand({
         rows: ctx.rows,
         fields: ctx.fields,
         datasetName: ctx.datasetName,
-        command: cleaned,
+        command: wake.wakeWordDetected ? cleaned : `Hey INSI, ${cleaned}`,
         activeMode: 'demo_sandbox'
       });
 
       insi.applyMascotState(result.mascot_state);
-      speakWithoutEcho(result.voice_reply);
+      if (speakReply && result.voice_reply) {
+        speakWithoutEcho(result.voice_reply);
+      }
 
       if (ctx.onVoiceCommandAction) {
         ctx.onVoiceCommandAction({
-          type: 'operator_result',
+          type: 'automate_all',
           result,
           rawCommand: cleaned
         });
       }
+
+      return result;
     },
     [speakWithoutEcho]
   );
 
-  // Automatic Microphone Permission & Always-On Wake-Word Listener ("Hey INSI", "Hey Incy", "Hey Siri")
+  // Expose `window.insiSpeak` and `window.insiExecuteCommand` globally across the app shell
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.insiSpeak = speakWithoutEcho;
+      window.insiExecuteCommand = (cmdText, opts = {}) =>
+        handleSpokenTranscript(cmdText, { requireWakeWord: false, speakReply: true, ...opts });
+    }
+  }, [speakWithoutEcho, handleSpokenTranscript]);
+
+  // Global, Persistent Web Speech API Listener + Site-Wide Audio Unlocker ("Hey INSI", "Hey Incy", "Hey Siri")
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    // Unlock browser AudioContext & SpeechSynthesis on any user gesture to bypass site-wide audio restrictions
+    const unlockSiteWideAudio = () => {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) {
+          const ctx = new Ctx();
+          if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+          setTimeout(() => {
+            try {
+              ctx.close();
+            } catch {}
+          }, 300);
+        }
+        if ('speechSynthesis' in window && typeof window.speechSynthesis.resume === 'function') {
+          window.speechSynthesis.resume();
+        }
+      } catch {}
+    };
+
     if (!SpeechRecognition) return undefined;
 
     const startUniversalWakeListener = async () => {
       if (micInitializedRef.current || isSpeakingRef.current) return;
       micInitializedRef.current = true;
 
-      // Request microphone permission automatically so the browser prompts the user
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
@@ -348,10 +395,11 @@ export default function InsiPetBot({
               autoGainControl: true
             }
           });
-          // Release the raw stream immediately so SpeechRecognition can bind cleanly with echo cancellation
           stream.getTracks().forEach((track) => track.stop());
+          try {
+            localStorage.setItem('insightboard-mic-granted', 'true');
+          } catch {}
         } catch {
-          // User or browser deferred permission until gesture; will retry on next interaction
           micInitializedRef.current = false;
         }
       }
@@ -363,12 +411,21 @@ export default function InsiPetBot({
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
+        recognition.onstart = () => {
+          lastProcessedResultIdxRef.current = -1;
+        };
+
         recognition.onresult = (event) => {
           if (isSpeakingRef.current) return;
-          const idx = event.results.length - 1;
-          const transcript = String(event.results[idx]?.[0]?.transcript || '').trim();
-          if (transcript) {
-            handleSpokenTranscript(transcript);
+          for (let i = event.resultIndex; i < event.results.length; i += 1) {
+            if (i <= lastProcessedResultIdxRef.current) continue;
+            const res = event.results[i];
+            if (!res?.isFinal) continue;
+            lastProcessedResultIdxRef.current = i;
+            const transcript = String(res[0]?.transcript || '').trim();
+            if (transcript) {
+              handleSpokenTranscript(transcript, { requireWakeWord: true, speakReply: true });
+            }
           }
         };
 
@@ -379,7 +436,7 @@ export default function InsiPetBot({
         };
 
         recognition.onend = () => {
-          // Automatically keep listening unless INSI is currently speaking
+          lastProcessedResultIdxRef.current = -1;
           if (!isSpeakingRef.current && micInitializedRef.current) {
             setTimeout(() => {
               if (!isSpeakingRef.current && recognitionRef.current) {
@@ -387,7 +444,7 @@ export default function InsiPetBot({
                   recognitionRef.current.start();
                 } catch {}
               }
-            }, 450);
+            }, 500);
           }
         };
 
@@ -398,24 +455,36 @@ export default function InsiPetBot({
       }
     };
 
-    // Attempt immediately on load + automatically on first user click/key if browser requires gesture
     const bootMicTimer = setTimeout(() => {
       void startUniversalWakeListener();
-    }, 900);
+    }, 650);
 
-    const onFirstGesture = () => {
+    // Persistent watchdog: ensure SpeechRecognition stays alive across tab switches
+    const watchdogInterval = setInterval(() => {
+      if (!isSpeakingRef.current && micInitializedRef.current && recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+        } catch {
+          // Already started — safe no-op
+        }
+      }
+    }, 6000);
+
+    const onUserInteraction = () => {
+      unlockSiteWideAudio();
       if (!micInitializedRef.current) {
         void startUniversalWakeListener();
       }
     };
 
-    window.addEventListener('pointerdown', onFirstGesture, { passive: true });
-    window.addEventListener('keydown', onFirstGesture, { passive: true });
+    window.addEventListener('pointerdown', onUserInteraction, { passive: true });
+    window.addEventListener('keydown', onUserInteraction, { passive: true });
 
     return () => {
       clearTimeout(bootMicTimer);
-      window.removeEventListener('pointerdown', onFirstGesture);
-      window.removeEventListener('keydown', onFirstGesture);
+      clearInterval(watchdogInterval);
+      window.removeEventListener('pointerdown', onUserInteraction);
+      window.removeEventListener('keydown', onUserInteraction);
       if (recognitionRef.current) {
         try {
           micInitializedRef.current = false;

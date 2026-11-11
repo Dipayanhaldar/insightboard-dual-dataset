@@ -807,36 +807,154 @@ export function executeInsiCommand({
 
   const leaderName = leader?.[dimensionKey] || 'Top unit';
   const leaderVal = formatCompactNumber(leader?.[valueKey] || 0);
+  const secondLeader = descendSorted[1];
+  const secondLeaderName = secondLeader?.[dimensionKey] || null;
+  const secondLeaderVal = secondLeader ? formatCompactNumber(secondLeader?.[valueKey] || 0) : null;
+  const thirdLeader = descendSorted[2];
+  const thirdLeaderName = thirdLeader?.[dimensionKey] || null;
   const laggardName = laggard?.[dimensionKey] || 'Lowest unit';
   const laggardVal = formatCompactNumber(laggard?.[valueKey] || 0);
   const secondLaggardName = secondLaggard?.[dimensionKey] || null;
   const totalFormatted = formatCompactNumber(totalMetricSum);
+  const meanFormatted = formatCompactNumber(meanGroupValue);
   const spokenMetricName = String(valueKey || 'value')
     .replace(/_inr\b|_pct\b|_usd\b/gi, '')
     .replace(/[_-]+/g, ' ')
     .trim();
+  const spokenDimName = String(dimensionKey || 'unit')
+    .replace(/[_-]+/g, ' ')
+    .trim();
 
-  // Crisp Spoken Voice Reply (Strictly <= 35 words, natural human speech without underscores)
+  // Silent Background Tensor & Statistical Z-Score Intelligence (runs invisibly behind the website)
+  const numericVector = aggregatedRows.map((r) => Number(r[valueKey]) || 0);
+  const vecN = numericVector.length || 1;
+  const vecMean = numericVector.reduce((a, b) => a + b, 0) / vecN;
+  const vecStdDev = Math.sqrt(numericVector.reduce((acc, v) => acc + (v - vecMean) ** 2, 0) / vecN);
+  const zOutliers = aggregatedRows.filter((r) => {
+    const val = Number(r[valueKey]) || 0;
+    return vecStdDev > 0 && Math.abs((val - vecMean) / vecStdDev) >= 1.5;
+  });
+
+  // Extract Full-App Automation Plan so voice or Run Command automates the entire website shell
+  const automationPlan = {
+    switchPreset: /\b(hyderabad|metro|rail|train|station)\b/.test(cmdLower) && /\b(switch|load|open|show|change)\b/.test(cmdLower)
+      ? 'metro'
+      : /\b(shopping|mall|retail)\b/.test(cmdLower) && /\b(switch|load|open|show|change)\b/.test(cmdLower)
+      ? 'mall'
+      : null,
+    switchTab: /\b(overview|6 charts|six charts|main charts)\b/.test(cmdLower)
+      ? 'overview'
+      : /\b(command hub|decision|statistical hub|what[- ]?if|simulation)\b/.test(cmdLower)
+      ? 'intelligence'
+      : /\b(gnani|voice studio|sign in|login|gemini)\b/.test(cmdLower)
+      ? 'studio'
+      : /\b(compare dataset|comparison|diff)\b/.test(cmdLower)
+      ? 'compare'
+      : /\b(quota|usage|billing|limit)\b/.test(cmdLower)
+      ? 'quotas'
+      : /\b(expand all|show all modules)\b/.test(cmdLower)
+      ? 'all'
+      : null,
+    exportAppFormat: /\b(pdf)\b/.test(cmdLower) && wantsExport
+      ? 'pdf'
+      : /\b(excel|xlsx|spreadsheet)\b/.test(cmdLower) && wantsExport
+      ? 'excel'
+      : exportFormat !== 'none'
+      ? exportFormat
+      : null,
+    toggleTheme: /\b(dark mode|dark theme|night mode)\b/.test(cmdLower)
+      ? 'dark'
+      : /\b(light mode|light theme|day mode)\b/.test(cmdLower)
+      ? 'light'
+      : null,
+    openCalendar: /\b(calendar|schedule|reminder|meeting|invite|ics)\b/.test(cmdLower),
+    openTable: /\b(open table|show table|expand table|data table|records table)\b/.test(cmdLower)
+      ? true
+      : /\b(hide table|close table|collapse table)\b/.test(cmdLower)
+      ? false
+      : null,
+    resetFilters: wantsReset,
+    searchQuery: (() => {
+      const m = effectiveCommand.match(/\b(?:search\s+for|search|find|filter\s+by|lookup)\s+["']?([a-z0-9\s&.-]{2,32})["']?$/i);
+      if (!m) return null;
+      const candidate = m[1].trim();
+      if (/^(store|stores|zone|zones|category|categories|revenue|footfall|red|top|bottom|chart|bar|pie|line|csv|json|pdf|excel)$/i.test(candidate)) {
+        return null;
+      }
+      return candidate;
+    })(),
+    sortField: /\bsort\s+by\b/.test(cmdLower) ? valueKey : null
+  };
+
+  // Detect if user only said bare wake-word ("Hey INSI") with no specific task
+  const isBareWakeGreeting =
+    /^(?:give me an executive overview of the active dataset|hello|hi|hey|are you there|what can you do)\s*$/i.test(
+      effectiveCommand.trim()
+    ) && !/\b(chart|top|bottom|export|revenue|footfall|conversion|zone|category|store|table|filter|reset)\b/i.test(String(command || '').replace(WAKE_WORD_REGEX, ''));
+
+  // Distinct, Context-Specific Spoken Voice Reply (Strictly <= 35 words, never repeats identical wording back-to-back)
   let rawVoiceReply = '';
-  if (wantsReset) {
-    rawVoiceReply = `Dashboard reset complete! All ${safeRows.length} records in ${datasetName} are active again across ${schema.detectedSchemaKeys.length} columns.`;
+  if (isBareWakeGreeting) {
+    const greetings = [
+      `I am online with ${safeRows.length} records in ${datasetName}. Ask me to highlight top or bottom units, switch charts, filter stores, or export PDF and CSV reports.`,
+      `Ready on your board! ${leaderName} currently leads ${spokenMetricName} at ${leaderVal}. Tell me what chart, filter, or report export to automate next.`,
+      `Listening live across ${safeRows.length} records. Say show top 3 leaders, switch to pie chart, open data table, or export Excel to automate your workflow.`
+    ];
+    const idx = Math.abs(Date.now() + safeRows.length) % greetings.length;
+    rawVoiceReply = greetings[idx];
+  } else if (automationPlan.switchPreset === 'metro') {
+    rawVoiceReply = `Switching your workspace to the Hyderabad Metro Rail dataset now and updating all charts and station KPIs.`;
+  } else if (automationPlan.switchPreset === 'mall') {
+    rawVoiceReply = `Switching your workspace to the Shopping Mall and Retail Sales portfolio across ${safeRows.length} stores.`;
+  } else if (automationPlan.toggleTheme) {
+    rawVoiceReply = `Switched your dashboard to ${automationPlan.toggleTheme} mode.`;
+  } else if (automationPlan.openCalendar) {
+    rawVoiceReply = `Opened your executive calendar invite for ${datasetName} with KPI totals and top segment pre-filled.`;
+  } else if (automationPlan.switchTab) {
+    rawVoiceReply = `Navigated to the requested workspace module and synchronized all ${safeRows.length} active records.`;
+  } else if (automationPlan.openTable === true) {
+    rawVoiceReply = `Expanded the Dataset Records Explorer table showing all ${safeRows.length} active records.`;
+  } else if (automationPlan.searchQuery) {
+    rawVoiceReply = `Filtered the entire dashboard for "${automationPlan.searchQuery}". All charts and KPIs now reflect matching records.`;
+  } else if (wantsReset) {
+    rawVoiceReply = `All filters and searches are cleared! Restored all ${safeRows.length} records in ${datasetName} across ${schema.detectedSchemaKeys.length} columns.`;
+  } else if (automationPlan.exportAppFormat === 'pdf') {
+    rawVoiceReply = `Automated your full PDF visual report export across all charts and ${safeRows.length} records in ${datasetName}.`;
+  } else if (automationPlan.exportAppFormat === 'excel') {
+    rawVoiceReply = `Exporting your formatted Excel workbook now with ${safeRows.length} records and ${leaderName} leading at ${leaderVal}.`;
   } else if ((bottomMatch || wantsAnomalies) && wantsExport) {
     rawVoiceReply = `Chart rendered! ${leaderName} leads at ${leaderVal}, while ${laggardName}${secondLaggardName ? ` and ${secondLaggardName}` : ''} are highlighted in crimson. Your ${exportFormat.toUpperCase()} export is downloading now.`;
   } else if (bottomMatch || wantsAnomalies) {
-    rawVoiceReply = `Done! ${laggardName}${secondLaggardName ? ` and ${secondLaggardName}` : ''} are flagged in red as the lowest performers at ${laggardVal}, while ${leaderName} leads at ${leaderVal}.`;
+    rawVoiceReply = `Flagged in crimson! ${laggardName} (${laggardVal})${secondLaggardName ? ` and ${secondLaggardName}` : ''} are the lowest on ${spokenMetricName}, trailing the ${meanFormatted} portfolio average.`;
+  } else if (topMatch) {
+    rawVoiceReply = `Top ${topCount || 3} leaders highlighted in emerald! ${leaderName} ranks first in ${spokenMetricName} at ${leaderVal}${secondLeaderName ? `, followed by ${secondLeaderName} at ${secondLeaderVal}` : ''}${thirdLeaderName ? ` and ${thirdLeaderName}` : ''}.`;
   } else if (wantsExport) {
-    rawVoiceReply = `Analysis complete across ${safeRows.length} records. ${leaderName} leads with ${leaderVal} (${leader?.portfolio_share_pct || 0}% share). Your ${exportFormat.toUpperCase()} file is downloading now.`;
+    rawVoiceReply = `Exporting your ${exportFormat.replace(/_/g, ' ').toUpperCase()} file now! Total ${spokenMetricName} across ${safeRows.length} records is ${totalFormatted}, led by ${leaderName} at ${leaderVal}.`;
+  } else if (requestedChartType === 'pie') {
+    rawVoiceReply = `Switched to a ${spokenMetricName} share pie chart by ${spokenDimName}! ${leaderName} holds the largest share at ${leader?.portfolio_share_pct || 0}% (${leaderVal}).`;
+  } else if (requestedChartType === 'line' || requestedChartType === 'area') {
+    rawVoiceReply = `Rendered the ${requestedChartType} trend chart for ${spokenMetricName} across ${groupMap.size} ${spokenDimName} groups, averaging ${meanFormatted} per unit.`;
+  } else if (requestedAggregation === 'average') {
+    rawVoiceReply = `Calculated average ${spokenMetricName} by ${spokenDimName}: portfolio mean is ${meanFormatted}, led by ${leaderName} at ${leaderVal}.`;
   } else {
-    rawVoiceReply = `Analyzed ${safeRows.length} records. ${leaderName} leads ${spokenMetricName} at ${leaderVal}, outperforming ${laggardName} at ${laggardVal}. Live chart updated on your board.`;
+    rawVoiceReply = `Updated ${requestedChartType} chart of ${spokenMetricName} by ${spokenDimName}: total is ${totalFormatted} across ${groupMap.size} groups, led by ${leaderName} (${leaderVal}).`;
   }
 
   const voiceReply = enforceVoiceBrevity(rawVoiceReply);
 
   const keyInsights = [
-    `Portfolio total for ${valueKey} across ${safeRows.length} records (${groupMap.size} distinct ${dimensionKey} groups) is ${Number(totalMetricSum.toFixed(2)).toLocaleString()} (mean: ${Number(meanGroupValue.toFixed(2)).toLocaleString()}).`,
+    `Portfolio total for ${valueKey} across ${safeRows.length} records (${groupMap.size} distinct ${dimensionKey} groups) is ${Number(totalMetricSum.toFixed(2)).toLocaleString()} (mean: ${Number(meanGroupValue.toFixed(2)).toLocaleString()}, σ: ${Math.round(vecStdDev).toLocaleString()}).`,
     `Top Performer: ${leaderName} generated ${Number(leader?.[valueKey] || 0).toLocaleString()} (${leader?.portfolio_share_pct || 0}% of total portfolio, ${leader?.variance_vs_mean_pct >= 0 ? '+' : ''}${leader?.variance_vs_mean_pct || 0}% vs group mean).`,
-    `Bottom Performer / Anomaly Check: ${laggardName} recorded ${Number(laggard?.[valueKey] || 0).toLocaleString()} (${laggard?.portfolio_share_pct || 0}% share, ${laggard?.variance_vs_mean_pct || 0}% vs group mean)${secondLaggardName ? `, followed by ${secondLaggardName} at ${Number(secondLaggard?.[valueKey] || 0).toLocaleString()}` : ''}.`
+    `Bottom Performer / Anomaly Check: ${laggardName} recorded ${Number(laggard?.[valueKey] || 0).toLocaleString()} (${laggard?.portfolio_share_pct || 0}% share, ${laggard?.variance_vs_mean_pct || 0}% vs group mean)${secondLaggardName ? `, followed by ${secondLaggardName} at ${Number(secondLaggard?.[valueKey] || 0).toLocaleString()}` : ''}${zOutliers.length ? ` · ${zOutliers.length} statistical outlier(s) isolated.` : '.'}`
   ];
+
+  const headlineText = topMatch
+    ? `Top ${topCount || 3} Leaders in ${spokenMetricName}: ${leaderName} (${leaderVal})${secondLeaderName ? ` & ${secondLeaderName} (${secondLeaderVal})` : ''}`
+    : bottomMatch || wantsAnomalies
+    ? `Underperforming Alert: ${laggardName} (${laggardVal})${secondLaggardName ? ` & ${secondLaggardName}` : ''} Flagged in Crimson`
+    : requestedChartType === 'pie'
+    ? `Distribution Share: ${leaderName} Captures ${leader?.portfolio_share_pct || 0}% of ${spokenMetricName}`
+    : `${leaderName} leads ${valueKey.replace(/_/g, ' ')} (${leaderVal}) across ${safeRows.length} analyzed records in ${datasetName}`;
 
   return {
     mascot_state: {
@@ -851,15 +969,18 @@ export function executeInsiCommand({
     },
     voice_reply: voiceReply,
     executive_summary: {
-      headline: `${leaderName} leads ${valueKey.replace(/_/g, ' ')} (${leaderVal}) across ${safeRows.length} analyzed records in ${datasetName}`,
+      headline: headlineText,
       key_insights: keyInsights,
       recommended_next_step:
         bottomMatch || wantsAnomalies
           ? `Audit footfall-to-checkout conversion and lease cost for ${laggardName}${secondLaggardName ? ` and ${secondLaggardName}` : ''}, or run a +10% promotional traffic simulation.`
+          : topMatch
+          ? `Replicate promotional mix and merchandising from ${leaderName} across mid-tier units to lift overall portfolio yield.`
           : `Say "Hey INSI, highlight the bottom 2 ${dimensionKey.replace(/_/g, ' ')} in red and export a CSV" to isolate underperforming units.`
     },
     dashboard_actions: dashboardActions,
-    processed_data: processedData
+    processed_data: processedData,
+    automation_plan: automationPlan
   };
 }
 

@@ -67,20 +67,6 @@ const DEFAULT_SERVICES = [
     status: 'Within Free Tier',
     billingCutoffActive: true,
     estimatedCostUsd: 0
-  },
-  {
-    id: 'browser_ai',
-    name: 'Browser-Native Free AI (TF.js / ONNX / Transformers.js)',
-    tierLabel: 'Unlimited Local WebGPU & WASM Runtime',
-    unit: 'runs/day',
-    used: 6,
-    limit: 100000,
-    remaining: 99994,
-    percentUsed: 1,
-    limitReached: false,
-    status: 'Within Free Tier',
-    billingCutoffActive: true,
-    estimatedCostUsd: 0
   }
 ];
 
@@ -97,11 +83,7 @@ export default function UsageQuotasPanel() {
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data.services) && data.services.length) {
-          const browserAiCard = DEFAULT_SERVICES.find((s) => s.id === 'browser_ai');
-          const merged = data.services.some((s) => s.id === 'browser_ai')
-            ? data.services
-            : [...data.services, browserAiCard];
-          setServices(merged);
+          setServices(data.services);
         }
         if (data.dateUtc) setDateUtc(data.dateUtc);
       }

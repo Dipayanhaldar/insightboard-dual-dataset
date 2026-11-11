@@ -15,7 +15,7 @@ import V2Workspace from './v2/V2Workspace.jsx';
 import DatasetCompare from './v2/DatasetCompare.jsx';
 import ReleaseCenter from './v2/ReleaseCenter.jsx';
 import UsageQuotasPanel from './v2/UsageQuotasPanel.jsx';
-import UniversalConnectorHub from './v2/UniversalConnectorHub.jsx';
+import UniversalConnectorHub, { exportProcessedDataFile } from './v2/UniversalConnectorHub.jsx';
 import InsiPetBot from './v2/InsiPetBot.jsx';
 import { playButtonClick, playMetroStationChime, recordRealQuotaUsage } from './v2/uiSound.js';
 import { insi } from './v2/insiController.js';
@@ -250,21 +250,107 @@ function App(){
   };
  }, [setDataset]);
 
+ // Full-Website Task Automation Executor (shared by Hands-Free "Hey INSI" Voice & Command Bar)
+ const executeWebsiteAutomation = useCallback(({ result, rawCommand = '', allowDownload = true } = {}) => {
+  if (!result) return [];
+  const plan = result.automation_plan || {};
+  const steps = [];
+
+  if (plan.switchPreset) {
+   void switchPreset(plan.switchPreset);
+   steps.push(`Switched dataset to ${plan.switchPreset === 'metro' ? 'Hyderabad Metro Rail' : 'Shopping Mall & Retail Sales'}`);
+  }
+  if (plan.toggleTheme) {
+   setTheme(plan.toggleTheme);
+   steps.push(`Switched theme to ${plan.toggleTheme} mode`);
+  }
+  if (plan.openCalendar) {
+   setCalendarDrawerOpen(true);
+   steps.push('Opened Executive Calendar Invite Drawer');
+  }
+  if (plan.resetFilters) {
+   setFilters({});
+   setSearch('');
+   setPage(1);
+   steps.push('Reset all dashboard filters and search');
+  }
+  if (plan.searchQuery) {
+   setSearch(plan.searchQuery);
+   setPage(1);
+   steps.push(`Filtered dashboard records by "${plan.searchQuery}"`);
+  }
+  if (plan.sortField && fields.includes(plan.sortField)) {
+   setSort({ key: plan.sortField, dir: 'desc' });
+   steps.push(`Sorted records by ${nice(plan.sortField)}`);
+  }
+  if (plan.openTable !== null && plan.openTable !== undefined) {
+   setTableOpen(Boolean(plan.openTable));
+   if (plan.openTable && activeTab !== 'overview' && activeTab !== 'all') {
+    setActiveTab('overview');
+   }
+   steps.push(plan.openTable ? 'Expanded Dataset Records Explorer table' : 'Collapsed Dataset Records Explorer table');
+  }
+  if (plan.switchTab) {
+   setActiveTab(plan.switchTab);
+   steps.push(`Navigated to ${plan.switchTab} module`);
+  }
+
+  if (allowDownload && plan.exportAppFormat) {
+   if (plan.exportAppFormat === 'pdf') {
+    void exportPDF();
+    steps.push('Triggered 6-Chart PDF Visual Report export');
+   } else if (plan.exportAppFormat === 'excel') {
+    exportExcel();
+    steps.push('Exported formatted Excel (.xlsx) workbook');
+   } else if (plan.exportAppFormat === 'csv') {
+    const exportAct = (result.dashboard_actions || []).find((a) => a.action_type === 'export_file');
+    const filename = exportProcessedDataFile(result, 'csv', exportAct?.export_config?.suggested_filename || 'insi_export');
+    if (filename) steps.push(`Downloaded ${filename}`);
+   } else if (plan.exportAppFormat === 'executive_summary_txt' || plan.exportAppFormat === 'json') {
+    const exportAct = (result.dashboard_actions || []).find((a) => a.action_type === 'export_file');
+    const filename = exportProcessedDataFile(
+     result,
+     plan.exportAppFormat,
+     exportAct?.export_config?.suggested_filename || 'insi_summary'
+    );
+    if (filename) steps.push(`Downloaded ${filename}`);
+   }
+  }
+
+  const summaryText = steps.length
+   ? `Automated: ${steps.join(' · ')}`
+   : `INSI Automated: ${result.voice_reply || result.executive_summary?.headline || rawCommand}`;
+
+  setNotice(summaryText);
+
+  if (typeof window !== 'undefined') {
+   queueMicrotask(() => {
+    window.dispatchEvent(
+     new CustomEvent('insi:operator-sync', {
+      detail: { result, rawCommand, summaryText }
+     })
+    );
+   });
+  }
+
+  return steps;
+ }, [activeTab, fields, switchPreset]);
+
  // Handle Hands-Free Voice Actions from INSI ("Hey INSI, switch to Hyderabad Metro", "Hey INSI, add to calendar", etc.)
  const handleVoiceCommandAction = useCallback((payload) => {
   if (!payload) return;
-  if (payload.type === 'switch_preset' && payload.preset) {
-   void switchPreset(payload.preset);
+  if (payload.type === 'security_scan' && payload.spoken) {
+   setNotice(payload.spoken);
    return;
   }
-  if (payload.type === 'open_calendar') {
-   setCalendarDrawerOpen(true);
-   return;
+  if (payload.type === 'automate_all' && payload.result) {
+   executeWebsiteAutomation({
+    result: payload.result,
+    rawCommand: payload.rawCommand,
+    allowDownload: true
+   });
   }
-  if (payload.type === 'command_result' && payload.output?.voice_reply) {
-   setNotice(`INSI Voice Operator: "${payload.output.voice_reply}"`);
-  }
- }, [switchPreset]);
+ }, [executeWebsiteAutomation]);
 
  async function importFile(e){const file=e.target.files?.[0];if(!file)return;playButtonClick();if(audioRef.current){audioRef.current.pause();setAudioStatus('');}try{const text=await file.text();const raw=file.name.toLowerCase().endsWith('.csv')?parseCSV(text):JSON.parse(text);insi.scanSecurity({text,rows:Array.isArray(raw)?raw:[],filename:file.name});setDataset(raw,file.name,'custom');recordRealQuotaUsage('mongodb',1);}catch(err){setNotice(`Import failed: ${err.message}`);insi.react('error');}e.target.value='';}
  function exportCSV(){playButtonClick();const cols=fields;const text=[cols.map(csvCell).join(','),...filtered.map(r=>cols.map(k=>csvCell(r[k])).join(','))].join('\r\n');downloadBlob(new Blob(['\ufeff'+text],{type:'text/csv;charset=utf-8;'}),'insightboard-vdb-filtered-data.csv');setNotice(`Exported ${filtered.length} filtered records to CSV.`);insi.react('export');}
@@ -356,7 +442,7 @@ function App(){
    </div>
    <div className="side-label">WORKSPACE MODULES</div>
    <button type="button" className={`nav-item ${activeTab==='overview'?'active':''}`} onClick={()=>handleSwitchTab('overview','Overview & 6 Charts')}><Activity size={18}/> Overview &amp; 6 Charts</button>
-   <button type="button" className={`nav-item ${activeTab==='connector'?'active':''}`} onClick={()=>handleSwitchTab('connector','Dropzone, Free AI & Hey INSI')}><Radio size={18}/> Dropzone &amp; Free AI</button>
+   <button type="button" className={`nav-item ${activeTab==='connector'?'active':''}`} onClick={()=>handleSwitchTab('connector','Data Dropzone & Hey INSI')}><Radio size={18}/> Dropzone &amp; Hey INSI</button>
    <button type="button" className={`nav-item ${activeTab==='intelligence'?'active':''}`} onClick={()=>handleSwitchTab('intelligence','Decision & Stats Hub')}><Building2 size={18}/> {preset==='mall'?'Mall & Sales Suite':'Decision & Stats Hub'}</button>
    <button type="button" className={`nav-item ${activeTab==='studio'?'active':''}`} onClick={()=>handleSwitchTab('studio','AI, Gnani Voice & Sign In')}><Sparkles size={18}/> AI, Gnani Voice &amp; Sign In</button>
    <button type="button" className={`nav-item ${activeTab==='compare'?'active':''}`} onClick={()=>handleSwitchTab('compare','Compare Datasets')}><GitCompareArrows size={18}/> Compare Datasets</button>
@@ -544,8 +630,8 @@ function App(){
       <button type="button" className={`workspace-tab-btn ${activeTab==='overview'?'active':''}`} onClick={()=>handleSwitchTab('overview','Overview & 6 Charts')}>
        <BarChart3 size={15}/> <span>Overview &amp; 6 Charts</span>
       </button>
-      <button type="button" className={`workspace-tab-btn ${activeTab==='connector'?'active':''}`} onClick={()=>handleSwitchTab('connector','Dropzone, Free AI & Hey INSI')} data-testid="tab-universal-connector">
-       <Radio size={15}/> <span>Dropzone, Free AI &amp; Hey INSI</span>
+      <button type="button" className={`workspace-tab-btn ${activeTab==='connector'?'active':''}`} onClick={()=>handleSwitchTab('connector','Data Dropzone & Hey INSI')} data-testid="tab-universal-connector">
+       <Radio size={15}/> <span>Data Dropzone &amp; Hey INSI</span>
       </button>
       <button type="button" className={`workspace-tab-btn ${activeTab==='intelligence'?'active':''}`} onClick={()=>handleSwitchTab('intelligence','Decision & Statistical Hub')}>
        <Building2 size={15}/> <span>{preset==='mall'?'Mall & Sales Command Hub':'Decision & Statistical Hub'}</span>
@@ -576,6 +662,7 @@ function App(){
       onLoadDataset={setDataset}
       onSwitchPreset={switchPreset}
       onParseCsv={parseCSV}
+      onAutomateWebsiteTask={executeWebsiteAutomation}
      />
     )}
 

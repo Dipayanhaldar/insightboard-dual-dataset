@@ -26,7 +26,6 @@ import {
   FileSpreadsheet,
   ShieldCheck,
   ShieldAlert,
-  Cpu,
   Eraser,
   Zap,
   Scale
@@ -42,12 +41,12 @@ import './UniversalConnectorHub.css';
 
 const QUICK_COMMANDS = [
   {
-    label: 'Bar Chart + Flag Bottom 2 in Red',
-    command: 'Hey INSI, show revenue by store as a bar chart and highlight the bottom 2 stores in red'
-  },
-  {
     label: 'Top 3 Leaders by Revenue',
     command: 'Hey INSI, show top 3 stores by revenue and highlight leaders'
+  },
+  {
+    label: 'Flag Bottom 2 in Red',
+    command: 'Hey INSI, show revenue by store as a bar chart and highlight the bottom 2 stores in red'
   },
   {
     label: 'Footfall Share Pie Chart',
@@ -58,35 +57,16 @@ const QUICK_COMMANDS = [
     command: 'Hey INSI, highlight the bottom 2 units by conversion rate in red'
   },
   {
-    label: 'Export Executive Summary TXT',
+    label: 'Open Data Table',
+    command: 'Hey INSI, open data table'
+  },
+  {
+    label: 'Schedule Calendar Review',
+    command: 'Hey INSI, add to calendar'
+  },
+  {
+    label: 'Export Summary TXT',
     command: 'Hey INSI, analyze revenue by zone and export an executive summary txt'
-  }
-];
-
-const FREE_BROWSER_ENGINES = [
-  {
-    id: 'tfjs_onnx',
-    name: 'TensorFlow.js + ONNX Runtime Web',
-    badge: 'WebGL / WASM Tensors · $0 Keyless',
-    desc: 'Runs in-browser matrix normalization, linear regression trend slope, and 2-sigma Z-score anomaly detection directly on your device GPU/CPU.'
-  },
-  {
-    id: 'transformers_hf',
-    name: 'Transformers.js (HuggingFace.js)',
-    badge: 'In-Browser ONNX NLP · $0 Keyless',
-    desc: 'Performs client-side semantic classification, executive sentiment scoring, and category risk tagging in WebAssembly without external API keys.'
-  },
-  {
-    id: 'webllm_gpu',
-    name: 'WebLLM (WebGPU Browser Engine)',
-    badge: 'WebGPU Hardware Accelerated · $0',
-    desc: 'Synthesizes executive boardroom narratives locally in the browser using WebGPU shader pipelines with automatic deterministic fallback.'
-  },
-  {
-    id: 'ollama_local',
-    name: 'Ollama Local Bridge (localhost:11434)',
-    badge: 'Localhost Daemon · Zero Cloud Cost',
-    desc: 'Connects directly to your local Ollama runtime (Llama 3 / Mistral / Phi-3) if running on your laptop, or falls back seamlessly to the browser engine.'
   }
 ];
 
@@ -106,7 +86,7 @@ function triggerClientDownload(filename, content, mimeType) {
   }
 }
 
-function exportProcessedDataFile(operatorOutput, format = 'csv', baseFilename = 'insight_board_export') {
+export function exportProcessedDataFile(operatorOutput, format = 'csv', baseFilename = 'insight_board_export') {
   const rows = Array.isArray(operatorOutput?.processed_data) ? operatorOutput.processed_data : [];
   const safeBase = String(baseFilename || 'insight_board_export').replace(/\.[a-z0-9]+$/i, '');
 
@@ -152,10 +132,14 @@ export default function UniversalConnectorHub({
   datasetName = 'Shopping Mall & Retail Sales — Flagship Portfolio',
   preset = 'mall',
   onLoadDataset,
-  onParseCsv
+  onParseCsv,
+  onAutomateWebsiteTask
 }) {
   const [commandInput, setCommandInput] = useState(
-    'Hey INSI, show revenue by store as a bar chart and highlight the bottom 2 stores in red'
+    'Hey INSI, show top 3 stores by revenue and highlight leaders'
+  );
+  const [lastExecutedSummary, setLastExecutedSummary] = useState(
+    'Ready · Say "Hey INSI..." out loud anywhere on the site or run any command below to automate charts, filters, tables, and exports.'
   );
   const [dragActive, setDragActive] = useState(false);
   const [ingestStatus, setIngestStatus] = useState('');
@@ -165,8 +149,6 @@ export default function UniversalConnectorHub({
     summary: 'Zero-Trust SHA-256 & XSS/Formula Guard Active · All records verified clean.'
   });
   const [downloadNotice, setDownloadNotice] = useState('');
-  const [selectedFreeEngine, setSelectedFreeEngine] = useState('tfjs_onnx');
-  const [freeEngineOutput, setFreeEngineOutput] = useState(null);
   const [scratchRevealed, setScratchRevealed] = useState(false);
   const [, setScratchProgress] = useState(0);
 
@@ -197,6 +179,23 @@ export default function UniversalConnectorHub({
     });
     setOperatorResult(res);
   }, [rows, fields, datasetName, preset]);
+
+  // Listen to global voice commands spoken anywhere on the app so this panel stays in sync
+  useEffect(() => {
+    const onGlobalVoiceSync = (event) => {
+      const detail = event?.detail;
+      if (!detail?.result) return;
+      setOperatorResult(detail.result);
+      if (detail.rawCommand) {
+        setCommandInput(detail.rawCommand);
+      }
+      if (detail.summaryText) {
+        setLastExecutedSummary(detail.summaryText);
+      }
+    };
+    window.addEventListener('insi:operator-sync', onGlobalVoiceSync);
+    return () => window.removeEventListener('insi:operator-sync', onGlobalVoiceSync);
+  }, []);
 
   // Compute hidden bottleneck & opportunity for the Razorpay "fix-my-itch" style interactive scratch card
   const scratchInsight = useMemo(() => {
@@ -243,7 +242,6 @@ export default function UniversalConnectorHub({
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, width, height);
 
-    // Subtle geometric dot grid
     ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
     for (let x = 16; x < width; x += 22) {
       for (let y = 16; y < height; y += 22) {
@@ -294,85 +292,7 @@ export default function UniversalConnectorHub({
     }
   };
 
-  // Run 100% Free Browser AI Engine computation on active dataset
-  const runFreeBrowserEngine = useCallback(
-    async (engineId = selectedFreeEngine, isUserClick = false) => {
-      setSelectedFreeEngine(engineId);
-      if (isUserClick) {
-        playButtonClick();
-        insi.heavyAi();
-        recordRealQuotaUsage('browser_ai', 1);
-      }
-
-      const numericVals = rows
-        .map((r) => Number(r[schemaInfo.primaryMetric]))
-        .filter((v) => Number.isFinite(v));
-      const n = numericVals.length || 1;
-      const mean = numericVals.reduce((a, b) => a + b, 0) / n;
-      const stdDev = Math.sqrt(
-        numericVals.reduce((acc, v) => acc + (v - mean) ** 2, 0) / n
-      );
-
-      // Compute linear trend slope via Tensor algebra
-      let num = 0;
-      let den = 0;
-      const xMean = (n - 1) / 2;
-      numericVals.forEach((v, idx) => {
-        num += (idx - xMean) * (v - mean);
-        den += (idx - xMean) ** 2;
-      });
-      const slope = den > 0 ? num / den : 0;
-      const zAnomalies = rows.filter((r) => {
-        const val = Number(r[schemaInfo.primaryMetric]);
-        if (!Number.isFinite(val) || stdDev === 0) return false;
-        return Math.abs((val - mean) / stdDev) >= 1.65;
-      });
-
-      let ollamaConnected = false;
-      if (engineId === 'ollama_local') {
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 900);
-          const res = await fetch('http://localhost:11434/api/tags', {
-            signal: controller.signal
-          });
-          clearTimeout(timer);
-          ollamaConnected = res.ok;
-        } catch {
-          ollamaConnected = false;
-        }
-      }
-
-      const hasWebGpu = typeof navigator !== 'undefined' && 'gpu' in navigator;
-
-      setFreeEngineOutput({
-        engineId,
-        timestamp: new Date().toLocaleTimeString(),
-        tensorMean: Math.round(mean * 100) / 100,
-        tensorStdDev: Math.round(stdDev * 100) / 100,
-        trendSlope: Math.round(slope * 100) / 100,
-        anomalyCount: zAnomalies.length,
-        webGpuAvailable: hasWebGpu,
-        ollamaConnected,
-        verdict:
-          engineId === 'tfjs_onnx'
-            ? `TensorFlow.js / ONNX Web normalized ${n} vectors (μ=${Math.round(mean).toLocaleString()}, σ=${Math.round(stdDev).toLocaleString()}, slope=${slope >= 0 ? '+' : ''}${Math.round(slope).toLocaleString()}/unit) and isolated ${zAnomalies.length} statistical outlier(s) at $0 cost.`
-            : engineId === 'transformers_hf'
-            ? `Transformers.js / HuggingFace.js classified ${n} records across "${datasetName}" with 98.4% schema confidence and flagged ${zAnomalies.length} priority attention unit(s).`
-            : engineId === 'webllm_gpu'
-            ? `WebLLM (${hasWebGpu ? 'WebGPU Hardware Active' : 'WASM SIMD Fallback Active'}) synthesized executive brief for ${n} records with zero external token cost.`
-            : ollamaConnected
-            ? `Connected to local Ollama daemon (localhost:11434) — zero-cloud local inference verified on ${n} records.`
-            : `Ollama localhost:11434 not currently running on this device — automatically routed to built-in Browser WASM Engine (${n} records analyzed at $0).`
-      });
-    },
-    [rows, schemaInfo.primaryMetric, datasetName, selectedFreeEngine]
-  );
-
-  useEffect(() => {
-    void runFreeBrowserEngine(selectedFreeEngine, false);
-  }, [rows, datasetName]);
-
+  // Execute a command and automate the entire website shell
   const runOperatorCommand = useCallback(
     (rawCommand, { allowDownload = true, speak = true } = {}) => {
       playButtonClick();
@@ -393,7 +313,31 @@ export default function UniversalConnectorHub({
         window.insiSpeak(output.voice_reply);
       }
 
-      if (allowDownload) {
+      const automatedSteps = [];
+      const primaryChart = (output.dashboard_actions || [])[0]?.chart_config;
+      if (primaryChart && primaryChart.chart_type !== 'none') {
+        automatedSteps.push(
+          `Rendered ${primaryChart.chart_type.toUpperCase()} (${primaryChart.y_axis_key} by ${primaryChart.x_axis_key})`
+        );
+      }
+      const highlightAct = (output.dashboard_actions || []).find(
+        (a) => a.action_type === 'highlight_anomalies' || a.action_type === 'filter_table'
+      );
+      if (highlightAct?.filter_config?.value) {
+        automatedSteps.push(`Highlighted: ${highlightAct.filter_config.value}`);
+      }
+
+      // Trigger full-website automation in App (main.jsx) if applicable
+      if (onAutomateWebsiteTask) {
+        const appActions = onAutomateWebsiteTask({
+          result: output,
+          rawCommand,
+          allowDownload
+        });
+        if (Array.isArray(appActions) && appActions.length) {
+          automatedSteps.push(...appActions);
+        }
+      } else if (allowDownload) {
         const exportAction = (output.dashboard_actions || []).find(
           (a) => a.action_type === 'export_file' && a.export_config?.trigger_download
         );
@@ -404,14 +348,21 @@ export default function UniversalConnectorHub({
             exportAction.export_config.suggested_filename
           );
           if (downloaded) {
-            setDownloadNotice(`Auto-exported "${downloaded}" via INSI Voice/Command Pipeline.`);
+            automatedSteps.push(`Downloaded ${downloaded}`);
+            setDownloadNotice(`Auto-exported "${downloaded}" via INSI Action Pipeline.`);
           }
         } else {
           setDownloadNotice('');
         }
       }
+
+      setLastExecutedSummary(
+        automatedSteps.length
+          ? `Automated: ${automatedSteps.join(' · ')}`
+          : `Executed: ${output.executive_summary?.headline || rawCommand}`
+      );
     },
-    [rows, fields, datasetName, preset]
+    [rows, fields, datasetName, preset, onAutomateWebsiteTask]
   );
 
   // Unified Drag & Drop or File Input Handler with Real-Time Security & Legal Gesture Scan
@@ -420,8 +371,7 @@ export default function UniversalConnectorHub({
     playButtonClick();
     try {
       const text = await file.text();
-      // Run INSI Virus / Malware / Legal / PII Guard before loading
-      const sec = insi.scanSecurity({ text, rows: [], filename: file.name });
+      insi.scanSecurity({ text, rows: [], filename: file.name });
 
       let parsedRows = [];
       if (file.name.toLowerCase().endsWith('.csv')) {
@@ -494,8 +444,8 @@ export default function UniversalConnectorHub({
   );
 
   return (
-    <section className="uch-wrapper" aria-label="Unified Data Dropzone, Free Browser AI Hub, and Hey INSI Operator">
-      {/* 1. UNIFIED DRAG & DROP CSV / JSON STUDIO + REAL-TIME INSI SECURITY & LEGAL SCANNER */}
+    <section className="uch-wrapper" aria-label="Unified Data Dropzone and Hey INSI Autonomous Operator">
+      {/* 1. UNIFIED DRAG & DROP CSV / JSON STUDIO + RAZORPAY-INSPIRED SCRATCH CARD */}
       <div className="uch-top-grid">
         <div
           className={`uch-unified-dropzone ${dragActive ? 'dragging' : ''}`}
@@ -681,49 +631,7 @@ export default function UniversalConnectorHub({
         <span>{ingestStatus || securityReport.summary}</span>
       </div>
 
-      {/* 3. 100% FREE ZERO-KEY BROWSER & LOCAL AI ENGINE HUB */}
-      <div className="uch-free-ai-panel" data-testid="free-browser-ai-hub">
-        <div className="uch-free-ai-head">
-          <div>
-            <span className="uch-section-kicker">100% FREE · ZERO API KEY · CLIENT-SIDE &amp; LOCAL AI RUNTIME</span>
-            <h3>Free Browser &amp; Local AI Engine Hub</h3>
-          </div>
-          <span className="uch-zero-cost-pill">$0.00 Forever · Runs on User Device</span>
-        </div>
-
-        <div className="uch-free-ai-grid">
-          {FREE_BROWSER_ENGINES.map((eng) => (
-            <button
-              key={eng.id}
-              type="button"
-              className={`uch-engine-card ${selectedFreeEngine === eng.id ? 'active' : ''}`}
-              onClick={() => void runFreeBrowserEngine(eng.id, true)}
-            >
-              <div className="uch-engine-top">
-                <Cpu size={15} />
-                <span className="uch-engine-badge">{eng.badge}</span>
-              </div>
-              <strong>{eng.name}</strong>
-              <p>{eng.desc}</p>
-            </button>
-          ))}
-        </div>
-
-        {freeEngineOutput && (
-          <div className="uch-free-ai-output">
-            <CheckCircle2 size={16} />
-            <div>
-              <strong>{freeEngineOutput.verdict}</strong>
-              <small>
-                Verified at {freeEngineOutput.timestamp} · Primary Metric: <code>{schemaInfo.primaryMetric}</code> ·
-                Records: {rows.length.toLocaleString()}
-              </small>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 4. HANDS-FREE "HEY INSI" COMMAND BAR */}
+      {/* 3. HANDS-FREE "HEY INSI" AUTONOMOUS COMMAND BAR */}
       <div className="uch-command-panel">
         <div className="uch-command-bar">
           <div className="uch-command-prefix">
@@ -740,7 +648,7 @@ export default function UniversalConnectorHub({
                 runOperatorCommand(commandInput, { allowDownload: true, speak: true });
               }
             }}
-            placeholder='Say "Hey INSI..." out loud or type a command here'
+            placeholder='Say "Hey INSI..." out loud or type any task (e.g. "show top 3 stores", "open data table", "export PDF", "switch to Hyderabad Metro")'
             aria-label="Hey INSI natural language command input"
             data-testid="insi-command-input"
           />
@@ -751,7 +659,7 @@ export default function UniversalConnectorHub({
             data-testid="insi-execute-btn"
           >
             <Play size={15} />
-            <span>Run Command</span>
+            <span>Automate Task</span>
           </button>
         </div>
 
@@ -770,6 +678,11 @@ export default function UniversalConnectorHub({
             </button>
           ))}
         </div>
+
+        <div className="uch-automation-log" data-testid="insi-automation-log">
+          <CheckCircle2 size={14} />
+          <span>{lastExecutedSummary}</span>
+        </div>
       </div>
 
       {downloadNotice && (
@@ -779,12 +692,12 @@ export default function UniversalConnectorHub({
         </div>
       )}
 
-      {/* 5. CLEAN EXECUTIVE SUMMARY & LIVE ANOMALY CHART */}
+      {/* 4. CLEAN EXECUTIVE SUMMARY & LIVE ANOMALY CHART */}
       <div className="uch-output-grid">
         <div className="uch-summary-card">
           <div className="uch-voice-bubble">
             <div className="uch-voice-header">
-              <span className="uch-voice-tag">INSI Spoken Executive Brief (Auto Echo-Safe Mic Active)</span>
+              <span className="uch-voice-tag">INSI Spoken Executive Brief (Persistent Wake-Word Active)</span>
             </div>
             <p className="uch-voice-text" data-testid="insi-voice-reply">
               &ldquo;{operatorResult?.voice_reply}&rdquo;
