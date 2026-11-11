@@ -18,9 +18,11 @@ const SAMPLE_MALL_RECORDS = [
   { store_name: 'Bistro Corner', mall_zone: 'Food Court', gross_sales: 910000, visitor_count: 7400, conversion_rate: 9.4 }
 ];
 
-test('detectWakeWordAndCommand recognizes "Hey INSI" and all phonetic STT variants', () => {
+test('detectWakeWordAndCommand recognizes "Hey INSI", "Hey NCI", "Wake up NCI" and all phonetic STT variants', () => {
   const variants = [
     'Hey INSI, show revenue by store',
+    'Hey NCI, show revenue by store',
+    'Wake up NCI, show revenue by store',
     'Hey NC show revenue by store',
     'Hey in C, show revenue by store',
     'hey insi show revenue by store',
@@ -41,6 +43,9 @@ test('detectWakeWordAndCommand recognizes "Hey INSI" and all phonetic STT varian
 
   const bareGreeting = detectWakeWordAndCommand('Hey');
   assert.equal(bareGreeting.wakeWordDetected, true);
+
+  const wakeUpNci = detectWakeWordAndCommand('Hey NCI, wake up NCI');
+  assert.equal(wakeUpNci.wakeWordDetected, true);
 });
 
 test('extractConnectorRecords unwraps nested API/Webhook arrays automatically', () => {

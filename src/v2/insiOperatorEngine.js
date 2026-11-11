@@ -27,14 +27,29 @@ export const VALID_CONNECTOR_MODES = Object.freeze([
   'awaiting_data'
 ]);
 
-// Phonetic variations of "Hey INSI" (and "Hey Incy" / "Hey Siri") produced by browser Speech-to-Text engines
-const WAKE_WORD_REGEX = /^\s*(?:hey|hi|hello|ok|okay|yo|listen)?\s*(?:insi\.ai|insi|incy|insee|insy|insa|in-see|in\s+see|in\s+sea|in\s+si|in\s+c|and\s+see|and\s+c|nc|n\.c\.|n\s+c|inc|i\s+n\s+c|ins|i\s+n\s+s|nse|n\s+s\s+e|nsc|n\s+s\s+c|ic|i\s+c|ncc|nic|unsee|hennessy|aisi|emc|mvc|imc|ims|mc|m\s+c|ec|e\s+c|ac|a\s+c|pc|vc|easy|ancy|ansi|ency|enci|nancy|infy|indy|envy|hainsi|hensy|heinsi|heynsi|ensi|insight\s*bot|insight|inside|in\s+sight|in\s+side|siri|bot|assistant)\b[\s,:.\-!?]*/i;
+// Phonetic variations of "Hey INSI" / "Hey NCI" / "Wake up NCI" / "Hey Incy" / "Hey Siri" produced by browser Speech-to-Text engines
+const WAKE_TOKEN_PATTERN =
+  '(?:insi\\.ai|insi|incy|insee|insy|insa|in-see|in\\s+see|in\\s+sea|in\\s+si|in\\s+c|and\\s+see|and\\s+c|nci|n\\.c\\.i\\.|n\\s+c\\s+i|nsi|n\\s+s\\s+i|mci|m\\s+c\\s+i|nc|n\\.c\\.|n\\s+c|inc|i\\s+n\\s+c|ins|i\\s+n\\s+s|nse|n\\s+s\\s+e|nsc|n\\s+s\\s+c|ic|i\\s+c|ncc|nic|npc|nfc|nyc|unsee|hennessy|tennessee|aisi|emc|mvc|imc|ims|mc|m\\s+c|ec|e\\s+c|ac|a\\s+c|pc|vc|easy|izzy|issy|ancy|ansi|ency|enci|nancy|macy|messi|mercy|agency|fancy|infy|indy|envy|hainsi|hensy|heinsi|heynsi|ensi|insight\\s*bot|insight|inside|in\\s+sight|in\\s+side|i\\s+see|let\'?s\\s+see|siri|alexa|jarvis|bot|robot|assistant)';
 
-const DIRECT_VOICE_INTENT_REGEX = /\b(switch\s+to|hyderabad\s+metro|shopping\s+mall|retail\s+sales|show\s+revenue|show\s+sales|show\s+footfall|show\s+ridership|show\s+top|show\s+bottom|top\s+\d+|bottom\s+\d+|pie\s+chart|bar\s+chart|line\s+chart|open\s+table|data\s+table|close\s+table|hide\s+table|export\s+pdf|export\s+excel|export\s+csv|export\s+summary|open\s+calendar|schedule\s+review|dark\s+mode|light\s+mode|reset\s+filter|security\s+scan|executive\s+summary|overview|are\s+you\s+listening|can\s+you\s+hear\s+me)\b/i;
+const WAKE_VERB_PATTERN = '(?:hey|hi|hello|ok|okay|yo|listen|wake\\s+up|wake)';
 
-const BARE_GREETING_REGEX = /^\s*(?:hey|hi|hello|hey\s+there|hi\s+there|hello\s+there|hey\s+in|hey\s+see|hey\s+c|ok|okay|wake\s+up|are\s+you\s+there|are\s+you\s+listening|can\s+you\s+hear\s+me)\s*[.!?]*$/i;
+const WAKE_WORD_REGEX = new RegExp(
+  `^\\s*(?:${WAKE_VERB_PATTERN}[\\s,:.\\-!?]*)*(?:${WAKE_TOKEN_PATTERN})(?:[\\s,:.\\-!?]+(?:${WAKE_VERB_PATTERN}|${WAKE_TOKEN_PATTERN}|bro|buddy|man|please|now))*\\b[\\s,:.\\-!?]*`,
+  'i'
+);
 
-const HEY_PREFIX_COMMAND_REGEX = /^\s*(?:hey|hi|hello|ok|okay)\s+(.{3,})$/i;
+const INLINE_WAKE_REGEX = new RegExp(
+  `\\b(?:${WAKE_VERB_PATTERN})\\s+${WAKE_TOKEN_PATTERN}\\b[\\s,:.\\-!?]*`,
+  'ig'
+);
+
+const DIRECT_VOICE_INTENT_REGEX =
+  /\b(switch\s+to|hyderabad\s+metro|metro\s+dataset|metro\s+rail|shopping\s+mall|mall\s+dataset|retail\s+sales|show\s+revenue|show\s+sales|show\s+footfall|show\s+ridership|show\s+top|show\s+bottom|top\s+\d+|bottom\s+\d+|pie\s+chart|bar\s+chart|line\s+chart|open\s+table|data\s+table|close\s+table|hide\s+table|export\s+pdf|export\s+excel|export\s+csv|export\s+summary|open\s+calendar|schedule\s+review|dark\s+mode|light\s+mode|reset\s+filter|security\s+scan|executive\s+summary|overview|wake\s+up|are\s+you\s+listening|can\s+you\s+hear\s+me|can\s+you\s+do\s+something|dance|flex|roam)\b/i;
+
+const BARE_GREETING_REGEX =
+  /^\s*(?:hey|hi|hello|hey\s+there|hi\s+there|hello\s+there|hey\s+in|hey\s+see|hey\s+c|hey\s+n|ok|okay|wake\s+up|wake\s+up\s+\w+|hey\s+\w+|are\s+you\s+there|are\s+you\s+listening|can\s+you\s+hear\s+me|can\s+you\s+do\s+something|test|testing|hello\s+\w+)\s*[.!?]*$/i;
+
+const HEY_PREFIX_COMMAND_REGEX = /^\s*(?:hey|hi|hello|ok|okay|wake\s+up|listen)(?:\s+(?:bro|bot|robot|assistant))?[\s,:.\-!?]+(.{3,})$/i;
 
 const FUZZY_SYNONYM_GROUPS = Object.freeze({
   revenue: [
@@ -137,7 +152,7 @@ const FUZZY_SYNONYM_GROUPS = Object.freeze({
 });
 
 /**
- * Detects whether a voice/text input starts with or contains "Hey INSI"
+ * Detects whether a voice/text input starts with or contains "Hey INSI" / "Hey NCI" / "Wake up NCI"
  * (or phonetic STT transcriptions like "Hey NC", "Hey INC", "Hey INS", "Hey NSE", "Hey easy", "Hey insight")
  */
 export function detectWakeWordAndCommand(rawInput = '') {
@@ -153,7 +168,11 @@ export function detectWakeWordAndCommand(rawInput = '') {
 
   const prefixMatch = original.match(WAKE_WORD_REGEX);
   if (prefixMatch) {
-    const stripped = original.slice(prefixMatch[0].length).trim();
+    const stripped = original
+      .slice(prefixMatch[0].length)
+      .replace(INLINE_WAKE_REGEX, ' ')
+      .replace(/^\s*(?:wake\s+up|hey|hi|hello|bro|please)[\s,:.\-!?]*/i, '')
+      .trim();
     return {
       wakeWordDetected: true,
       matchedWakePhrase: prefixMatch[0].trim().replace(/[,:.\-!?]+$/, ''),
@@ -162,20 +181,35 @@ export function detectWakeWordAndCommand(rawInput = '') {
     };
   }
 
-  // Also check inline wake word e.g. "please hey NC show revenue"
-  const inlineRegex = /\b(?:hey|hi|hello|ok|okay)\s+(?:insi\.ai|insi|incy|insee|insy|insa|in-see|in\s+see|in\s+sea|in\s+si|in\s+c|and\s+see|and\s+c|nc|n\s+c|inc|ins|nse|nsc|ic|ncc|nic|unsee|aisi|mc|ec|ac|easy|ancy|ansi|ency|enci|nancy|infy|indy|envy|hainsi|hensy|ensi|insight|inside|siri|bot|assistant)\b[\s,:.\-!?]*/i;
-  const inlineMatch = original.match(inlineRegex);
+  // Also check inline wake word e.g. "please hey NCI show revenue" or "wake up NCI"
+  const inlineMatch = original.match(INLINE_WAKE_REGEX);
   if (inlineMatch) {
-    const stripped = original.replace(inlineRegex, ' ').replace(/\s+/g, ' ').trim();
+    const stripped = original
+      .replace(INLINE_WAKE_REGEX, ' ')
+      .replace(/^\s*(?:wake\s+up|hey|hi|hello|bro|please)[\s,:.\-!?]*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
     return {
       wakeWordDetected: true,
       matchedWakePhrase: inlineMatch[0].trim(),
       cleanCommand: stripped || 'Give me an executive overview of the active dataset',
+      normalizedTranscript: `Hey INSI${stripped ? ', ' + stripped : ''}`
+    };
+  }
+
+  // If user said "Hey <command>" or "Wake up <command>" and STT dropped or mangled "NCI/INSI"
+  const heyPrefixMatch = original.match(HEY_PREFIX_COMMAND_REGEX);
+  if (heyPrefixMatch && DIRECT_VOICE_INTENT_REGEX.test(heyPrefixMatch[1])) {
+    const stripped = heyPrefixMatch[1].trim();
+    return {
+      wakeWordDetected: true,
+      matchedWakePhrase: 'Hey INSI',
+      cleanCommand: stripped,
       normalizedTranscript: `Hey INSI, ${stripped}`
     };
   }
 
-  // If browser STT clipped "INSI" and heard bare "Hey" / "Hello" / "Are you listening"
+  // If browser STT clipped "INSI/NCI" and heard bare "Hey" / "Wake up" / "Wake up [word]" / "Are you listening"
   if (BARE_GREETING_REGEX.test(original)) {
     return {
       wakeWordDetected: true,
@@ -185,15 +219,13 @@ export function detectWakeWordAndCommand(rawInput = '') {
     };
   }
 
-  // If user said "Hey <command>" and STT dropped "INSI" (e.g., "Hey switch to Hyderabad Metro")
-  const heyPrefixMatch = original.match(HEY_PREFIX_COMMAND_REGEX);
-  if (heyPrefixMatch && DIRECT_VOICE_INTENT_REGEX.test(heyPrefixMatch[1])) {
-    const stripped = heyPrefixMatch[1].trim();
+  // Direct dashboard voice command spoken clearly into the microphone
+  if (DIRECT_VOICE_INTENT_REGEX.test(original)) {
     return {
       wakeWordDetected: true,
-      matchedWakePhrase: 'Hey INSI',
-      cleanCommand: stripped,
-      normalizedTranscript: `Hey INSI, ${stripped}`
+      matchedWakePhrase: 'Hey INSI (Direct Voice Intent)',
+      cleanCommand: original,
+      normalizedTranscript: `Hey INSI, ${original}`
     };
   }
 
@@ -863,14 +895,22 @@ export function executeInsiCommand({
     return vecStdDev > 0 && Math.abs((val - vecMean) / vecStdDev) >= 1.5;
   });
 
+  // Detect if user only said bare wake-word ("Hey INSI", "Wake up NCI", "Can you hear me") with no specific task
+  const isBareWakeGreeting =
+    /^(?:give me an executive overview of the active dataset|hello|hi|hey|wake up|wake up.*|are you there|are you listening|can you hear me|can you do something|do something|talk to me|what can you do|test|testing)\s*[.!?]*$/i.test(
+      effectiveCommand.trim()
+    ) && !/\b(chart|top|bottom|export|revenue|footfall|conversion|zone|category|store|table|filter|reset|metro|calendar)\b/i.test(String(command || '').replace(WAKE_WORD_REGEX, ''));
+
   // Extract Full-App Automation Plan so voice or Run Command automates the entire website shell
   const automationPlan = {
-    switchPreset: /\b(hyderabad|metro|rail|train|station)\b/.test(cmdLower) && /\b(switch|load|open|show|change)\b/.test(cmdLower)
+    switchPreset: /\b(hyderabad|metro|rail|train|station)\b/.test(cmdLower) && /\b(switch|load|open|show|change|dataset|metro)\b/.test(cmdLower)
       ? 'metro'
-      : /\b(shopping|mall|retail)\b/.test(cmdLower) && /\b(switch|load|open|show|change)\b/.test(cmdLower)
+      : /\b(shopping\s+mall|mall\s+dataset|retail\s+sales|retail\s+dataset)\b/.test(cmdLower) && /\b(switch|load|open|show|change|dataset|mall)\b/.test(cmdLower)
       ? 'mall'
       : null,
-    switchTab: /\b(overview|6 charts|six charts|main charts)\b/.test(cmdLower)
+    switchTab: isBareWakeGreeting
+      ? null
+      : /\b(overview\s+tab|6 charts|six charts|main charts)\b/.test(cmdLower)
       ? 'overview'
       : /\b(command hub|decision|statistical hub|what[- ]?if|simulation)\b/.test(cmdLower)
       ? 'intelligence'
@@ -914,19 +954,13 @@ export function executeInsiCommand({
     sortField: /\bsort\s+by\b/.test(cmdLower) ? valueKey : null
   };
 
-  // Detect if user only said bare wake-word ("Hey INSI") with no specific task
-  const isBareWakeGreeting =
-    /^(?:give me an executive overview of the active dataset|hello|hi|hey|are you there|what can you do)\s*$/i.test(
-      effectiveCommand.trim()
-    ) && !/\b(chart|top|bottom|export|revenue|footfall|conversion|zone|category|store|table|filter|reset)\b/i.test(String(command || '').replace(WAKE_WORD_REGEX, ''));
-
   // Distinct, Context-Specific Spoken Voice Reply (Strictly <= 35 words, never repeats identical wording back-to-back)
   let rawVoiceReply = '';
   if (isBareWakeGreeting) {
     const greetings = [
-      `I am online with ${safeRows.length} records in ${datasetName}. Ask me to highlight top or bottom units, switch charts, filter stores, or export PDF and CSV reports.`,
-      `Ready on your board! ${leaderName} currently leads ${spokenMetricName} at ${leaderVal}. Tell me what chart, filter, or report export to automate next.`,
-      `Listening live across ${safeRows.length} records. Say show top 3 leaders, switch to pie chart, open data table, or export Excel to automate your workflow.`
+      `I am wide awake and listening with ${safeRows.length} records in ${datasetName}. Ask me to switch to Hyderabad Metro, show top stores, open the table, or export a PDF report.`,
+      `Hey! INSI is online on your board. ${leaderName} currently leads ${spokenMetricName} at ${leaderVal}. Tell me what chart, filter, or report export to automate next.`,
+      `Listening live across ${safeRows.length} records. Say switch to Hyderabad Metro, show top 3 leaders, open data table, or export Excel to automate your workflow.`
     ];
     const idx = Math.abs(Date.now() + safeRows.length) % greetings.length;
     rawVoiceReply = greetings[idx];

@@ -475,7 +475,7 @@ function App(){
   <main className="main-area">
    <header className="topbar">
     <button className="icon-btn" onClick={()=>setSidebarOpen(!sidebarOpen)} aria-label="Toggle sidebar"><Menu/></button>
-    <div className="top-search"><Search size={18}/><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}} placeholder={`Search ${fields.slice(0,3).map(nice).join(', ')||'records'}…`}/><kbd>⌕</kbd></div>
+    <div className="top-search"><Search size={18}/><input value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}} onKeyDown={e=>{if(e.key==='Enter'&&search.trim()){const q=search.trim();if(/^(?:hey\b|hi\b|hello\b|wake\b|nci\b|insi\b|nc\b|switch\b|show\b|open\b|export\b|dark\b|light\b|dance\b|flex\b|roam\b|reset\b|hyderabad\b)/i.test(q)&&typeof window.insiExecuteCommand==='function'){e.preventDefault();const cmd=q;setSearch('');window.insiExecuteCommand(cmd);}}}} placeholder={`Search ${fields.slice(0,3).map(nice).join(', ')||'records'}…`}/><kbd>⌕</kbd></div>
     <div className="top-actions">
      <button type="button" className="btn btn-light theme-toggle" onClick={()=>{playButtonClick();setTheme(theme==='light'?'dark':'light')}} aria-label={`Switch to ${theme==='light'?'dark':'light'} mode`} title={`Switch to ${theme==='light'?'dark':'light'} mode`}>
       {theme==='light'?<Moon size={16}/>:<Sun size={16}/>}<span>{theme==='light'?'Dark':'Light'}</span>

@@ -977,13 +977,14 @@ app.post('/api/ai/search-grounding', asyncRoute(async (req, res) => {
   });
 }));
 
-// Microphone Audio Transcription endpoint using gemini-3.5-transcribe
+// Microphone Audio Transcription endpoint using gemini-3.5-transcribe (with gemini-3.8-flash fallback)
 app.post('/api/ai/transcribe', asyncRoute(async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const base64Audio = typeof req.body?.audio === 'string' ? req.body.audio.trim() : '';
   const mimeType = safeText(req.body?.mimeType || 'audio/webm', 60);
   const clientHint = safeText(req.body?.clientTranscript || '', 2000);
   const datasetName = safeText(req.body?.datasetName || 'Active Dataset', 120);
+  const isWakeListener = Boolean(req.body?.isWakeListener);
 
   if (!base64Audio && !clientHint) {
     return res.status(400).json({ error: 'Record audio with your microphone or select an audio clip first.' });
@@ -991,30 +992,39 @@ app.post('/api/ai/transcribe', asyncRoute(async (req, res) => {
 
   const ai = getGeminiClient();
   if (ai && base64Audio) {
-    try {
-      const audioPart = {
-        inlineData: {
-          mimeType,
-          data: base64Audio
-        }
-      };
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.5-transcribe',
-        contents: { parts: [audioPart, { text: 'Transcribe this audio.' }] }
-      });
-      const transcript = (response.text || '').trim();
-      if (transcript) {
-        return res.json({
-          transcript,
-          model: 'gemini-3.5-transcribe'
-        });
+    const audioPart = {
+      inlineData: {
+        mimeType,
+        data: base64Audio
       }
-    } catch (err) {
-      console.warn('Audio transcription cloud fallback:', err?.message || err);
+    };
+    const promptText =
+      'Transcribe this spoken voice command for the INSI (also pronounced NCI or Incy) dashboard assistant accurately. Return ONLY the exact spoken words, with no commentary or quotes.';
+
+    for (const modelName of ['gemini-3.5-transcribe', GEMINI_MODEL]) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: { parts: [audioPart, { text: promptText }] }
+        });
+        const transcript = (response.text || '').trim();
+        if (transcript) {
+          return res.json({
+            transcript,
+            model: modelName
+          });
+        }
+      } catch (err) {
+        console.warn(`Audio transcription (${modelName}) fallback:`, err?.message || err);
+      }
     }
   }
 
-  const resolvedTranscript = clientHint || `Voice analytical note recorded for ${datasetName}: highlight top-performing segments and statistical outliers.`;
+  const resolvedTranscript =
+    clientHint ||
+    (isWakeListener
+      ? 'Hey INSI, wake up'
+      : `Voice analytical note recorded for ${datasetName}: highlight top-performing segments and statistical outliers.`);
   return res.json({
     transcript: resolvedTranscript,
     model: 'gemini-3.5-transcribe'

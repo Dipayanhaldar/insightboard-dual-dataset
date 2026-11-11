@@ -48,8 +48,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
+  cursor: pointer;
   transform: scale(var(--insi-scale, 0.92));
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.insi-robot-rig:hover {
+  transform: scale(calc(var(--insi-scale, 0.92) * 1.07));
 }
 
 .insi-ambient-halo {
