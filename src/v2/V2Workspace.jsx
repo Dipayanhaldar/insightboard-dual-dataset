@@ -8,7 +8,6 @@ import {
   Sparkles,
   Trash2,
   LogIn,
-  LogOut,
   Database,
   ArrowUpRight,
   BookOpen,
@@ -24,17 +23,6 @@ import AIProviderHub from './AIProviderHub.jsx';
 import UsageQuotasPanel from './UsageQuotasPanel.jsx';
 import { playButtonClick, summonInsi } from './uiSound.js';
 import {
-  db as firestoreDb,
-  handleFirestoreError,
-  OperationType,
-  doc,
-  setDoc,
-  deleteDoc,
-  collection,
-  query,
-  where,
-  onSnapshot,
-  serverTimestamp
 } from '../firebase.js';
 
 const GEMINI_BROWSER_MODEL = 'gemini-2.5-flash';
@@ -53,7 +41,7 @@ const LANGUAGES = [
 const LABELS = {
   en: {
     title: 'InsightBoard VDB · AI, Voice & Quotas Studio',
-    subtitle: '10-Provider BYOK AI Hub, Gnani Timbre v2.5 Voice Summary, Sign-In Gemini Summary, and Usage & Quotas.',
+    subtitle: '10-Provider BYOK AI Hub, Gnani Timbre v2.5 Voice Summary, Gemini Summary, and Usage & Quotas.',
     quality: 'Smart Data Checks',
     records: 'Rows inspected',
     duplicates: 'Duplicate rows',
@@ -219,12 +207,8 @@ export default function V2Workspace({
   const [summarySource, setSummarySource] = useState('');
   const [message, setMessage] = useState('');
   const [history, setHistory] = useState([]);
-  const [authToken] = useState('');
-  const [account] = useState(null);
-  const [firebaseUser] = useState(null);
-  const [authReady] = useState(true);
+  const [reportsBusy] = useState(false);
   const [reportsBusy, setReportsBusy] = useState(false);
-  const [reportSaveBusy, setReportSaveBusy] = useState(false);
 
   // Personal Gemini API Key (BYOK) controls — unlocked after Sign-In
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
@@ -240,11 +224,6 @@ export default function V2Workspace({
   const copy = LABELS[uiLanguage] || LABELS.en;
   const quality = useMemo(() => checkData(rows, fields, numericFields), [rows, fields, numericFields]);
   const activeGeminiKey = geminiKeyInput.trim() || savedGeminiKey.trim();
-
-  const fetchReports = useCallback(async () => {
-    setHistory([]);
-    setReportsBusy(false);
-  }, []);
 
   function saveGeminiKey() {
     playButtonClick();
@@ -336,65 +315,15 @@ export default function V2Workspace({
     }
   }
 
-  async function saveSnapshot() {
-    playButtonClick();
-    setMessage('Cloud report history is unavailable because sign-in has been removed. Your dashboard and Gemini summary remain available.');
-  }
 
-  async function deleteSnapshot(id) {
+  async function deleteSnapshot() {
     playButtonClick();
-    if (!firebaseUser && !authToken) return;
-    try {
-      if (firebaseUser?.uid) {
-        const reportPath = `reports/${id}`;
-        try {
-          await deleteDoc(doc(firestoreDb, 'reports', id));
-          setMessage('Saved report deleted.');
-          return;
-        } catch (firestoreErr) {
-          handleFirestoreError(firestoreErr, OperationType.DELETE, reportPath);
-        }
-      }
-      const response = await fetch('/api/reports/' + encodeURIComponent(id), {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Could not delete the report.');
-      await fetchReports(authToken);
-      setMessage('Saved report deleted from your account.');
-    } catch (error) {
-      setMessage(error?.message || 'Could not delete the report.');
-    }
+    setMessage('Cloud report history is unavailable because sign-in has been removed.');
   }
 
   async function clearHistory() {
     playButtonClick();
-    if ((!firebaseUser && !authToken) || !history.length) return;
-    try {
-      if (firebaseUser?.uid) {
-        for (const item of history) {
-          const reportPath = `reports/${item.id}`;
-          try {
-            await deleteDoc(doc(firestoreDb, 'reports', item.id));
-          } catch (firestoreErr) {
-            handleFirestoreError(firestoreErr, OperationType.DELETE, reportPath);
-          }
-        }
-        setMessage(copy.cleared);
-        return;
-      }
-      const response = await fetch('/api/reports', {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Could not clear report history.');
-      setHistory([]);
-      setMessage(copy.cleared);
-    } catch (error) {
-      setMessage(error?.message || 'Could not clear report history.');
-    }
+    setMessage('Cloud report history is unavailable because sign-in has been removed.');
   }
 
   const [studioTab, setStudioTab] = useState('python_search');
@@ -650,16 +579,6 @@ export default function V2Workspace({
                 <p className="v2-note">{copy.none}</p>
               )}
 
-              {false && account && (
-                <button
-                  className="v2-button secondary btn-3d"
-                  onClick={() => void saveSnapshot()}
-                  disabled={reportSaveBusy}
-                >
-                  {reportSaveBusy ? <RefreshCw size={15} className="v2-spin" /> : <Save size={15} />}{' '}
-                  {reportSaveBusy ? 'Saving report…' : copy.save}
-                </button>
-              )}
               {message && (
                 <div className="v2-message" role="status">
                   <span>{message}</span>
@@ -678,7 +597,7 @@ export default function V2Workspace({
               <button
                 className="v2-text-button"
                 onClick={() => void clearHistory()}
-                disabled={(!firebaseUser && !authToken) || !history.length || reportsBusy}
+                disabled={!history.length || reportsBusy}
               >
                 <Trash2 size={14} />
                 {copy.clear}
@@ -686,7 +605,7 @@ export default function V2Workspace({
             </div>
             <p className="v2-muted">{copy.historyNote}</p>
 
-            {(firebaseUser || authToken) && (
+            {history.length > 0 && (
               <div className="v2-report-list">
                 {reportsBusy && !history.length ? (
                   <p className="v2-note">Loading saved reports…</p>
@@ -720,7 +639,7 @@ export default function V2Workspace({
                             className="v2-delete"
                             title={copy.delete}
                             aria-label={copy.delete}
-                            onClick={() => void deleteSnapshot(item.id)}
+                            onClick={() => void deleteSnapshot()}
                           >
                             <Trash2 size={14} />
                           </button>
