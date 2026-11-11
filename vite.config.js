@@ -8,7 +8,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    manifest: 'asset-manifest.json'
+    manifest: 'asset-manifest.json',
+    chunkSizeWarningLimit: 3500
   },
   server: {
     host: '0.0.0.0',

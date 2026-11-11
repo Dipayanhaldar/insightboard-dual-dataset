@@ -17,6 +17,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -36,4 +39,3 @@ jobs:
           npm run check:python
       - name: Build Vite frontend
         run: npm run build
-

@@ -28,6 +28,7 @@ env:
   APP_NAME: "InsightBoard VDB"
   DEFAULT_VERSION: "3.0.0"
   PRODUCTION_WEB_URL: ${{ vars.PRODUCTION_WEB_URL || 'https://insightboard.me' }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   validate-and-build-web:
@@ -102,14 +103,30 @@ jobs:
         with:
           node-version: 22
 
-      - name: Set up JDK 17 for Android Gradle build
-        uses: actions/setup-java@v4
+      - name: Set up JDK 21 for Android Gradle build
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Verify Android SDK & accept licenses
+        shell: bash
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          if [ ! -d "$SDK_ROOT" ]; then
+            mkdir -p "$HOME/android-sdk/cmdline-tools"
+            curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdtools.zip
+            unzip -q /tmp/cmdtools.zip -d "$HOME/android-sdk/cmdline-tools"
+            mv "$HOME/android-sdk/cmdline-tools/cmdline-tools" "$HOME/android-sdk/cmdline-tools/latest"
+            SDK_ROOT="$HOME/android-sdk"
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          SDKMANAGER=$(find "$SDK_ROOT" -name sdkmanager -type f 2>/dev/null | head -n 1 || true)
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses >/dev/null 2>&1 || true
+            "$SDKMANAGER" --sdk_root="$SDK_ROOT" "platform-tools" >/dev/null 2>&1 || true
+          fi
 
       - name: Download production web build
         uses: actions/download-artifact@v4
@@ -121,15 +138,18 @@ jobs:
         env:
           VERSION_NAME: ${{ needs.validate-and-build-web.outputs.version }}
         run: |
+          rm -rf build-android
           mkdir -p build-android
+          cp -r dist build-android/dist
           cd build-android
           npm init -y
-          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
-          npx cap init "InsightBoard VDB" "com.insightboard.vdb" --web-dir ../dist
+          npm install --no-audit --no-fund @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+          npx cap init "InsightBoard VDB" "com.insightboard.vdb" --web-dir dist
           npx cap add android
+          npx cap sync android
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew --no-daemon assembleDebug
           mkdir -p ../../release-artifacts
           cp app/build/outputs/apk/debug/app-debug.apk "../../release-artifacts/InsightBoard-VDB-v${VERSION_NAME}.apk"
 
@@ -248,11 +268,13 @@ jobs:
             });
           '
 
-
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ needs.validate-and-build-web.outputs.version }}
+          target_commitish: ${{ github.sha }}
           name: "InsightBoard VDB v${{ needs.validate-and-build-web.outputs.version }} (Web + Windows Store + Android APK)"
           body_path: release-bundle/RELEASE_NOTES.md
           files: |
