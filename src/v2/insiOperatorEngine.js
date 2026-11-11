@@ -28,7 +28,7 @@ export const VALID_CONNECTOR_MODES = Object.freeze([
 ]);
 
 // Phonetic variations of "Hey INSI" (and "Hey Incy" / "Hey Siri") produced by browser Speech-to-Text engines
-const WAKE_WORD_REGEX = /^\s*(?:hey|hi|hello|ok|okay)?\s*(?:insi\.ai|insi|incy|in-see|in\s+see|in\s+c|nc|n\.c\.|easy|insight\s*bot|insight|siri)\b[\s,:.\-!?]*/i;
+const WAKE_WORD_REGEX = /^\s*(?:hey|hi|hello|ok|okay|yo)?\s*(?:insi\.ai|insi|incy|insee|insy|insa|in-see|in\s+see|in\s+sea|in\s+si|in\s+c|and\s+see|and\s+c|nc|n\.c\.|n\s+c|mc|m\s+c|ec|e\s+c|ac|a\s+c|easy|ancy|ansi|ency|enci|nancy|infy|indy|envy|hainsi|hensy|heinsi|heynsi|ensi|insight\s*bot|insight|inside|in\s+sight|in\s+side|siri)\b[\s,:.\-!?]*/i;
 
 const FUZZY_SYNONYM_GROUPS = Object.freeze({
   revenue: [
@@ -157,7 +157,7 @@ export function detectWakeWordAndCommand(rawInput = '') {
   }
 
   // Also check inline wake word e.g. "please hey NC show revenue"
-  const inlineRegex = /\b(?:hey|hi|ok|okay)\s+(?:insi\.ai|insi|incy|in-see|in\s+see|in\s+c|nc|easy|insight|siri)\b[\s,:.\-!?]*/i;
+  const inlineRegex = /\b(?:hey|hi|hello|ok|okay)\s+(?:insi\.ai|insi|incy|insee|insy|insa|in-see|in\s+see|in\s+sea|in\s+si|in\s+c|and\s+see|and\s+c|nc|n\s+c|mc|ec|ac|easy|ancy|ansi|ency|enci|nancy|infy|indy|envy|hainsi|hensy|ensi|insight|inside|siri)\b[\s,:.\-!?]*/i;
   const inlineMatch = original.match(inlineRegex);
   if (inlineMatch) {
     const stripped = original.replace(inlineRegex, ' ').replace(/\s+/g, ' ').trim();

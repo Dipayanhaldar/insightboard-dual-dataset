@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import hyderabadDataset from './hyderabad_metro_stations.json';
 import shoppingMallDataset from './shopping_mall_sales.json';
+import metroAnnouncementUrl from '../hyderabad-metro-announcement.mp3';
 import { createRoot } from 'react-dom/client';
 import { Activity, BarChart3, Search, SlidersHorizontal, RotateCcw, Download, FileSpreadsheet, FileText, Upload, ChevronDown, Menu, X, Database, Sparkles, ArrowUpRight, Layers3, Globe2, Volume2, Moon, Sun, GitCompareArrows, Building2, BookOpen, Gauge, Radio, CalendarPlus, Check } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -17,7 +18,7 @@ import ReleaseCenter from './v2/ReleaseCenter.jsx';
 import UsageQuotasPanel from './v2/UsageQuotasPanel.jsx';
 import UniversalConnectorHub, { exportProcessedDataFile } from './v2/UniversalConnectorHub.jsx';
 import InsiPetBot from './v2/InsiPetBot.jsx';
-import { playButtonClick, playMetroStationChime, recordRealQuotaUsage } from './v2/uiSound.js';
+import { playButtonClick, recordRealQuotaUsage } from './v2/uiSound.js';
 import { insi } from './v2/insiController.js';
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '3.0.0';
@@ -154,46 +155,61 @@ function App(){
  const [audioStatus,setAudioStatus]=useState('');
  const audioRef=useRef(null);
 
- // Smart Hyderabad Metro Audio Announcement:
- // Plays clearly when switching to Hyderabad Metro, bypasses blockers via WebAudio Chime + Echo-Safe Speech fallback,
- // and remembers session state so refreshing the browser never repeats or irritates the user.
- const playMetroAnnouncement = useCallback(async ({ forceReplay = false } = {}) => {
-  try {
-   if (!forceReplay && sessionStorage.getItem('insightboard-metro-announced-session') === '1') {
-    setAudioStatus('Hyderabad Metro dataset active (smart session mute prevents repeat on refresh).');
-    return;
-   }
-   sessionStorage.setItem('insightboard-metro-announced-session', '1');
-  } catch {}
-
-  if(audioRef.current){audioRef.current.pause();audioRef.current.currentTime=0;}
-  playMetroStationChime();
-  insi.audioSync();
-  setAudioStatus('Playing Hyderabad Metro Rail station announcement…');
-
-  const audio=new Audio('/assets/hyderabad-metro-announcement.mp3');
-  audio.loop=false;
-  audioRef.current=audio;
-  audio.onended=()=>setAudioStatus('Hyderabad Metro announcement complete.');
-
-  try{
-   await audio.play();
-   setAudioStatus('Hyderabad Metro station announcement playing.');
-  }catch{
-   // Seamless Web Speech + Chime bypass so no blocker error message ever appears
-   if (typeof window !== 'undefined' && typeof window.insiSpeak === 'function') {
-    window.insiSpeak(
-     'Welcome to Hyderabad Metro Rail on InsightBoard VDB. Now displaying 57 stations across Red, Blue, and Green corridors.'
-    );
-   }
-   setAudioStatus('Hyderabad Metro station announcement active.');
+ // Authentic Hyderabad Metro MP3 Announcement:
+ // Always plays the original hyderabad-metro-announcement.mp3 recording when switching to the Hyderabad Metro dataset.
+ const playMetroAnnouncement = useCallback(async () => {
+  if (audioRef.current) {
+   try {
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+   } catch {}
   }
- },[]);
+
+  const primarySrc = '/assets/hyderabad-metro-announcement.mp3';
+  const fallbackSrc = metroAnnouncementUrl || primarySrc;
+  const audio = new Audio(primarySrc);
+  audio.preload = 'auto';
+  audio.loop = false;
+  audio.volume = 1.0;
+  audioRef.current = audio;
+
+  audio.onended = () => setAudioStatus('Announcement finished.');
+  audio.onerror = () => {
+   if (audio.src && !audio.src.endsWith(fallbackSrc) && fallbackSrc !== primarySrc) {
+    audio.src = fallbackSrc;
+    audio.play().catch(() => {});
+   }
+  };
+
+  setAudioStatus('Starting announcement…');
+  insi.audioSync();
+
+  try {
+   await audio.play();
+   setAudioStatus('Announcement is playing.');
+  } catch {
+   // If triggered before a gesture (e.g., via voice or external hook), play the real MP3 on the very next interaction
+   setAudioStatus('Announcement ready.');
+   const resumeOnNextGesture = () => {
+    window.removeEventListener('pointerdown', resumeOnNextGesture);
+    window.removeEventListener('keydown', resumeOnNextGesture);
+    window.removeEventListener('touchstart', resumeOnNextGesture);
+    if (audioRef.current === audio) {
+     audio.play().then(() => setAudioStatus('Announcement is playing.')).catch(() => {});
+    }
+   };
+   window.addEventListener('pointerdown', resumeOnNextGesture, { once: true, passive: true });
+   window.addEventListener('keydown', resumeOnNextGesture, { once: true, passive: true });
+   window.addEventListener('touchstart', resumeOnNextGesture, { once: true, passive: true });
+  }
+ }, []);
 
  useEffect(()=>{document.documentElement.dataset.theme=theme;try{localStorage.setItem('insightboard-theme',theme);}catch{}},[theme]);
 
  const switchPreset = useCallback(async (value)=>{
-  playButtonClick();
+  if (value !== 'metro') {
+   playButtonClick();
+  }
   setBusy(true);
   try{
    if(value==='mall'){
@@ -201,7 +217,7 @@ function App(){
     setDataset(shoppingMallDataset,'Shopping Mall & Retail Sales — Flagship Portfolio','mall');
    }else if(value==='metro'){
     setDataset(hyderabadDataset,'Hyderabad Metro station reference','metro');
-    void playMetroAnnouncement({ forceReplay: false });
+    void playMetroAnnouncement();
    }else if(value==='custom'&&customDataset.rows){
     if(audioRef.current){audioRef.current.pause();setAudioStatus('');}
     setDataset(customDataset.rows,customDataset.name||'Imported Dataset','custom');

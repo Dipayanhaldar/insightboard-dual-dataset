@@ -66,7 +66,12 @@ export default function InsiPetBot({
 
   // Always-On Echo-Free "Hey INSI" / "Hey Incy" / "Hey Siri" Voice Guardian Refs
   const recognitionRef = useRef(null);
+  const isListeningRef = useRef(false);
   const isSpeakingRef = useRef(false);
+  const activeUtteranceRef = useRef(null);
+  const maxSpeakTimerRef = useRef(null);
+  const interimTimerRef = useRef(null);
+  const lastInterimWakeTimeRef = useRef(0);
   const lastTranscriptRef = useRef({ text: '', time: 0 });
   const lastSpokenReplyRef = useRef({ text: '', time: 0, count: 0 });
   const lastProcessedResultIdxRef = useRef(-1);
@@ -176,7 +181,7 @@ export default function InsiPetBot({
     return () => window.removeEventListener('pointermove', handlePointerMove);
   }, []);
 
-  // Half-Duplex Echo-Free Speech Output with Strict Anti-Repetition Guard
+  // Half-Duplex Echo-Free Speech Output with Strict Anti-Repetition & V8 GC Protection
   const speakWithoutEcho = useCallback((textToSpeak) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window) || !textToSpeak) return;
 
@@ -196,47 +201,71 @@ export default function InsiPetBot({
       lastSpokenReplyRef.current = { text: finalSpeech, time: Date.now(), count: 0 };
     }
 
+    if (maxSpeakTimerRef.current) clearTimeout(maxSpeakTimerRef.current);
+    if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
+
     // 1. Immediately pause SpeechRecognition so INSI NEVER hears or repeats its own voice!
     isSpeakingRef.current = true;
-    if (recognitionRef.current) {
+    if (recognitionRef.current && isListeningRef.current) {
       try {
         recognitionRef.current.abort();
       } catch {}
     }
 
+    const finishSpeechAndResumeMic = () => {
+      if (maxSpeakTimerRef.current) {
+        clearTimeout(maxSpeakTimerRef.current);
+        maxSpeakTimerRef.current = null;
+      }
+      setTimeout(() => {
+        isSpeakingRef.current = false;
+        lastProcessedResultIdxRef.current = -1;
+        if (recognitionRef.current && !isListeningRef.current) {
+          try {
+            recognitionRef.current.start();
+          } catch {}
+        }
+      }, 450);
+    };
+
     try {
-      window.speechSynthesis.cancel();
+      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        window.speechSynthesis.cancel();
+      }
       if (typeof window.speechSynthesis.resume === 'function') {
         window.speechSynthesis.resume();
       }
+
       const utterance = new SpeechSynthesisUtterance(finalSpeech);
+      // Keep strong reference so Chromium V8 never garbage-collects utterance before onend fires
+      activeUtteranceRef.current = utterance;
       utterance.lang = 'en-IN';
       utterance.rate = 1.04;
       utterance.pitch = 1.05;
+
+      const voices = window.speechSynthesis.getVoices?.() || [];
+      const preferredVoice =
+        voices.find((v) => /en[-_]IN/i.test(v.lang)) ||
+        voices.find((v) => /en[-_](GB|US)/i.test(v.lang)) ||
+        voices.find((v) => /^en/i.test(v.lang));
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
 
       utterance.onstart = () => {
         isSpeakingRef.current = true;
         insi.audioSync();
       };
 
-      const resumeMicAfterCooldown = () => {
-        setTimeout(() => {
-          isSpeakingRef.current = false;
-          lastProcessedResultIdxRef.current = -1;
-          if (recognitionRef.current) {
-            try {
-              recognitionRef.current.start();
-            } catch {}
-          }
-        }, 900);
-      };
+      utterance.onend = finishSpeechAndResumeMic;
+      utterance.onerror = finishSpeechAndResumeMic;
 
-      utterance.onend = resumeMicAfterCooldown;
-      utterance.onerror = resumeMicAfterCooldown;
+      // Safety watchdog: never allow isSpeakingRef to remain stuck true if browser drops onend
+      maxSpeakTimerRef.current = setTimeout(finishSpeechAndResumeMic, 6500);
 
       window.speechSynthesis.speak(utterance);
     } catch {
-      isSpeakingRef.current = false;
+      finishSpeechAndResumeMic();
     }
   }, []);
 
@@ -255,17 +284,17 @@ export default function InsiPetBot({
       if (
         requireWakeWord &&
         lastSpokenLower &&
-        now - lastSpokenReplyRef.current.time < 9000 &&
+        now - lastSpokenReplyRef.current.time < 8500 &&
         (lastSpokenLower.includes(lowerCleaned) || lowerCleaned.includes(lastSpokenLower.slice(0, 24)))
       ) {
         return null;
       }
 
-      // Guard 2: Deduplicate identical STT transcripts within 4.5 seconds
+      // Guard 2: Deduplicate identical STT transcripts within 3.5 seconds
       if (
         requireWakeWord &&
         lastTranscriptRef.current.text.toLowerCase() === lowerCleaned &&
-        now - lastTranscriptRef.current.time < 4500
+        now - lastTranscriptRef.current.time < 3500
       ) {
         return null;
       }
@@ -278,9 +307,9 @@ export default function InsiPetBot({
       }
 
       lastTranscriptRef.current = { text: cleaned, time: now };
-      // Keep a 12-second active follow-up window after saying "Hey INSI"
+      // Keep a 14-second active follow-up window after saying "Hey INSI"
       if (wake.wakeWordDetected) {
-        wakeConversationUntilRef.current = now + 12000;
+        wakeConversationUntilRef.current = now + 14000;
       }
 
       const cmd = (wake.wakeWordDetected ? wake.cleanCommand : cleaned).toLowerCase();
@@ -327,7 +356,8 @@ export default function InsiPetBot({
       });
 
       insi.applyMascotState(result.mascot_state);
-      if (speakReply && result.voice_reply) {
+      // When switching to Hyderabad Metro, let the authentic Metro MP3 announcement play without TTS overlap
+      if (speakReply && result.voice_reply && result.automation_plan?.switchPreset !== 'metro') {
         speakWithoutEcho(result.voice_reply);
       }
 
@@ -382,117 +412,161 @@ export default function InsiPetBot({
 
     if (!SpeechRecognition) return undefined;
 
-    const startUniversalWakeListener = async () => {
-      if (micInitializedRef.current || isSpeakingRef.current) return;
-      micInitializedRef.current = true;
+    const createOrGetRecognition = () => {
+      if (recognitionRef.current) return recognitionRef.current;
 
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-IN';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 5;
+
+      recognition.onstart = () => {
+        isListeningRef.current = true;
+        micInitializedRef.current = true;
+        lastProcessedResultIdxRef.current = -1;
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true
+          localStorage.setItem('insightboard-mic-granted', 'true');
+        } catch {}
+      };
+
+      recognition.onresult = (event) => {
+        if (isSpeakingRef.current) return;
+
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          if (i <= lastProcessedResultIdxRef.current) continue;
+          const res = event.results[i];
+          if (!res) continue;
+
+          // Collect all phonetic alternatives returned by the browser speech engine
+          const alternatives = [];
+          for (let a = 0; a < res.length; a += 1) {
+            const t = String(res[a]?.transcript || '').trim();
+            if (t) alternatives.push(t);
+          }
+          if (!alternatives.length) continue;
+
+          // Prefer whichever alternative matches the "Hey INSI" wake word
+          const matchedAlt = alternatives.find((alt) => detectWakeWordAndCommand(alt).wakeWordDetected);
+          const now = Date.now();
+          const withinWakeWindow = now < wakeConversationUntilRef.current;
+          const chosenTranscript = matchedAlt || (withinWakeWindow ? alternatives[0] : '');
+
+          if (!chosenTranscript) continue;
+
+          // Instant Visual & Sonic Wake-Up (<150ms) the moment "Hey INSI" is heard in interim speech
+          if (matchedAlt && now - lastInterimWakeTimeRef.current > 2200) {
+            lastInterimWakeTimeRef.current = now;
+            wakeConversationUntilRef.current = now + 14000;
+            showInsi('waving', {
+              prop: 'chair_laptop',
+              size: 'md',
+              corner: 'bottom-right',
+              auraColor: '#00F0FF',
+              durationMs: 6500
+            });
+          }
+
+          if (res.isFinal) {
+            if (interimTimerRef.current) {
+              clearTimeout(interimTimerRef.current);
+              interimTimerRef.current = null;
             }
-          });
-          stream.getTracks().forEach((track) => track.stop());
-          try {
-            localStorage.setItem('insightboard-mic-granted', 'true');
-          } catch {}
-        } catch {
+            lastProcessedResultIdxRef.current = i;
+            handleSpokenTranscript(chosenTranscript, { requireWakeWord: true, speakReply: true });
+          } else {
+            // Interim settlement debounce (750ms): responds immediately even if ambient noise delays isFinal
+            if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
+            const settledIdx = i;
+            const settledText = chosenTranscript;
+            interimTimerRef.current = setTimeout(() => {
+              interimTimerRef.current = null;
+              if (!isSpeakingRef.current && settledIdx > lastProcessedResultIdxRef.current) {
+                lastProcessedResultIdxRef.current = settledIdx;
+                handleSpokenTranscript(settledText, { requireWakeWord: true, speakReply: true });
+              }
+            }, 750);
+          }
+        }
+      };
+
+      recognition.onerror = (err) => {
+        isListeningRef.current = false;
+        if (err?.error === 'not-allowed' || err?.error === 'service-not-allowed') {
           micInitializedRef.current = false;
         }
-      }
+      };
 
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'en-IN';
-        recognition.continuous = true;
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
-
-        recognition.onstart = () => {
-          lastProcessedResultIdxRef.current = -1;
-        };
-
-        recognition.onresult = (event) => {
-          if (isSpeakingRef.current) return;
-          for (let i = event.resultIndex; i < event.results.length; i += 1) {
-            if (i <= lastProcessedResultIdxRef.current) continue;
-            const res = event.results[i];
-            if (!res?.isFinal) continue;
-            lastProcessedResultIdxRef.current = i;
-            const transcript = String(res[0]?.transcript || '').trim();
-            if (transcript) {
-              handleSpokenTranscript(transcript, { requireWakeWord: true, speakReply: true });
+      recognition.onend = () => {
+        isListeningRef.current = false;
+        lastProcessedResultIdxRef.current = -1;
+        if (!isSpeakingRef.current && micInitializedRef.current) {
+          setTimeout(() => {
+            if (!isSpeakingRef.current && !isListeningRef.current && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch {}
             }
-          }
-        };
+          }, 280);
+        }
+      };
 
-        recognition.onerror = (err) => {
-          if (err?.error === 'not-allowed' || err?.error === 'service-not-allowed') {
-            micInitializedRef.current = false;
-          }
-        };
+      recognitionRef.current = recognition;
+      return recognition;
+    };
 
-        recognition.onend = () => {
-          lastProcessedResultIdxRef.current = -1;
-          if (!isSpeakingRef.current && micInitializedRef.current) {
-            setTimeout(() => {
-              if (!isSpeakingRef.current && recognitionRef.current) {
-                try {
-                  recognitionRef.current.start();
-                } catch {}
-              }
-            }, 500);
-          }
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
+    // Synchronously start recognition (critical for browser user-gesture activation on all devices)
+    const ensureRecognitionStarted = () => {
+      if (isSpeakingRef.current || isListeningRef.current) return;
+      try {
+        const rec = createOrGetRecognition();
+        rec.start();
       } catch {
-        micInitializedRef.current = false;
+        // Already started or awaiting user gesture — safe no-op
       }
     };
 
     const bootMicTimer = setTimeout(() => {
-      void startUniversalWakeListener();
-    }, 650);
+      ensureRecognitionStarted();
+    }, 450);
 
     // Persistent watchdog: ensure SpeechRecognition stays alive across tab switches
     const watchdogInterval = setInterval(() => {
-      if (!isSpeakingRef.current && micInitializedRef.current && recognitionRef.current) {
-        try {
-          recognitionRef.current.start();
-        } catch {
-          // Already started — safe no-op
-        }
+      if (!isSpeakingRef.current && !isListeningRef.current && micInitializedRef.current) {
+        ensureRecognitionStarted();
       }
-    }, 6000);
+    }, 3500);
 
     const onUserInteraction = () => {
       unlockSiteWideAudio();
-      if (!micInitializedRef.current) {
-        void startUniversalWakeListener();
+      if (!isListeningRef.current && !isSpeakingRef.current) {
+        ensureRecognitionStarted();
       }
     };
 
     window.addEventListener('pointerdown', onUserInteraction, { passive: true });
+    window.addEventListener('touchstart', onUserInteraction, { passive: true });
+    window.addEventListener('click', onUserInteraction, { passive: true });
     window.addEventListener('keydown', onUserInteraction, { passive: true });
 
     return () => {
       clearTimeout(bootMicTimer);
       clearInterval(watchdogInterval);
+      if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
+      if (maxSpeakTimerRef.current) clearTimeout(maxSpeakTimerRef.current);
       window.removeEventListener('pointerdown', onUserInteraction);
+      window.removeEventListener('touchstart', onUserInteraction);
+      window.removeEventListener('click', onUserInteraction);
       window.removeEventListener('keydown', onUserInteraction);
       if (recognitionRef.current) {
         try {
           micInitializedRef.current = false;
+          isListeningRef.current = false;
           recognitionRef.current.abort();
         } catch {}
       }
     };
-  }, [handleSpokenTranscript]);
+  }, [handleSpokenTranscript, showInsi]);
 
   // Subscribe to `insi` controller events & legacy `insi:summon` events
   useEffect(() => {

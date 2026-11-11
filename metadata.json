@@ -1,7 +1,9 @@
 {
   "name": "InsightBoard VDB",
   "description": "InsightBoard VDB (Visual Dashboard) — Enterprise Retail, Shopping Mall & Sales Business Intelligence Workspace with Dual-Dataset Comparison, AI Optimization & Summary Generation, and Multi-Platform PWA/Store Sync.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "microphone"
+  ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

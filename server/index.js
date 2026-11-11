@@ -155,7 +155,7 @@ function sanitizePayloadValue(val, depth = 0) {
 app.use((req, res, next) => {
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.set('Permissions-Policy', 'geolocation=(), payment=(), usb=(), camera=(), accelerometer=()');
+  res.set('Permissions-Policy', 'microphone=*, geolocation=(), payment=(), usb=(), camera=(), accelerometer=()');
   res.set('X-Permitted-Cross-Domain-Policies', 'none');
   res.set('X-DNS-Prefetch-Control', 'off');
   if (req.body && typeof req.body === 'object') {
