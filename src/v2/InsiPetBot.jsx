@@ -68,6 +68,7 @@ export default function InsiPetBot({
   const recognitionRef = useRef(null);
   const isListeningRef = useRef(false);
   const isSpeakingRef = useRef(false);
+  const ignoreMicUntilRef = useRef(0);
   const activeUtteranceRef = useRef(null);
   const maxSpeakTimerRef = useRef(null);
   const interimTimerRef = useRef(null);
@@ -182,6 +183,8 @@ export default function InsiPetBot({
   }, []);
 
   // Half-Duplex Echo-Free Speech Output with Strict Anti-Repetition & V8 GC Protection
+  // IMPORTANT: Never call `recognition.abort()` during speech — keeping the SpeechRecognition stream
+  // open preserves the browser's microphone permission/gesture session while ignoring self-echo via `isSpeakingRef`.
   const speakWithoutEcho = useCallback((textToSpeak) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window) || !textToSpeak) return;
 
@@ -204,28 +207,22 @@ export default function InsiPetBot({
     if (maxSpeakTimerRef.current) clearTimeout(maxSpeakTimerRef.current);
     if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
 
-    // 1. Immediately pause SpeechRecognition so INSI NEVER hears or repeats its own voice!
+    // Gate incoming STT transcripts while speaking so INSI never hears its own voice
     isSpeakingRef.current = true;
-    if (recognitionRef.current && isListeningRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch {}
-    }
+    ignoreMicUntilRef.current = Date.now() + 7000;
 
     const finishSpeechAndResumeMic = () => {
       if (maxSpeakTimerRef.current) {
         clearTimeout(maxSpeakTimerRef.current);
         maxSpeakTimerRef.current = null;
       }
-      setTimeout(() => {
-        isSpeakingRef.current = false;
-        lastProcessedResultIdxRef.current = -1;
-        if (recognitionRef.current && !isListeningRef.current) {
-          try {
-            recognitionRef.current.start();
-          } catch {}
-        }
-      }, 450);
+      isSpeakingRef.current = false;
+      ignoreMicUntilRef.current = Date.now() + 1100;
+      if (recognitionRef.current && !isListeningRef.current) {
+        try {
+          recognitionRef.current.start();
+        } catch {}
+      }
     };
 
     try {
@@ -254,6 +251,7 @@ export default function InsiPetBot({
 
       utterance.onstart = () => {
         isSpeakingRef.current = true;
+        ignoreMicUntilRef.current = Date.now() + 6500;
         insi.audioSync();
       };
 
@@ -272,7 +270,7 @@ export default function InsiPetBot({
   // Process a spoken or typed command across the entire application shell
   const handleSpokenTranscript = useCallback(
     (rawTranscript, { requireWakeWord = true, speakReply = true } = {}) => {
-      if (isSpeakingRef.current && requireWakeWord) return null;
+      if ((isSpeakingRef.current || Date.now() < ignoreMicUntilRef.current) && requireWakeWord) return null;
       const cleaned = String(rawTranscript || '').trim();
       if (!cleaned || cleaned.length < 2) return null;
 
@@ -302,14 +300,20 @@ export default function InsiPetBot({
       const wake = detectWakeWordAndCommand(cleaned);
       const withinActiveWakeWindow = now < wakeConversationUntilRef.current;
 
-      if (requireWakeWord && !wake.wakeWordDetected && !withinActiveWakeWindow) {
+      // Also accept unmistakable dashboard voice commands if browser STT clipped the "Hey INSI" prefix on mic warm-up
+      const isDirectDashboardCommand =
+        /\b(switch\s+to|hyderabad\s+metro|shopping\s+mall|show\s+top|show\s+bottom|pie\s+chart|bar\s+chart|line\s+chart|open\s+table|data\s+table|export\s+pdf|export\s+excel|export\s+csv|open\s+calendar|dark\s+mode|light\s+mode|reset\s+filter)\b/i.test(
+          lowerCleaned
+        );
+
+      if (requireWakeWord && !wake.wakeWordDetected && !withinActiveWakeWindow && !isDirectDashboardCommand) {
         return null;
       }
 
       lastTranscriptRef.current = { text: cleaned, time: now };
-      // Keep a 14-second active follow-up window after saying "Hey INSI"
-      if (wake.wakeWordDetected) {
-        wakeConversationUntilRef.current = now + 14000;
+      // Keep a 20-second active follow-up window after saying "Hey INSI" or issuing a dashboard command
+      if (wake.wakeWordDetected || isDirectDashboardCommand) {
+        wakeConversationUntilRef.current = now + 20000;
       }
 
       const cmd = (wake.wakeWordDetected ? wake.cleanCommand : cleaned).toLowerCase();
@@ -416,7 +420,10 @@ export default function InsiPetBot({
       if (recognitionRef.current) return recognitionRef.current;
 
       const recognition = new SpeechRecognition();
-      recognition.lang = 'en-IN';
+      // Use browser's native locale (or en-US/en-IN fallback) so speech models match the user's accent
+      recognition.lang =
+        (typeof navigator !== 'undefined' && /^en/i.test(navigator.language || '') ? navigator.language : '') ||
+        'en-IN';
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.maxAlternatives = 5;
@@ -431,12 +438,22 @@ export default function InsiPetBot({
       };
 
       recognition.onresult = (event) => {
-        if (isSpeakingRef.current) return;
+        const now = Date.now();
+        const mutedForSelfSpeech = isSpeakingRef.current || now < ignoreMicUntilRef.current;
 
         for (let i = event.resultIndex; i < event.results.length; i += 1) {
           if (i <= lastProcessedResultIdxRef.current) continue;
           const res = event.results[i];
           if (!res) continue;
+
+          // If INSI is currently speaking (or within post-speech echo cooldown), mark this result index
+          // as consumed so it is never re-processed after speech finishes
+          if (mutedForSelfSpeech) {
+            if (res.isFinal) {
+              lastProcessedResultIdxRef.current = i;
+            }
+            continue;
+          }
 
           // Collect all phonetic alternatives returned by the browser speech engine
           const alternatives = [];
@@ -446,18 +463,22 @@ export default function InsiPetBot({
           }
           if (!alternatives.length) continue;
 
-          // Prefer whichever alternative matches the "Hey INSI" wake word
+          // Prefer whichever alternative matches the "Hey INSI" wake word or direct command
           const matchedAlt = alternatives.find((alt) => detectWakeWordAndCommand(alt).wakeWordDetected);
-          const now = Date.now();
           const withinWakeWindow = now < wakeConversationUntilRef.current;
-          const chosenTranscript = matchedAlt || (withinWakeWindow ? alternatives[0] : '');
+          const directCmdAlt = alternatives.find((alt) =>
+            /\b(switch\s+to|hyderabad\s+metro|shopping\s+mall|show\s+top|show\s+bottom|pie\s+chart|bar\s+chart|line\s+chart|open\s+table|data\s+table|export\s+pdf|export\s+excel|export\s+csv|open\s+calendar|dark\s+mode|light\s+mode|reset\s+filter)\b/i.test(
+              alt
+            )
+          );
+          const chosenTranscript = matchedAlt || directCmdAlt || (withinWakeWindow ? alternatives[0] : '');
 
           if (!chosenTranscript) continue;
 
           // Instant Visual & Sonic Wake-Up (<150ms) the moment "Hey INSI" is heard in interim speech
-          if (matchedAlt && now - lastInterimWakeTimeRef.current > 2200) {
+          if ((matchedAlt || directCmdAlt) && now - lastInterimWakeTimeRef.current > 2200) {
             lastInterimWakeTimeRef.current = now;
-            wakeConversationUntilRef.current = now + 14000;
+            wakeConversationUntilRef.current = now + 20000;
             showInsi('waving', {
               prop: 'chair_laptop',
               size: 'md',
@@ -475,24 +496,33 @@ export default function InsiPetBot({
             lastProcessedResultIdxRef.current = i;
             handleSpokenTranscript(chosenTranscript, { requireWakeWord: true, speakReply: true });
           } else {
-            // Interim settlement debounce (750ms): responds immediately even if ambient noise delays isFinal
+            // Interim settlement debounce (650ms): responds immediately even if ambient noise delays isFinal
             if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
             const settledIdx = i;
             const settledText = chosenTranscript;
             interimTimerRef.current = setTimeout(() => {
               interimTimerRef.current = null;
-              if (!isSpeakingRef.current && settledIdx > lastProcessedResultIdxRef.current) {
+              if (
+                !isSpeakingRef.current &&
+                Date.now() >= ignoreMicUntilRef.current &&
+                settledIdx > lastProcessedResultIdxRef.current
+              ) {
                 lastProcessedResultIdxRef.current = settledIdx;
                 handleSpokenTranscript(settledText, { requireWakeWord: true, speakReply: true });
               }
-            }, 750);
+            }, 650);
           }
         }
       };
 
       recognition.onerror = (err) => {
+        const errCode = String(err?.error || '');
+        if (errCode === 'aborted' || errCode === 'no-speech') {
+          isListeningRef.current = false;
+          return;
+        }
         isListeningRef.current = false;
-        if (err?.error === 'not-allowed' || err?.error === 'service-not-allowed') {
+        if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
           micInitializedRef.current = false;
         }
       };
@@ -500,15 +530,14 @@ export default function InsiPetBot({
       recognition.onend = () => {
         isListeningRef.current = false;
         lastProcessedResultIdxRef.current = -1;
-        if (!isSpeakingRef.current && micInitializedRef.current) {
-          setTimeout(() => {
-            if (!isSpeakingRef.current && !isListeningRef.current && recognitionRef.current) {
-              try {
-                recognitionRef.current.start();
-              } catch {}
-            }
-          }, 280);
-        }
+        // Automatically restart continuous listening whenever session ends (e.g. after silence timeout)
+        setTimeout(() => {
+          if (!isListeningRef.current && recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch {}
+          }
+        }, 200);
       };
 
       recognitionRef.current = recognition;
@@ -517,7 +546,7 @@ export default function InsiPetBot({
 
     // Synchronously start recognition (critical for browser user-gesture activation on all devices)
     const ensureRecognitionStarted = () => {
-      if (isSpeakingRef.current || isListeningRef.current) return;
+      if (isListeningRef.current) return;
       try {
         const rec = createOrGetRecognition();
         rec.start();
@@ -528,18 +557,58 @@ export default function InsiPetBot({
 
     const bootMicTimer = setTimeout(() => {
       ensureRecognitionStarted();
-    }, 450);
+    }, 300);
 
-    // Persistent watchdog: ensure SpeechRecognition stays alive across tab switches
-    const watchdogInterval = setInterval(() => {
-      if (!isSpeakingRef.current && !isListeningRef.current && micInitializedRef.current) {
+    // Watch the Browser Permissions API so the EXACT instant the user clicks "Allow" in the
+    // browser's address-bar microphone popup (which happens outside the DOM), recognition starts immediately!
+    let permissionStatus = null;
+    const handlePermissionChange = () => {
+      if (permissionStatus && permissionStatus.state === 'granted') {
+        micInitializedRef.current = true;
         ensureRecognitionStarted();
       }
-    }, 3500);
+    };
+    if (typeof navigator !== 'undefined' && navigator.permissions && typeof navigator.permissions.query === 'function') {
+      navigator.permissions
+        .query({ name: 'microphone' })
+        .then((status) => {
+          permissionStatus = status;
+          if (status.state === 'granted') {
+            micInitializedRef.current = true;
+            ensureRecognitionStarted();
+          }
+          status.onchange = handlePermissionChange;
+        })
+        .catch(() => {});
+    }
+
+    // Unconditional watchdog: every 2 seconds, if SpeechRecognition is not actively listening, attempt start()
+    // (Once microphone permission is granted by the user, start() succeeds immediately even from a timer)
+    const watchdogInterval = setInterval(() => {
+      if (!isListeningRef.current) {
+        ensureRecognitionStarted();
+      }
+    }, 2000);
 
     const onUserInteraction = () => {
       unlockSiteWideAudio();
-      if (!isListeningRef.current && !isSpeakingRef.current) {
+      if (!isListeningRef.current) {
+        ensureRecognitionStarted();
+      }
+    };
+
+    let lastPointerAttempt = 0;
+    const onPointerMoveWake = () => {
+      if (isListeningRef.current) return;
+      const now = Date.now();
+      if (now - lastPointerAttempt > 1500) {
+        lastPointerAttempt = now;
+        ensureRecognitionStarted();
+      }
+    };
+
+    const onVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible' && !isListeningRef.current) {
         ensureRecognitionStarted();
       }
     };
@@ -548,16 +617,25 @@ export default function InsiPetBot({
     window.addEventListener('touchstart', onUserInteraction, { passive: true });
     window.addEventListener('click', onUserInteraction, { passive: true });
     window.addEventListener('keydown', onUserInteraction, { passive: true });
+    window.addEventListener('pointermove', onPointerMoveWake, { passive: true });
+    window.addEventListener('focus', onVisibilityOrFocus);
+    document.addEventListener('visibilitychange', onVisibilityOrFocus);
 
     return () => {
       clearTimeout(bootMicTimer);
       clearInterval(watchdogInterval);
+      if (permissionStatus) {
+        permissionStatus.onchange = null;
+      }
       if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
       if (maxSpeakTimerRef.current) clearTimeout(maxSpeakTimerRef.current);
       window.removeEventListener('pointerdown', onUserInteraction);
       window.removeEventListener('touchstart', onUserInteraction);
       window.removeEventListener('click', onUserInteraction);
       window.removeEventListener('keydown', onUserInteraction);
+      window.removeEventListener('pointermove', onPointerMoveWake);
+      window.removeEventListener('focus', onVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', onVisibilityOrFocus);
       if (recognitionRef.current) {
         try {
           micInitializedRef.current = false;

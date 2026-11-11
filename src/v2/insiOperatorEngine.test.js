@@ -25,7 +25,12 @@ test('detectWakeWordAndCommand recognizes "Hey INSI" and all phonetic STT varian
     'Hey in C, show revenue by store',
     'hey insi show revenue by store',
     'Hey easy, show revenue by store',
-    'Hey insight, show revenue by store'
+    'Hey insight, show revenue by store',
+    'Hey INC, show revenue by store',
+    'Hey INS show revenue by store',
+    'Hey NSE, show revenue by store',
+    'Hey IC show revenue by store',
+    'Hey show revenue by store'
   ];
 
   for (const input of variants) {
@@ -33,6 +38,9 @@ test('detectWakeWordAndCommand recognizes "Hey INSI" and all phonetic STT varian
     assert.equal(res.wakeWordDetected, true, `Failed on variant: ${input}`);
     assert.equal(res.cleanCommand, 'show revenue by store');
   }
+
+  const bareGreeting = detectWakeWordAndCommand('Hey');
+  assert.equal(bareGreeting.wakeWordDetected, true);
 });
 
 test('extractConnectorRecords unwraps nested API/Webhook arrays automatically', () => {
