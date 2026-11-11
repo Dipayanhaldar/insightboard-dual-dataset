@@ -54,8 +54,8 @@ const LABELS = {
     none: 'Enter your Gemini API key and click Generate Gemini Summary.',
     save: 'Save snapshot to account',
     history: 'Saved Report History',
-    historyNote: 'Only aggregate metrics and filters are stored in your account.',
-    noHistory: 'No saved reports in this account yet.',
+    historyNote: 'Cloud report history is currently unavailable without account sign-in.',
+    noHistory: 'No local saved reports. Cloud history requires account sign-in.',
     saved: 'Aggregate snapshot saved to your account.',
     cleared: 'Account report history cleared.',
     delete: 'Delete saved report',
@@ -315,16 +315,6 @@ export default function V2Workspace({
     }
   }
 
-
-  async function deleteSnapshot() {
-    playButtonClick();
-    setMessage('Cloud report history is unavailable because sign-in has been removed.');
-  }
-
-  async function clearHistory() {
-    playButtonClick();
-    setMessage('Cloud report history is unavailable because sign-in has been removed.');
-  }
 
   const [studioTab, setStudioTab] = useState('python_search');
   function exportSnapshot(item) {
@@ -594,64 +584,9 @@ export default function V2Workspace({
             <div className="v2-card-title">
               <History size={18} />
               <h3>{copy.history}</h3>
-              <button
-                className="v2-text-button"
-                onClick={() => void clearHistory()}
-                disabled={!history.length || reportsBusy}
-              >
-                <Trash2 size={14} />
-                {copy.clear}
-              </button>
             </div>
             <p className="v2-muted">{copy.historyNote}</p>
-
-            {history.length > 0 && (
-              <div className="v2-report-list">
-                {reportsBusy && !history.length ? (
-                  <p className="v2-note">Loading saved reports…</p>
-                ) : history.length ? (
-                  <div className="v2-reports">
-                    {history.map((item) => (
-                      <div className="v2-report-row" key={item.id}>
-                        <div>
-                          <strong>{item.title}</strong>
-                          <small>
-                            {item.datasetName} · {Number(item.recordCount || 0).toLocaleString()}{' '}
-                            records · {new Date(item.createdAt).toLocaleString()}
-                          </small>
-                          {item.summary && (
-                            <p>
-                              {item.summary.slice(0, 220)}
-                              {item.summary.length > 220 ? '…' : ''}
-                            </p>
-                          )}
-                        </div>
-                        <div className="v2-report-actions">
-                          <button
-                            className="v2-delete"
-                            title="Download aggregate snapshot"
-                            aria-label="Download aggregate snapshot"
-                            onClick={() => exportSnapshot(item)}
-                          >
-                            <Save size={14} />
-                          </button>
-                          <button
-                            className="v2-delete"
-                            title={copy.delete}
-                            aria-label={copy.delete}
-                            onClick={() => void deleteSnapshot()}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="v2-note">{copy.noHistory}</p>
-                )}
-              </div>
-            )}
+            <p className="v2-note">{copy.noHistory}</p>
           </article>
         </>
       )}
