@@ -651,7 +651,7 @@ export default function InsiPetBot({
 
   /**
    * Primary Command Handler for both Voice ("Hey, Inci") and Text Input:
-   * 1. Normalizes speech transcript ("Hey, Inci", "Hey Inci", "Hey Inci", "Wake up Inci")
+   * 1. Normalizes speech transcript ("Hey Inci", "Hey In C I", "Wake up Inci")
    * 2. Evaluates against the Local Editable Command Router (`matchLocalCommandRouter`)
    * 3. Handles unrecognized commands honestly (never fakes or invents a completed action)
    * 4. Prompts for confirmation before consequential actions
@@ -689,7 +689,7 @@ export default function InsiPetBot({
       const strippedCmd = (wake.wakeWordDetected ? wake.cleanCommand : normalized).trim();
       const ctx = latestContextRef.current;
 
-      // Check bare wake greeting ("Hey, Inci", "Hey Inci", "Hey Inci", "Wake up Inci", "Are you listening")
+      // Check bare wake greeting ("Hey Inci", "Hey In C I", "Wake up Inci", "Are you listening")
       if (
         /^(?:give me an executive overview of the active dataset|wake\s+up.*|hey.*|insi|are\s+you\s+listening.*|can\s+you\s+hear\s+me.*|hello|hi)$/i.test(
           strippedCmd
@@ -1477,7 +1477,7 @@ export default function InsiPetBot({
                 </h2>
                 <p className="insi-panel-subtitle">
                   Default wake phrase: <strong>&ldquo;Hey, Inci&rdquo;</strong> (also recognizes{' '}
-                  <code>Hey Inci</code>, <code>Hey Inci</code>, <code>Wake up Inci</code>)
+                  <code>Hey In C I</code>, <code>Wake up Inci</code>)
                 </p>
               </div>
             </div>
