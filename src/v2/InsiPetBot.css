@@ -228,21 +228,30 @@
    DOVE STATE ANIMATIONS (Articulated Wing Flap on Fly, Takeoff, Orbit, Landing)
    ============================================================ */
 
-/* Active Wing-Flapping During Takeoff, Flight, Orbit & Landing */
+/* Active Wing-Flapping During Entry, Takeoff, Flight, Orbit, Landing & Perch */
+.insi-entering .insi-dove-artwork,
 .state-takeoff .insi-dove-artwork,
 .state-flying .insi-dove-artwork,
 .state-orbiting .insi-dove-artwork,
 .insi-orbit-flight-active .insi-dove-artwork {
-  animation: insiDoveBodyFlightLift 0.22s ease-in-out infinite alternate;
+  animation: insiDoveBodyFlightLift 0.2s ease-in-out infinite alternate;
 }
 
+.insi-entering .insi-dove-wing-flap-layer,
 .state-takeoff .insi-dove-wing-flap-layer,
 .state-flying .insi-dove-wing-flap-layer,
 .state-orbiting .insi-dove-wing-flap-layer,
 .state-landing .insi-dove-wing-flap-layer,
 .insi-orbit-flight-active .insi-dove-wing-flap-layer {
   opacity: 1;
-  animation: insiDoveArticulatedWingFlap 0.16s ease-in-out infinite alternate;
+  animation: insiDoveArticulatedWingFlap 0.14s ease-in-out infinite alternate;
+}
+
+.state-perched .insi-dove-wing-flap-layer,
+.state-listening .insi-dove-wing-flap-layer,
+.state-speaking .insi-dove-wing-flap-layer {
+  opacity: 1;
+  animation: insiDoveArticulatedWingFlap 0.48s ease-in-out infinite alternate;
 }
 
 .state-landing .insi-dove-artwork {
@@ -512,8 +521,8 @@
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.28), rgba(15, 23, 42, 0.8));
-  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: transparent;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;

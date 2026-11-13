@@ -95,9 +95,9 @@ export default function InsiPetBot({
     {
       id: 'welcome',
       kind: 'info',
-      title: 'INSI Dove Assistant Ready',
+      title: 'INSI Dove Assistant · Always Listening ("Hey, INSI")',
       detail:
-        'Browser-based voice & action router connected to InsightBoard. Click "Enable Voice" or "Push to Talk" below to use microphone commands, or type any command directly.'
+        'Automatic browser microphone wake-word detection is active. Say "Hey, INSI" anytime to summon the dove, fly across the workspace, download reports, or switch datasets.'
     }
   ]);
 
@@ -109,14 +109,14 @@ export default function InsiPetBot({
   const [newRouteCommand, setNewRouteCommand] = useState('');
   const [newRouteConfirm, setNewRouteConfirm] = useState(false);
 
-  // Voice & Speech Synthesis States (Strictly opt-in: no mic prompt until user clicks Enable Voice or Push-to-Talk)
+  // Voice & Speech Synthesis States (Auto-enabled: requests browser mic permission automatically & always listens for "Hey, INSI")
   const speechSupported = useMemo(() => {
     if (typeof window === 'undefined') return false;
     return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
   }, []);
 
-  // 'idle' | 'requesting_permission' | 'listening_wake' | 'push_to_talk' | 'permission_denied' | 'unsupported' | 'error'
-  const [voiceStatus, setVoiceStatus] = useState(() => (speechSupported ? 'idle' : 'unsupported'));
+  // 'listening_wake' | 'requesting_permission' | 'push_to_talk' | 'permission_denied' | 'unsupported' | 'idle'
+  const [voiceStatus, setVoiceStatus] = useState(() => (speechSupported ? 'listening_wake' : 'unsupported'));
   const [voiceErrorMsg, setVoiceErrorMsg] = useState('');
   const [voiceMuted, setVoiceMuted] = useState(false);
   const [isSpeakingState, setIsSpeakingState] = useState(false);
@@ -131,7 +131,7 @@ export default function InsiPetBot({
   const orbitTimerRef = useRef(null);
   const recognitionRef = useRef(null);
   const isListeningRef = useRef(false);
-  const voiceModeRef = useRef('off'); // 'off' | 'continuous' | 'ptt'
+  const voiceModeRef = useRef(speechSupported ? 'continuous' : 'off'); // Always 'continuous' by default when supported
   const isSpeakingRef = useRef(false);
   const voiceMutedRef = useRef(false);
   const ignoreMicUntilRef = useRef(0);
@@ -783,91 +783,50 @@ export default function InsiPetBot({
   );
 
   /**
-   * Stops browser SpeechRecognition cleanly when user clicks "Stop Listening"
-   */
-  const stopVoiceListening = useCallback(() => {
-    voiceModeRef.current = 'off';
-    isListeningRef.current = false;
-    try {
-      window.localStorage.setItem('insightboard_insi_voice_enabled', 'false');
-    } catch {}
-    if (interimTimerRef.current) {
-      clearTimeout(interimTimerRef.current);
-      interimTimerRef.current = null;
-    }
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.abort();
-      } catch {}
-      recognitionRef.current = null;
-    }
-    setVoiceStatus(speechSupported ? 'idle' : 'unsupported');
-    setAnimState('perched');
-    setStatusBubbleText('Voice listening stopped · Click Enable Voice anytime');
-    appendLog({
-      kind: 'info',
-      title: 'Microphone Listening Stopped',
-      detail: 'Wake-word listening is now off. You can re-enable voice or use text commands anytime.'
-    });
-  }, [appendLog, speechSupported]);
-
-  /**
-   * Starts browser SpeechRecognition ONLY when explicitly triggered by the user
-   * ("Enable Voice" for continuous "Hey, INSI" wake-word mode, or "Push to Talk" for single command)
+   * Starts and maintains persistent browser SpeechRecognition so the website and integrated AI
+   * ALWAYS listen for "Hey, INSI" automatically with auto browser mic permission.
    */
   const startExplicitVoiceSession = useCallback(
-    async (mode = 'continuous') => {
+    async (mode = 'continuous', { silent = false } = {}) => {
       if (typeof window === 'undefined') return;
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
         setVoiceStatus('unsupported');
-        setVoiceErrorMsg(
-          'This browser does not support the Web Speech API (SpeechRecognition). Please use the text command input or quick action buttons below, or open in Chrome/Edge.'
-        );
-        setPanelOpen(true);
         return;
       }
 
       setVoiceErrorMsg('');
-      setVoiceStatus('requesting_permission');
-      voiceModeRef.current = mode;
+      voiceModeRef.current = mode === 'off' ? 'continuous' : mode;
       try {
         window.localStorage.setItem('insightboard_insi_voice_enabled', 'true');
       } catch {}
 
-      // Request microphone permission ONLY when enabled or already granted
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      // Auto-request browser microphone permission so the user doesn't have to click an Enable Voice button
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia && !isListeningRef.current) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
           });
-          // Immediately release probe stream so SpeechRecognition has exclusive mic access
+          // Release probe stream immediately so SpeechRecognition has clean access to the microphone
           stream.getTracks().forEach((t) => t.stop());
         } catch (err) {
           const errName = String(err?.name || '');
           if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-            voiceModeRef.current = 'off';
-            isListeningRef.current = false;
             setVoiceStatus('permission_denied');
-            setVoiceErrorMsg(
-              'Microphone permission was denied by the browser. Allow microphone access in the address bar settings, or use the text command input and buttons below.'
-            );
-            setPanelOpen(true);
-            appendLog({
-              kind: 'error',
-              title: 'Microphone Permission Denied',
-              detail: 'Allow microphone permission in your browser address bar, or use text commands below.'
-            });
+            if (!silent) {
+              setVoiceErrorMsg(
+                'Browser microphone permission is blocked. Please allow microphone access in the browser address bar so INSI can hear "Hey, INSI".'
+              );
+            }
             return;
           }
         }
       }
 
       const launchRecognitionInstance = () => {
-        if (voiceModeRef.current === 'off') return;
+        if (voiceModeRef.current === 'off') {
+          voiceModeRef.current = 'continuous';
+        }
         if (recognitionRef.current) {
           try {
             recognitionRef.current.onend = null;
@@ -881,7 +840,7 @@ export default function InsiPetBot({
         try {
           const recognition = new SpeechRecognition();
           recognition.lang = 'en-IN';
-          recognition.continuous = voiceModeRef.current === 'continuous';
+          recognition.continuous = true;
           recognition.interimResults = true;
           recognition.maxAlternatives = 5;
 
@@ -889,10 +848,9 @@ export default function InsiPetBot({
             isListeningRef.current = true;
             lastProcessedResultIdxRef.current = -1;
             setVoiceStatus(voiceModeRef.current === 'ptt' ? 'push_to_talk' : 'listening_wake');
-            setAnimState('listening');
             setStatusBubbleText(
               voiceModeRef.current === 'ptt'
-                ? 'Push-to-Talk active · Speak your command now…'
+                ? 'Speak your command now…'
                 : 'Listening for "Hey, INSI"…'
             );
           };
@@ -938,9 +896,8 @@ export default function InsiPetBot({
                   speakReply: true
                 });
                 if (isPtt) {
-                  voiceModeRef.current = 'off';
-                  isListeningRef.current = false;
-                  setVoiceStatus('idle');
+                  voiceModeRef.current = 'continuous';
+                  setVoiceStatus('listening_wake');
                 }
               } else {
                 if (interimTimerRef.current) clearTimeout(interimTimerRef.current);
@@ -959,6 +916,10 @@ export default function InsiPetBot({
                       requireWakeWord: !isPtt,
                       speakReply: true
                     });
+                    if (isPtt) {
+                      voiceModeRef.current = 'continuous';
+                      setVoiceStatus('listening_wake');
+                    }
                   }
                 }, 650);
               }
@@ -974,15 +935,7 @@ export default function InsiPetBot({
               return;
             }
             if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
-              voiceModeRef.current = 'off';
               setVoiceStatus('permission_denied');
-              setVoiceErrorMsg(
-                'Microphone access was blocked by the browser. Please allow microphone permission in your browser settings or use text commands.'
-              );
-              setAnimState('perched');
-            } else {
-              setVoiceStatus('error');
-              setVoiceErrorMsg(`Speech recognition notice (${errCode}). You can retry or use text commands.`);
             }
           };
 
@@ -990,86 +943,88 @@ export default function InsiPetBot({
             isListeningRef.current = false;
             lastProcessedResultIdxRef.current = -1;
             recognitionRef.current = null;
-            if (voiceModeRef.current === 'continuous') {
-              setTimeout(() => {
-                if (voiceModeRef.current === 'continuous' && !isListeningRef.current) {
-                  launchRecognitionInstance();
-                }
-              }, 260);
-            } else {
-              setVoiceStatus('idle');
-              setAnimState('perched');
-            }
+            // Always auto-restart continuous wake-word listening while the site is open
+            setTimeout(() => {
+              if (voiceModeRef.current !== 'off' && !isListeningRef.current) {
+                launchRecognitionInstance();
+              }
+            }, 240);
           };
 
           recognitionRef.current = recognition;
           recognition.start();
-        } catch (err) {
+        } catch {
           isListeningRef.current = false;
           recognitionRef.current = null;
-          setVoiceStatus('error');
-          setVoiceErrorMsg('Could not start browser speech recognition. Use text commands below.');
         }
       };
 
       launchRecognitionInstance();
-      appendLog({
-        kind: 'info',
-        title: mode === 'ptt' ? 'Push-to-Talk Activated' : 'Wake-Word Listening Enabled ("Hey, INSI")',
-        detail:
-          mode === 'ptt'
-            ? 'Speak your command now—no wake phrase required during Push-to-Talk.'
-            : 'Listening while this tab is open. Say "Hey, INSI", "Hey I N S I", or "Hey Insee" followed by your command.'
-      });
+      if (!silent) {
+        appendLog({
+          kind: 'info',
+          title: mode === 'ptt' ? 'Instant Command Listening Active' : 'Always-On "Hey, INSI" Listener Active',
+          detail:
+            mode === 'ptt'
+              ? 'Speak your command now—no wake phrase required.'
+              : 'Automatically listening while the website is open. Say "Hey, INSI" followed by your command.'
+        });
+      }
     },
     [appendLog, handleSpokenTranscript]
   );
 
-  // Creative Hands-Free Wake-Word Auto-Resume:
-  // If microphone permission is already granted in the browser (or user enabled voice once before),
-  // automatically resume background "Hey, INSI" wake-word listening while keeping the bird invisible until called!
+  // Automatic Browser Microphone Permission & Persistent Always-On "Hey, INSI" Wake-Word Engine:
+  // 1. Immediately requests microphone permission and starts continuous listening on mount.
+  // 2. Automatically unlocks/resumes on any user interaction, tab focus, or visibility change.
+  // 3. Keeps a lightweight watchdog interval so "Hey, INSI" never stops listening.
   useEffect(() => {
     if (typeof window === 'undefined' || !speechSupported) return undefined;
     let cancelled = false;
 
-    const tryAutoResumeWakeListener = async () => {
-      if (cancelled || isListeningRef.current || voiceModeRef.current !== 'off') return;
-      let previouslyEnabled = false;
-      try {
-        previouslyEnabled = window.localStorage.getItem('insightboard_insi_voice_enabled') === 'true';
-      } catch {}
+    const ensureListeningActive = () => {
+      if (cancelled || isListeningRef.current) return;
+      voiceModeRef.current = 'continuous';
+      void startExplicitVoiceSession('continuous', { silent: true });
+    };
 
-      let permGranted = false;
-      if (navigator.permissions?.query) {
-        try {
-          const status = await navigator.permissions.query({ name: 'microphone' });
-          permGranted = status.state === 'granted';
-        } catch {}
-      }
+    // 1. Immediate auto-start on load
+    ensureListeningActive();
 
-      if (!cancelled && (permGranted || previouslyEnabled)) {
-        void startExplicitVoiceSession('continuous');
+    // 2. Auto-resume on any interaction or focus event (bypasses browser gesture deferral)
+    const onUserActivity = () => {
+      if (!isListeningRef.current) {
+        ensureListeningActive();
       }
     };
 
-    void tryAutoResumeWakeListener();
-
-    const onFirstGesture = () => {
-      if (!isListeningRef.current && voiceModeRef.current === 'off') {
-        let savedPref = null;
-        try {
-          savedPref = window.localStorage.getItem('insightboard_insi_voice_enabled');
-        } catch {}
-        if (savedPref === 'true') {
-          void startExplicitVoiceSession('continuous');
-        }
+    const onVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible' && !isListeningRef.current) {
+        ensureListeningActive();
       }
     };
 
-    window.addEventListener('pointerdown', onFirstGesture, { once: true, passive: true });
+    window.addEventListener('pointerdown', onUserActivity, { passive: true });
+    window.addEventListener('keydown', onUserActivity, { passive: true });
+    window.addEventListener('touchstart', onUserActivity, { passive: true });
+    window.addEventListener('focus', onVisibilityOrFocus, { passive: true });
+    document.addEventListener('visibilitychange', onVisibilityOrFocus, { passive: true });
+
+    // 3. Watchdog timer to keep "Hey, INSI" always active while the page is open
+    const watchdog = setInterval(() => {
+      if (!cancelled && document.visibilityState === 'visible' && !isListeningRef.current) {
+        ensureListeningActive();
+      }
+    }, 3500);
+
     return () => {
       cancelled = true;
-      window.removeEventListener('pointerdown', onFirstGesture);
+      clearInterval(watchdog);
+      window.removeEventListener('pointerdown', onUserActivity);
+      window.removeEventListener('keydown', onUserActivity);
+      window.removeEventListener('touchstart', onUserActivity);
+      window.removeEventListener('focus', onVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', onVisibilityOrFocus);
     };
   }, [speechSupported, startExplicitVoiceSession]);
 
@@ -1453,26 +1408,14 @@ export default function InsiPetBot({
               <span className="perch-glow-dot" />
             </div>
           </div>
-
-          {/* Live Status Pill under Dove */}
-          <div className={`insi-dove-status-pill ${isListeningActive ? 'is-listening' : ''} ${isSpeakingState ? 'is-speaking' : ''}`}>
-            <span className="insi-status-dot" />
-            <span className="insi-status-label">
-              {isOrbitingTask || animState === 'flying'
-                ? 'Flapping Wings · Executing Task…'
-                : isSpeakingState
-                ? 'INSI Speaking…'
-                : statusBubbleText || 'Standing on Project Dossier'}
-            </span>
-          </div>
         </div>
       )}
 
       {/* 2. Floating Bottom-Right Control Dock:
-          - By default when bird is invisible (`!visible && !panelOpen`), ONLY the "🎙 Enable Voice" button is visible.
-          - When the user says "Hey, INSI" and the dove appears (`visible` or `panelOpen`), the "INSI Dove" button appears with it! */}
-      <div className="insi-floating-dock" role="region" aria-label="INSI Dove Assistant Controls">
-        {(visible || panelOpen) && (
+          - Completely invisible until "Hey, INSI" summons the bird (NO "Enable Voice" button!)
+          - When the dove appears (`visible` or `panelOpen`), the "INSI Dove" button appears with it! */}
+      {(visible || panelOpen) && (
+        <div className="insi-floating-dock" role="region" aria-label="INSI Dove Assistant Controls">
           <button
             type="button"
             className={`insi-dock-toggle-btn ${panelOpen ? 'active' : ''} ${isListeningActive ? 'listening' : ''}`}
@@ -1492,10 +1435,8 @@ export default function InsiPetBot({
             <span className="insi-dock-text">
               <strong>INSI Dove</strong>
               <small>
-                {voiceStatus === 'listening_wake'
-                  ? '● Listening ("Hey, INSI")'
-                  : voiceStatus === 'push_to_talk'
-                  ? '● Push-to-Talk'
+                {isListeningActive
+                  ? '● Always Listening ("Hey, INSI")'
                   : 'Website Manager Active'}
               </small>
             </span>
@@ -1503,43 +1444,8 @@ export default function InsiPetBot({
               {panelOpen ? '✕' : '▲'}
             </span>
           </button>
-        )}
-
-        <button
-          type="button"
-          className={`insi-dock-mic-btn ${isListeningActive ? 'active' : ''}`}
-          onClick={() => {
-            if (!speechSupported) {
-              setVisible(true);
-              setPanelOpen((prev) => !prev);
-              return;
-            }
-            if (isListeningActive) {
-              // If already listening and bird is hidden, clicking summons the bird & panel; if visible, stops mic
-              if (!visible && !panelOpen) {
-                triggerTaskFlightOrbit('INSI Dove summoned · Standing on Project Dossier!');
-                setPanelOpen(true);
-              } else {
-                stopVoiceListening();
-              }
-            } else {
-              void startExplicitVoiceSession('continuous');
-            }
-          }}
-          aria-label={
-            isListeningActive
-              ? 'Wake-word active ("Hey, INSI"). Click to summon INSI Dove or manage voice'
-              : 'Enable INSI Voice ("Hey, INSI")'
-          }
-          title={
-            isListeningActive
-              ? 'Say "Hey, INSI" anytime to summon the dove, or click here to open controls'
-              : 'Click once to enable hands-free "Hey, INSI" wake-word detection'
-          }
-        >
-          {isListeningActive ? '🟢 Say "Hey, INSI"' : '🎙 Enable Voice'}
-        </button>
-      </div>
+        </div>
+      )}
 
       {/* 3. Open / Close INSI Assistant Panel (Modal / Drawer) */}
       {panelOpen && (
@@ -1567,7 +1473,7 @@ export default function InsiPetBot({
               <div>
                 <h2 className="insi-panel-title">
                   INSI Dove Assistant
-                  <span className="insi-local-badge">100% Browser-Local</span>
+                  <span className="insi-local-badge">Always-On Wake Word</span>
                 </h2>
                 <p className="insi-panel-subtitle">
                   Default wake phrase: <strong>&ldquo;Hey, INSI&rdquo;</strong> (also recognizes{' '}
@@ -1587,27 +1493,25 @@ export default function InsiPetBot({
 
           {/* Honest Browser & Wake-Word Scope Notice */}
           <div className="insi-scope-banner">
-            <span>ℹ️</span>
+            <span>🕊️</span>
             <p>
-              Wake-word listening works only while this site tab is open and your browser supports Web Speech API. No
-              external AI, Gemini API key, or paid backend is used—commands run through the local router below and ask
-              before consequential actions.
+              INSI automatically listens for <strong>&ldquo;Hey, INSI&rdquo;</strong> while this site is open. When
+              called, the dove flies in, executes your command, and flies off when finished.
             </p>
           </div>
 
-          {/* Voice Status & Explicit Microphone Controls */}
+          {/* Voice Status & Automatic Microphone Controls */}
           <section className="insi-voice-controls-card" aria-label="Voice and Microphone Controls">
             <div className="insi-voice-status-row">
               <div className={`insi-voice-indicator status-${voiceStatus}`}>
                 <span className="pulse-dot" />
                 <span>
-                  {voiceStatus === 'idle' && 'Voice Idle (Mic Off — Click Enable Voice to start)'}
-                  {voiceStatus === 'requesting_permission' && 'Requesting Microphone Permission…'}
-                  {voiceStatus === 'listening_wake' && 'Listening Actively for "Hey, INSI"…'}
-                  {voiceStatus === 'push_to_talk' && 'Push-to-Talk Active — Speak Command Now…'}
-                  {voiceStatus === 'permission_denied' && 'Microphone Permission Blocked in Browser'}
+                  {voiceStatus === 'listening_wake' && 'Always Listening Actively for "Hey, INSI"…'}
+                  {voiceStatus === 'push_to_talk' && 'Instant Voice Command Active — Speak Now…'}
+                  {voiceStatus === 'requesting_permission' && 'Requesting Browser Microphone Permission…'}
+                  {voiceStatus === 'permission_denied' && 'Browser Mic Permission Blocked (Allow in Address Bar)'}
                   {voiceStatus === 'unsupported' && 'Browser Speech Recognition Unavailable (Use Text/Buttons)'}
-                  {voiceStatus === 'error' && 'Voice Recognition Paused'}
+                  {(voiceStatus === 'idle' || voiceStatus === 'error') && 'Auto-Resuming Wake-Word Listener…'}
                 </span>
               </div>
               {lastHeardTranscript && (
@@ -1624,32 +1528,22 @@ export default function InsiPetBot({
             )}
 
             <div className="insi-voice-btn-grid">
-              {!isListeningActive ? (
-                <button
-                  type="button"
-                  className="insi-ctrl-btn primary"
-                  disabled={!speechSupported || voiceStatus === 'requesting_permission'}
-                  onClick={() => void startExplicitVoiceSession('continuous')}
-                >
-                  🎙 Enable Voice (&ldquo;Hey, INSI&rdquo;)
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="insi-ctrl-btn danger"
-                  onClick={stopVoiceListening}
-                >
-                  ⏹ Stop Listening
-                </button>
-              )}
+              <button
+                type="button"
+                className="insi-ctrl-btn active"
+                disabled={!speechSupported}
+                onClick={() => void startExplicitVoiceSession('continuous', { silent: false })}
+              >
+                🟢 Auto-Listening (&ldquo;Hey, INSI&rdquo;)
+              </button>
 
               <button
                 type="button"
-                className={`insi-ctrl-btn ${voiceStatus === 'push_to_talk' ? 'active' : ''}`}
-                disabled={!speechSupported || voiceStatus === 'requesting_permission'}
-                onClick={() => void startExplicitVoiceSession('ptt')}
+                className={`insi-ctrl-btn ${voiceStatus === 'push_to_talk' ? 'primary' : ''}`}
+                disabled={!speechSupported}
+                onClick={() => void startExplicitVoiceSession('ptt', { silent: false })}
               >
-                🗣 Push to Talk
+                🗣 Speak Command Now
               </button>
 
               <button

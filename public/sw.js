@@ -1,4 +1,4 @@
-const CACHE_NAME = 'insightboard-shell-v5';
+const CACHE_NAME = 'insightboard-shell-v4';
 const OFFLINE_URL = '/offline.html';
 const APP_SHELL_URL = '/';
 const ASSET_MANIFEST_URL = '/asset-manifest.json';
