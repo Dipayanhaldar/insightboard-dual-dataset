@@ -27,9 +27,9 @@ export const VALID_CONNECTOR_MODES = Object.freeze([
   'awaiting_data'
 ]);
 
-// Phonetic variations of "Hey, INSI" / "Hey I N S I" / "Hey Insee" / "Wake up Insee" / "Hey NCI" produced by browser Speech-to-Text engines
+// Phonetic variations of the public wake phrase "Hey Inci" produced by browser Speech-to-Text engines
 const WAKE_TOKEN_PATTERN =
-  '(?:insi\\.ai|insi|incy|insee|eensee|insy|insa|in-see|in\\s+see|in\\s+sea|in\\s+si|in\\s+c|i\\s+n\\s+s\\s+i|i\\.n\\.s\\.i\\.?|and\\s+see|and\\s+c|nci|n\\.c\\.i\\.|n\\s+c\\s+i|nsi|n\\s+s\\s+i|mci|m\\s+c\\s+i|nc|n\\.c\\.|n\\s+c|inc|i\\s+n\\s+c|ins|i\\s+n\\s+s|nse|n\\s+s\\s+e|nsc|n\\s+s\\s+c|ic|i\\s+c|ncc|nic|npc|nfc|nyc|unsee|hennessy|tennessee|aisi|emc|mvc|imc|ims|mc|m\\s+c|ec|e\\s+c|ac|a\\s+c|pc|vc|easy|izzy|issy|ancy|ansi|ency|enci|nancy|macy|messi|mercy|agency|fancy|infy|indy|envy|hainsi|hensy|heinsi|heynsi|ensi|insight\\s*bot|insight|inside|in\\s+sight|in\\s+side|i\\s+see|let\'?s\\s+see|dove|pigeon|bird|bot|robot|assistant)';
+  '(?:hey\\s+inci|inci|in\\s+ci|in-see|in\\s+see|in\\s+sea|insee|incy|insy|insight\\s*bot|insi|in\\s+sight|in\\s+side|nci|n\\s+c\\s+i|dove|pigeon|bird|assistant)';
 
 const WAKE_VERB_PATTERN = '(?:hey|hi|hello|ok|okay|yo|listen|wake\\s+up|wake|fly)';
 
@@ -53,14 +53,13 @@ const HEY_PREFIX_COMMAND_REGEX = /^\s*(?:hey|hi|hello|ok|okay|wake\s+up|listen)(
 
 /**
  * Normalizes raw browser SpeechRecognition transcripts so spaced letters and phonetic variants
- * like "Hey, I N S I", "Hey I.N.S.I.", "Hey Insee", "Wake up Insee", "Hey N C I" normalize cleanly.
+ * like "Hey Inci", "Hey In C I", "Hey N C I", and common phonetic variants normalize cleanly.
  */
 export function normalizeSpeechTranscript(rawInput = '') {
   return String(rawInput || '')
-    .replace(/\bI[\s.\-_]*N[\s.\-_]*S[\s.\-_]*I\b/gi, 'INSI')
-    .replace(/\bN[\s.\-_]*C[\s.\-_]*I\b/gi, 'NCI')
-    .replace(/\bN[\s.\-_]*S[\s.\-_]*I\b/gi, 'NSI')
-    .replace(/\b(?:in[\s\-_]*see|in[\s\-_]*sea|eensee|insee|incy|insy)\b/gi, 'INSI')
+    .replace(/\b(?:hey[\s,.-]*)?in[\s.\-_]*c[\s.\-_]*i\b/gi, 'Inci')
+    .replace(/\b(?:in[\s\-_]*see|in[\s\-_]*sea|insee|incy|insy)\b/gi, 'Inci')
+    .replace(/\bN[\s.\-_]*C[\s.\-_]*I\b/gi, 'Inci')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -166,7 +165,7 @@ const FUZZY_SYNONYM_GROUPS = Object.freeze({
 });
 
 /**
- * Detects whether a voice/text input starts with or contains "Hey, INSI" / "Hey I N S I" / "Hey Insee" / "Wake up Insee" / "Hey NCI"
+ * Detects whether a voice/text input starts with or contains "Hey Inci" / "Hey Inci" / "Hey Inci" / "Wake up Inci" / "Hey NCI"
  * (or phonetic STT transcriptions like "Hey NC", "Hey INC", "Hey INS", "Hey NSE", "Hey easy", "Hey insight")
  */
 export function detectWakeWordAndCommand(rawInput = '') {
@@ -191,7 +190,7 @@ export function detectWakeWordAndCommand(rawInput = '') {
       wakeWordDetected: true,
       matchedWakePhrase: prefixMatch[0].trim().replace(/[,:.\-!?]+$/, ''),
       cleanCommand: stripped || 'Give me an executive overview of the active dataset',
-      normalizedTranscript: `Hey, INSI${stripped ? ', ' + stripped : ''}`
+      normalizedTranscript: `Hey Inci${stripped ? ', ' + stripped : ''}`
     };
   }
 
@@ -207,7 +206,7 @@ export function detectWakeWordAndCommand(rawInput = '') {
       wakeWordDetected: true,
       matchedWakePhrase: inlineMatch[0].trim().replace(/[,:.\-!?]+$/, ''),
       cleanCommand: stripped || 'Give me an executive overview of the active dataset',
-      normalizedTranscript: `Hey, INSI${stripped ? ', ' + stripped : ''}`
+      normalizedTranscript: `Hey Inci${stripped ? ', ' + stripped : ''}`
     };
   }
 
@@ -217,9 +216,9 @@ export function detectWakeWordAndCommand(rawInput = '') {
     const stripped = heyPrefixMatch[1].trim();
     return {
       wakeWordDetected: true,
-      matchedWakePhrase: 'Hey, INSI',
+      matchedWakePhrase: 'Hey Inci',
       cleanCommand: stripped,
-      normalizedTranscript: `Hey, INSI, ${stripped}`
+      normalizedTranscript: `Hey Inci, ${stripped}`
     };
   }
 
@@ -229,7 +228,7 @@ export function detectWakeWordAndCommand(rawInput = '') {
       wakeWordDetected: true,
       matchedWakePhrase: original,
       cleanCommand: 'Give me an executive overview of the active dataset',
-      normalizedTranscript: 'Hey, INSI'
+      normalizedTranscript: 'Hey Inci'
     };
   }
 
@@ -237,9 +236,9 @@ export function detectWakeWordAndCommand(rawInput = '') {
   if (DIRECT_VOICE_INTENT_REGEX.test(original)) {
     return {
       wakeWordDetected: true,
-      matchedWakePhrase: 'Hey, INSI (Direct Voice Intent)',
+      matchedWakePhrase: 'Hey Inci (Direct Voice Intent)',
       cleanCommand: original,
-      normalizedTranscript: `Hey, INSI, ${original}`
+      normalizedTranscript: `Hey Inci, ${original}`
     };
   }
 
@@ -1059,7 +1058,7 @@ export function executeInsiCommand({
           ? `Audit footfall-to-checkout conversion and lease cost for ${laggardName}${secondLaggardName ? ` and ${secondLaggardName}` : ''}, or run a +10% promotional traffic simulation.`
           : topMatch
           ? `Replicate promotional mix and merchandising from ${leaderName} across mid-tier units to lift overall portfolio yield.`
-          : `Say "Hey INSI, highlight the bottom 2 ${dimensionKey.replace(/_/g, ' ')} in red and export a CSV" to isolate underperforming units.`
+          : `Say "Hey Inci, highlight the bottom 2 ${dimensionKey.replace(/_/g, ' ')} in red and export a CSV" to isolate underperforming units.`
     },
     dashboard_actions: dashboardActions,
     processed_data: processedData,
@@ -1101,7 +1100,7 @@ export function buildExternalConnectorOpenApiSpec(baseUrl = '') {
                   properties: {
                     command: {
                       type: 'string',
-                      description: 'Natural language command (e.g. "Hey INSI, show revenue by store as a bar chart, highlight the bottom 2 stores in red, and export a CSV")'
+                      description: 'Natural language command (e.g. "Hey Inci, show revenue by store as a bar chart, highlight the bottom 2 stores in red, and export a CSV")'
                     },
                     active_mode: {
                       type: 'string',
