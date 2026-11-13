@@ -21,6 +21,7 @@ const SAMPLE_MALL_RECORDS = [
 
 test('detectWakeWordAndCommand recognizes "Hey Inci" and common speech-to-text variants', () => {
   assert.equal(normalizeSpeechTranscript('Hey Inci show revenue'), 'Hey Inci show revenue');
+  assert.equal(normalizeSpeechTranscript('Hey I N S I show revenue'), 'Hey Inci show revenue');
   assert.equal(normalizeSpeechTranscript('Wake up Inci'), 'Wake up Inci');
 
   const variants = [
