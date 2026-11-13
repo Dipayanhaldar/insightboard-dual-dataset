@@ -24,7 +24,7 @@ test('detectWakeWordAndCommand recognizes "Hey Inci" and common speech-to-text v
   assert.equal(normalizeSpeechTranscript('Hey I N S I show revenue'), 'Hey Inci, show revenue');
   assert.equal(normalizeSpeechTranscript('Wake up Inci'), 'Wake up Inci');
   assert.equal(normalizeSpeechTranscript('Wake up In C I'), 'Wake up Inci');
-  assert.equal(normalizeSpeechTranscript('Hey, In C I show revenue'), 'Hey Inci show revenue');
+  assert.equal(normalizeSpeechTranscript('Hey, In C I show revenue'), 'Hey Inci, show revenue');
 
   const variants = [
     'Hey Inci, show revenue by store',
