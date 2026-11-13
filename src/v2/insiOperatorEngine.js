@@ -29,7 +29,7 @@ export const VALID_CONNECTOR_MODES = Object.freeze([
 
 // Phonetic variations of the public wake phrase "Hey Inci" produced by browser Speech-to-Text engines
 const WAKE_TOKEN_PATTERN =
-  '(?:hey\\s+inci|inci|in\\s+ci|in-see|in\\s+see|in\\s+sea|insee|incy|insy|insight\\s*bot|insi|in\\s+sight|in\\s+side|nci|n\\s+c\\s+i|dove|pigeon|bird|assistant)';
+  '(?:hey\\s+inci|inci|in\\s+ci|in\\s+c|in-see|in\\s+see|in\\s+sea|insee|incy|insy|insight\\s*bot|insi|in\\s+sight|in\\s+side|nci|n\\s+c\\s+i|dove|pigeon|bird|assistant)';
 
 const WAKE_VERB_PATTERN = '(?:hey|hi|hello|ok|okay|yo|listen|wake\\s+up|wake|fly)';
 
