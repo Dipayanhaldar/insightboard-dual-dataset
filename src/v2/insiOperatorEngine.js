@@ -613,8 +613,8 @@ export function executeInsiCommand({
   const wantsReset = /\b(reset|clear all|clear filter|show all|restore)\b/.test(cmdLower);
   const wantsCompare = /\b(compare|versus|vs\.?|period|variance)\b/.test(cmdLower);
 
-  // Detect file export request
-  const wantsExport = /\b(export|download|save|extract)\b/.test(cmdLower);
+  // Detect file export request (any natural phrasing: download pdf, export excel, save csv, get report, etc.)
+  const wantsExport = /\b(export|download|save|extract|print\s+pdf|get\s+pdf|get\s+excel|get\s+csv|pdf\s+report|excel\s+sheet|csv\s+file)\b/.test(cmdLower);
   let exportFormat = 'none';
   if (wantsExport) {
     if (/\bjson\b/.test(cmdLower)) exportFormat = 'json';
@@ -917,30 +917,36 @@ export function executeInsiCommand({
 
   // Extract Full-App Automation Plan so voice or Run Command automates the entire website shell
   const automationPlan = {
-    switchPreset: /\b(hyderabad|metro|rail|train|station)\b/.test(cmdLower) && /\b(switch|load|open|show|change|dataset|metro)\b/.test(cmdLower)
+    switchPreset: /\b(hyderabad|metro|rail|train|station)\b/.test(cmdLower) && /\b(switch|load|open|show|change|dataset|metro|go\s+to)\b/.test(cmdLower)
       ? 'metro'
-      : /\b(shopping\s+mall|mall\s+dataset|retail\s+sales|retail\s+dataset)\b/.test(cmdLower) && /\b(switch|load|open|show|change|dataset|mall)\b/.test(cmdLower)
+      : /\b(shopping\s+mall|mall\s+dataset|retail\s+sales|retail\s+dataset|shopping)\b/.test(cmdLower) && /\b(switch|load|open|show|change|dataset|mall|go\s+to)\b/.test(cmdLower)
       ? 'mall'
       : null,
     switchTab: isBareWakeGreeting
       ? null
-      : /\b(overview\s+tab|6 charts|six charts|main charts)\b/.test(cmdLower)
+      : /\b(overview\s+tab|6 charts|six charts|main charts|go\s+to\s+overview)\b/.test(cmdLower)
       ? 'overview'
-      : /\b(command hub|decision|statistical hub|what[- ]?if|simulation)\b/.test(cmdLower)
+      : /\b(universal\s+connector|connector\s+tab|connector\s+hub|upload\s+tab)\b/.test(cmdLower)
+      ? 'connector'
+      : /\b(command hub|decision|statistical hub|what[- ]?if|simulation|intelligence\s+tab)\b/.test(cmdLower)
       ? 'intelligence'
-      : /\b(gnani|voice studio|sign in|login|gemini)\b/.test(cmdLower)
+      : /\b(gnani|voice studio|sign in|login|gemini|ai\s+studio|puter|pollinations)\b/.test(cmdLower)
       ? 'studio'
-      : /\b(compare dataset|comparison|diff)\b/.test(cmdLower)
+      : /\b(compare dataset|comparison|diff|compare\s+tab)\b/.test(cmdLower)
       ? 'compare'
       : /\b(quota|usage|billing|limit)\b/.test(cmdLower)
       ? 'quotas'
       : /\b(expand all|show all modules)\b/.test(cmdLower)
       ? 'all'
       : null,
-    exportAppFormat: /\b(pdf)\b/.test(cmdLower) && wantsExport
+    exportAppFormat: /\b(pdf)\b/.test(cmdLower) && (wantsExport || /\b(report|file|document)\b/.test(cmdLower))
       ? 'pdf'
-      : /\b(excel|xlsx|spreadsheet)\b/.test(cmdLower) && wantsExport
+      : /\b(excel|xlsx|spreadsheet|workbook)\b/.test(cmdLower) && (wantsExport || /\b(report|file|sheet)\b/.test(cmdLower))
       ? 'excel'
+      : /\b(csv)\b/.test(cmdLower) && (wantsExport || /\b(report|file|data)\b/.test(cmdLower))
+      ? 'csv'
+      : /\b(download|export)\s+(?:the\s+)?(?:report|data|dataset|file)\b/.test(cmdLower)
+      ? 'csv'
       : exportFormat !== 'none'
       ? exportFormat
       : null,
@@ -950,11 +956,12 @@ export function executeInsiCommand({
       ? 'light'
       : null,
     openCalendar: /\b(calendar|schedule|reminder|meeting|invite|ics)\b/.test(cmdLower),
-    openTable: /\b(open table|show table|expand table|data table|records table)\b/.test(cmdLower)
+    openTable: /\b(open table|show table|expand table|data table|records table|open data table)\b/.test(cmdLower)
       ? true
       : /\b(hide table|close table|collapse table)\b/.test(cmdLower)
       ? false
       : null,
+    perchOnDossier: /\b(project\s+dossier|project\s+desire|dossier|stand\s+on\s+project|sit\s+on\s+project)\b/.test(cmdLower),
     resetFilters: wantsReset,
     searchQuery: (() => {
       const m = effectiveCommand.match(/\b(?:search\s+for|search|find|filter\s+by|lookup)\s+["']?([a-z0-9\s&.-]{2,32})["']?$/i);
@@ -1065,8 +1072,12 @@ export function executeInsiCommand({
  * ChatGPT Custom GPT Actions, Claude MCP bridges, or Gemini Extensions can connect
  * directly to InsightBoard VDB without opening the browser UI.
  */
-export function buildExternalConnectorOpenApiSpec(baseUrl = 'http://localhost:3000') {
-  const cleanOrigin = String(baseUrl || 'http://localhost:3000').replace(/\/$/, '');
+export function buildExternalConnectorOpenApiSpec(baseUrl = '') {
+  const defaultOrigin =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : 'https://insightboard-dual-dataset.vercel.app';
+  const cleanOrigin = String(baseUrl || defaultOrigin).replace(/\/$/, '');
   return {
     openapi: '3.1.0',
     info: {

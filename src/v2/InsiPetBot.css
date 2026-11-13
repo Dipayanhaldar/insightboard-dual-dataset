@@ -53,15 +53,18 @@
   animation: insiWorkspaceOrbitFlight 2.4s cubic-bezier(0.32, 0, 0.24, 1) forwards;
 }
 
-/* Main Dove Rig Container */
+/* Main Dove Rig Container — Strictly Transparent (No Blue Background Circle) */
 .insi-robot-rig.insi-dove-rig {
   position: relative;
-  width: 78px;
-  height: 74px;
+  width: 82px;
+  height: 76px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   pointer-events: auto;
   cursor: pointer;
   transform: scale(var(--insi-scale, 0.94));
@@ -72,26 +75,13 @@
   transform: scale(calc(var(--insi-scale, 0.94) * 1.09)) translateY(-3px);
 }
 
-.insi-ambient-halo {
-  position: absolute;
-  inset: 4px;
-  border-radius: 999px;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--insi-aura, #00F0FF) 42%, transparent) 0%,
-    rgba(14, 165, 233, 0.16) 58%,
-    transparent 100%
-  );
-  animation: insiHaloPulse 2.4s ease-in-out infinite;
-}
-
-/* Active Listening Sonar Rings */
+/* Subtle Listening Ring (Transparent Interior — Zero Blue Background Fill) */
 .insi-listening-sonar {
   position: absolute;
   inset: -4px;
   border-radius: 999px;
-  border: 2px solid #00f0ff;
-  box-shadow: 0 0 14px rgba(0, 240, 255, 0.55);
+  background: transparent !important;
+  border: 1.5px solid rgba(16, 185, 129, 0.65);
   pointer-events: none;
   animation: insiSonarExpand 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
@@ -99,23 +89,15 @@
   animation-delay: 0.9s;
 }
 
-.insi-quantum-ring-outer {
-  position: absolute;
-  inset: 0px;
-  border-radius: 999px;
-  border: 2px dashed var(--insi-aura, #38bdf8);
-  box-shadow: 0 0 18px var(--insi-aura, rgba(56, 189, 248, 0.45));
-  animation: insiSpinRing 3.4s linear infinite;
-}
-
-/* Dove Artwork & Motion Layers */
+/* Dove Artwork & Articulated Wing-Flapping Layers */
 .insi-dove-body-wrap {
   position: relative;
-  width: 72px;
-  height: 68px;
+  width: 76px;
+  height: 72px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: transparent !important;
   z-index: 2;
   transform: scaleX(var(--insi-facing-dir, 1)) rotate(var(--insi-head-tilt, 0deg));
   transition: transform 0.22s ease-out;
@@ -125,15 +107,32 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 2px;
-  filter: drop-shadow(0 6px 14px rgba(14, 165, 233, 0.35));
-  transform-origin: 50% 62%;
+  background: transparent !important;
+  padding: 0;
+  filter: drop-shadow(0 8px 14px rgba(15, 23, 42, 0.28));
+  transform-origin: 54% 62%;
   animation: insiDoveIdleBreathe 2.8s ease-in-out infinite;
 }
 
+/* Articulated Upper-Wing Layer that Flaps Realistic Up-and-Down Strokes During Flight */
+.insi-dove-wing-flap-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: transparent !important;
+  pointer-events: none;
+  clip-path: polygon(0% 0%, 88% 0%, 76% 58%, 0% 66%);
+  transform-origin: 54% 56%;
+  opacity: 0;
+  will-change: transform;
+}
+
 .insi-dove-fallback-svg {
-  width: 66px;
-  height: 66px;
+  width: 68px;
+  height: 68px;
+  background: transparent !important;
 }
 
 /* Periodic Natural Eye Blink Overlay */
@@ -145,7 +144,6 @@
   height: 5px;
   border-radius: 999px;
   background: rgba(226, 232, 240, 0.92);
-  box-shadow: 0 0 4px rgba(56, 189, 248, 0.8);
   pointer-events: none;
   animation: insiDoveEyeBlink 4.2s infinite;
 }
@@ -159,24 +157,23 @@
   animation: insiSparkleTwinkle 0.7s ease-in-out infinite alternate;
 }
 
-/* Perch Bar Under Dove Claws */
+/* Subtle Claw Shadow When Standing on Project Dossier or Active Tab */
 .insi-dove-perch-bar {
-  width: 38px;
-  height: 5px;
+  width: 28px;
+  height: 4px;
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(56, 189, 248, 0.25), rgba(56, 189, 248, 0.9), rgba(56, 189, 248, 0.25));
-  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.55);
-  margin-top: -5px;
+  background: rgba(15, 23, 42, 0.28);
+  margin-top: -4px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .perch-glow-dot {
-  width: 8px;
-  height: 3px;
+  width: 6px;
+  height: 2px;
   border-radius: 999px;
-  background: #e0f2fe;
+  background: rgba(255, 255, 255, 0.45);
 }
 
 /* Compact Live Status Pill Beneath Dove */
@@ -188,14 +185,14 @@
   gap: 5px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.88);
-  border: 1px solid rgba(56, 189, 248, 0.42);
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.35);
   color: #e2e8f0;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.01em;
   white-space: nowrap;
-  max-width: 175px;
+  max-width: 185px;
   overflow: hidden;
   text-overflow: ellipsis;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.35);
@@ -208,7 +205,7 @@
 }
 
 .insi-dove-status-pill.is-speaking {
-  background: rgba(12, 74, 110, 0.94);
+  background: rgba(15, 23, 42, 0.94);
   border-color: #38bdf8;
   color: #f0f9ff;
 }
@@ -228,14 +225,24 @@
 }
 
 /* ============================================================
-   DOVE STATE ANIMATIONS (Takeoff, Flight, Orbit, Hopping, Listening, Dancing, Magic, Error)
+   DOVE STATE ANIMATIONS (Articulated Wing Flap on Fly, Takeoff, Orbit, Landing)
    ============================================================ */
 
-/* Takeoff & Flight Wing Flap */
+/* Active Wing-Flapping During Takeoff, Flight, Orbit & Landing */
 .state-takeoff .insi-dove-artwork,
 .state-flying .insi-dove-artwork,
-.state-orbiting .insi-dove-artwork {
-  animation: insiDoveWingFlap 0.34s ease-in-out infinite alternate;
+.state-orbiting .insi-dove-artwork,
+.insi-orbit-flight-active .insi-dove-artwork {
+  animation: insiDoveBodyFlightLift 0.22s ease-in-out infinite alternate;
+}
+
+.state-takeoff .insi-dove-wing-flap-layer,
+.state-flying .insi-dove-wing-flap-layer,
+.state-orbiting .insi-dove-wing-flap-layer,
+.state-landing .insi-dove-wing-flap-layer,
+.insi-orbit-flight-active .insi-dove-wing-flap-layer {
+  opacity: 1;
+  animation: insiDoveArticulatedWingFlap 0.16s ease-in-out infinite alternate;
 }
 
 .state-landing .insi-dove-artwork {
@@ -260,9 +267,13 @@
   animation: insiDoveSpeakingBob 0.36s ease-in-out infinite alternate;
 }
 
-/* Dancing Groove */
+/* Dancing Groove (Wings also flutter!) */
 .state-dancing .insi-dove-rig {
-  animation: insiDanceGroove 0.44s ease-in-out infinite alternate;
+  animation: insiDanceGroove 0.4s ease-in-out infinite alternate;
+}
+.state-dancing .insi-dove-wing-flap-layer {
+  opacity: 1;
+  animation: insiDoveArticulatedWingFlap 0.22s ease-in-out infinite alternate;
 }
 
 /* Magic & Celebrating */
@@ -411,8 +422,7 @@
   width: 28px;
   height: 28px;
   object-fit: contain;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.28), transparent 70%);
+  background: transparent;
 }
 
 .insi-dock-text {
@@ -1114,6 +1124,16 @@
 @keyframes insiDoveIdleBreathe {
   0%, 100% { transform: translateY(0px) rotate(0deg); }
   50% { transform: translateY(-3.5px) rotate(-1.5deg); }
+}
+
+@keyframes insiDoveBodyFlightLift {
+  0% { transform: translateY(3px) rotate(-4deg); }
+  100% { transform: translateY(-7px) rotate(5deg); }
+}
+
+@keyframes insiDoveArticulatedWingFlap {
+  0% { transform: rotate(-28deg) scaleY(0.56) translateY(5px) skewX(-8deg); }
+  100% { transform: rotate(19deg) scaleY(1.18) translateY(-5px) skewX(6deg); }
 }
 
 @keyframes insiDoveWingFlap {

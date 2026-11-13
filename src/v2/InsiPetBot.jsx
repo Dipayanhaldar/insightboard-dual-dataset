@@ -54,14 +54,14 @@ export default function InsiPetBot({
   emptyDashboard = false,
   onVoiceCommandAction
 }) {
-  // Visual Dove States
-  const [visible, setVisible] = useState(true);
+  // Visual Dove States — Invisible by default until summoned by "Hey, INSI" or command
+  const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [animState, setAnimState] = useState('perched');
   const [activeProp, setActiveProp] = useState('chair_laptop');
   const [sizeVariant, setSizeVariant] = useState('md');
   const [auraColor, setAuraColor] = useState('#00F0FF');
-  const [corner, setCorner] = useState('active-tab-perch');
+  const [corner, setCorner] = useState('project-dossier-perch');
   const [doveImgFailed, setDoveImgFailed] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(() => {
     if (typeof window !== 'undefined' && window.matchMedia) {
@@ -70,9 +70,10 @@ export default function InsiPetBot({
     return false;
   });
 
-  // Active Tab Perch & Cursor Motion Tracking
+  // Project Dossier Fixed Perch, Active Tab Perch & Cursor Motion Tracking
+  const [dossierPerchCoords, setDossierPerchCoords] = useState(null);
   const [activeTabCoords, setActiveTabCoords] = useState(null);
-  const [activeTabLabel, setActiveTabLabel] = useState('Active Tab');
+  const [activeTabLabel, setActiveTabLabel] = useState('Project Dossier');
   const [followCursorMode, setFollowCursorMode] = useState(false);
   const [cursorCoords, setCursorCoords] = useState({ x: 0, y: 0 });
   const [pointerTrack, setPointerTrack] = useState({
@@ -82,7 +83,7 @@ export default function InsiPetBot({
     eyeY: 0
   });
   const [isOrbitingTask, setIsOrbitingTask] = useState(false);
-  const [statusBubbleText, setStatusBubbleText] = useState('Perched on active tab · Say "Hey, INSI"');
+  const [statusBubbleText, setStatusBubbleText] = useState('Standing on Project Dossier · Say "Hey, INSI"');
 
   // Assistant Panel & Local Command Router States
   const [panelOpen, setPanelOpen] = useState(false);
@@ -187,16 +188,37 @@ export default function InsiPetBot({
     };
   }, []);
 
-  // Measure and track the currently active workspace tab (`button.workspace-tab-btn.active`) so INSI perches right on it
+  // Measure and track the fixed "Project Dossier" button AND the active workspace tab so INSI stands right on Project Dossier
   const updateActiveTabPerchPosition = useCallback(() => {
     if (typeof document === 'undefined' || typeof window === 'undefined') return;
+
+    // 1. Measure the fixed "Project Dossier" button so INSI can stand directly on top of it
+    const dossierEl =
+      document.querySelector('.project-dossier-fab') ||
+      document.querySelector('a[aria-label*="project dossier" i]') ||
+      document.querySelector('a[href*="notion.com"]');
+
+    if (dossierEl) {
+      const dRect = dossierEl.getBoundingClientRect();
+      if (dRect.width > 0 && dRect.top >= 40 && dRect.bottom <= window.innerHeight + 20) {
+        const dossierLeft = Math.max(24, Math.min(window.innerWidth - 92, dRect.left + dRect.width / 2 - 41));
+        const dossierTop = Math.max(12, dRect.top - 72);
+        setDossierPerchCoords({
+          left: `${Math.round(dossierLeft)}px`,
+          top: `${Math.round(dossierTop)}px`,
+          bottom: 'auto',
+          right: 'auto'
+        });
+      }
+    }
+
+    // 2. Also measure the currently active workspace tab
     const activeTabEl = document.querySelector('.workspace-tab-btn.active');
     if (!activeTabEl) {
       setActiveTabCoords(null);
       return;
     }
     const rect = activeTabEl.getBoundingClientRect();
-    // Only perch directly on the tab if it is visible in the viewport and viewport is wide enough
     if (
       window.innerWidth >= 640 &&
       rect.width > 0 &&
@@ -211,7 +233,7 @@ export default function InsiPetBot({
         bottom: 'auto',
         right: 'auto'
       });
-      const cleanLabel = String(activeTabEl.textContent || 'Active Tab')
+      const cleanLabel = String(activeTabEl.textContent || 'Project Dossier')
         .replace(/\s+/g, ' ')
         .trim();
       setActiveTabLabel(cleanLabel);
@@ -223,34 +245,16 @@ export default function InsiPetBot({
   useEffect(() => {
     updateActiveTabPerchPosition();
     const handleLayoutUpdate = () => updateActiveTabPerchPosition();
-    const handleTabClick = () => {
-      // When user clicks a tab, INSI takes flight briefly and lands on the newly active tab!
-      if (!reducedMotion) {
-        setAnimState('flying');
-        setTimeout(() => {
-          updateActiveTabPerchPosition();
-          setAnimState('landing');
-          setTimeout(() => {
-            setAnimState(isListeningRef.current ? 'listening' : 'perched');
-          }, 650);
-        }, 220);
-      } else {
-        setTimeout(updateActiveTabPerchPosition, 60);
-      }
-    };
-
     window.addEventListener('resize', handleLayoutUpdate, { passive: true });
     window.addEventListener('scroll', handleLayoutUpdate, { passive: true });
-    document.addEventListener('click', handleTabClick, { passive: true });
     const interval = setInterval(updateActiveTabPerchPosition, 1800);
 
     return () => {
       window.removeEventListener('resize', handleLayoutUpdate);
       window.removeEventListener('scroll', handleLayoutUpdate);
-      document.removeEventListener('click', handleTabClick);
       clearInterval(interval);
     };
-  }, [reducedMotion, updateActiveTabPerchPosition]);
+  }, [updateActiveTabPerchPosition]);
 
   // Real-Time Pointer Tracking: Dove head tilt, facing direction, and optional mouse-follow flight
   useEffect(() => {
@@ -286,14 +290,39 @@ export default function InsiPetBot({
     if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
   }, []);
 
+  const scheduleFlyOffAndHide = useCallback(
+    (delayMs = 6800) => {
+      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      fadeTimerRef.current = setTimeout(() => {
+        // Keep visible if user currently has the assistant control panel open
+        setAnimState('takeoff');
+        setLeaving(true);
+        playInsiDisappear();
+        hideTimerRef.current = setTimeout(() => {
+          setVisible(false);
+          setLeaving(false);
+        }, 460);
+      }, delayMs);
+    },
+    []
+  );
+
   const triggerTaskFlightOrbit = useCallback(
-    (statusNote = 'Flying across workspace & committing task…') => {
+    (statusNote = 'Flying across workspace & committing task…', { autoFlyOff = true, perchTarget = 'project-dossier-perch' } = {}) => {
+      clearTimers();
+      setLeaving(false);
+      setVisible(true);
       setStatusBubbleText(statusNote);
+      updateActiveTabPerchPosition();
+
       if (reducedMotion) {
+        setCorner(perchTarget);
         setAnimState('celebrating');
         if (orbitTimerRef.current) clearTimeout(orbitTimerRef.current);
         orbitTimerRef.current = setTimeout(() => {
           setAnimState(isListeningRef.current ? 'listening' : 'perched');
+          if (autoFlyOff) scheduleFlyOffAndHide(5200);
         }, 2200);
         return;
       }
@@ -304,35 +333,41 @@ export default function InsiPetBot({
 
       setTimeout(() => {
         setAnimState('orbiting');
-      }, 280);
+      }, 220);
 
       orbitTimerRef.current = setTimeout(() => {
         setIsOrbitingTask(false);
         updateActiveTabPerchPosition();
+        setCorner(perchTarget);
         setAnimState('landing');
         setTimeout(() => {
           setAnimState(isListeningRef.current ? 'listening' : 'perched');
-        }, 650);
-      }, 2500);
+          if (autoFlyOff) scheduleFlyOffAndHide(5800);
+        }, 620);
+      }, 2400);
     },
-    [reducedMotion, updateActiveTabPerchPosition]
+    [clearTimers, reducedMotion, scheduleFlyOffAndHide, updateActiveTabPerchPosition]
   );
 
   const showInsi = useCallback(
     (nextState = 'perched', options = {}) => {
       clearTimers();
+      updateActiveTabPerchPosition();
 
       const validState = INSI_STATES.includes(nextState) ? nextState : 'perched';
       const durationMs = Number(options.durationMs) || 5200;
 
       const chosenCorner =
-        options.corner && (CORNER_POSITIONS[options.corner] || options.corner === 'active-tab-perch')
+        options.corner &&
+        (CORNER_POSITIONS[options.corner] ||
+          options.corner === 'active-tab-perch' ||
+          options.corner === 'project-dossier-perch')
           ? options.corner
           : validState === 'roaming_heading'
           ? 'heading-perch'
           : validState === 'pulling_dashboard'
           ? 'kpi-perch'
-          : 'active-tab-perch';
+          : 'project-dossier-perch';
 
       const chosenSize =
         options.size && INSI_SIZES.includes(options.size) ? options.size : 'md';
@@ -376,11 +411,12 @@ export default function InsiPetBot({
       if (options.autoReturnToPerch !== false) {
         stepTimerRef.current = setTimeout(() => {
           setAnimState(isListeningRef.current ? 'listening' : 'perched');
-          setCorner('active-tab-perch');
+          setCorner('project-dossier-perch');
+          scheduleFlyOffAndHide(4200);
         }, durationMs);
       }
     },
-    [clearTimers]
+    [clearTimers, scheduleFlyOffAndHide, updateActiveTabPerchPosition]
   );
 
   /**
@@ -503,13 +539,14 @@ export default function InsiPetBot({
       // Play crisp avian task-commit chime
       playInsiChime('signin');
 
-      // 1. Bird motion-only routes (fly around, dance, magic)
+      // 1. Bird motion-only routes (fly around, stand on Project Dossier, dance, magic)
       if (routeInfo?.actionType === 'bird_motion') {
         if (routeInfo.birdMotion === 'dancing') {
           showInsi('dancing', {
             prop: 'audio_deck',
             size: 'lg',
             auraColor: '#00F0FF',
+            corner: 'project-dossier-perch',
             message: routeInfo.confirmationNote,
             durationMs: 5200,
             sound: 'celebrate'
@@ -519,12 +556,21 @@ export default function InsiPetBot({
             prop: 'magician_wand',
             size: 'lg',
             auraColor: '#00FF88',
+            corner: 'project-dossier-perch',
             message: routeInfo.confirmationNote,
             durationMs: 5200,
             sound: 'celebrate'
           });
+        } else if (routeInfo.birdMotion === 'perch_dossier') {
+          triggerTaskFlightOrbit(routeInfo.confirmationNote, {
+            autoFlyOff: true,
+            perchTarget: 'project-dossier-perch'
+          });
         } else {
-          triggerTaskFlightOrbit(routeInfo.confirmationNote);
+          triggerTaskFlightOrbit(routeInfo.confirmationNote, {
+            autoFlyOff: true,
+            perchTarget: 'project-dossier-perch'
+          });
         }
         if (speakReply && routeInfo.confirmationNote) {
           speakWithoutEcho(routeInfo.confirmationNote);
@@ -742,6 +788,9 @@ export default function InsiPetBot({
   const stopVoiceListening = useCallback(() => {
     voiceModeRef.current = 'off';
     isListeningRef.current = false;
+    try {
+      window.localStorage.setItem('insightboard_insi_voice_enabled', 'false');
+    } catch {}
     if (interimTimerRef.current) {
       clearTimeout(interimTimerRef.current);
       interimTimerRef.current = null;
@@ -785,8 +834,11 @@ export default function InsiPetBot({
       setVoiceErrorMsg('');
       setVoiceStatus('requesting_permission');
       voiceModeRef.current = mode;
+      try {
+        window.localStorage.setItem('insightboard_insi_voice_enabled', 'true');
+      } catch {}
 
-      // Request microphone permission ONLY now, after explicit user opt-in
+      // Request microphone permission ONLY when enabled or already granted
       if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
@@ -972,6 +1024,54 @@ export default function InsiPetBot({
     },
     [appendLog, handleSpokenTranscript]
   );
+
+  // Creative Hands-Free Wake-Word Auto-Resume:
+  // If microphone permission is already granted in the browser (or user enabled voice once before),
+  // automatically resume background "Hey, INSI" wake-word listening while keeping the bird invisible until called!
+  useEffect(() => {
+    if (typeof window === 'undefined' || !speechSupported) return undefined;
+    let cancelled = false;
+
+    const tryAutoResumeWakeListener = async () => {
+      if (cancelled || isListeningRef.current || voiceModeRef.current !== 'off') return;
+      let previouslyEnabled = false;
+      try {
+        previouslyEnabled = window.localStorage.getItem('insightboard_insi_voice_enabled') === 'true';
+      } catch {}
+
+      let permGranted = false;
+      if (navigator.permissions?.query) {
+        try {
+          const status = await navigator.permissions.query({ name: 'microphone' });
+          permGranted = status.state === 'granted';
+        } catch {}
+      }
+
+      if (!cancelled && (permGranted || previouslyEnabled)) {
+        void startExplicitVoiceSession('continuous');
+      }
+    };
+
+    void tryAutoResumeWakeListener();
+
+    const onFirstGesture = () => {
+      if (!isListeningRef.current && voiceModeRef.current === 'off') {
+        let savedPref = null;
+        try {
+          savedPref = window.localStorage.getItem('insightboard_insi_voice_enabled');
+        } catch {}
+        if (savedPref === 'true') {
+          void startExplicitVoiceSession('continuous');
+        }
+      }
+    };
+
+    window.addEventListener('pointerdown', onFirstGesture, { once: true, passive: true });
+    return () => {
+      cancelled = true;
+      window.removeEventListener('pointerdown', onFirstGesture);
+    };
+  }, [speechSupported, startExplicitVoiceSession]);
 
   // Clean up SpeechRecognition on unmount
   useEffect(() => {
@@ -1174,7 +1274,7 @@ export default function InsiPetBot({
     });
   };
 
-  // Resolve Dove Stage Coordinates (Orbiting Flight vs Cursor-Follow vs Active Tab Perch vs Corner)
+  // Resolve Dove Stage Coordinates (Orbiting Flight vs Cursor-Follow vs Project Dossier Perch vs Active Tab Perch)
   const resolvedStageStyle = useMemo(() => {
     if (isOrbitingTask && !reducedMotion) {
       return {
@@ -1192,11 +1292,17 @@ export default function InsiPetBot({
         right: 'auto'
       };
     }
+    if (corner === 'project-dossier-perch' && dossierPerchCoords) {
+      return dossierPerchCoords;
+    }
     if (corner === 'active-tab-perch' && activeTabCoords) {
       return activeTabCoords;
     }
+    if (dossierPerchCoords) {
+      return dossierPerchCoords;
+    }
     return CORNER_POSITIONS[corner] || CORNER_POSITIONS['bottom-right'];
-  }, [activeTabCoords, corner, cursorCoords, followCursorMode, isOrbitingTask, reducedMotion]);
+  }, [activeTabCoords, corner, cursorCoords, dossierPerchCoords, followCursorMode, isOrbitingTask, reducedMotion]);
 
   const isListeningActive = voiceStatus === 'listening_wake' || voiceStatus === 'push_to_talk';
 
@@ -1211,7 +1317,7 @@ export default function InsiPetBot({
 
   return (
     <>
-      {/* 1. Animated INSI Dove Avatar (Perched on Active Tab or Flying Across Workspace) */}
+      {/* 1. Animated INSI Dove Avatar (Invisible until called by "Hey, INSI"; stands on Project Dossier button) */}
       {visible && (
         <div
           className={`insi-pet-stage ${leaving ? 'insi-leaving' : 'insi-entering'} state-${animState} prop-${activeProp} size-${sizeVariant} corner-${corner} ${
@@ -1233,7 +1339,7 @@ export default function InsiPetBot({
           role="button"
           tabIndex={0}
           aria-label={`INSI Dove Assistant (${animState}). Click to open or close INSI Assistant Panel.`}
-          title={`INSI Dove Assistant — Perched on ${activeTabLabel}. Click to open controls or say "Hey, INSI"`}
+          title='INSI Dove Assistant — Standing on Project Dossier. Click to open controls or say "Hey, INSI"'
           onClick={() => setPanelOpen((prev) => !prev)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -1242,7 +1348,7 @@ export default function InsiPetBot({
             }
           }}
         >
-          {/* Emotive FX Layer Above Dove (Musical Notes, Sparkles, Sleep Zzz, Confused ?, Listening Waves) */}
+          {/* Emotive FX Layer Above Dove */}
           <div className="insi-fx-layer" aria-hidden="true">
             {animState === 'sleeping' && (
               <div className="insi-zzz-group">
@@ -1284,33 +1390,27 @@ export default function InsiPetBot({
             )}
           </div>
 
-          {/* Main Dove Rig */}
+          {/* Main Dove Rig — Pure Transparent Bird Only (No Blue Background Circle) + Articulated Flapping Wings */}
           <div className="insi-robot-rig insi-dove-rig">
-            <div className="insi-ambient-halo" />
-
-            {/* Active Listening Sonar Rings */}
-            {(isListeningActive || animState === 'listening') && (
-              <>
-                <div className="insi-listening-sonar sonar-1" />
-                <div className="insi-listening-sonar sonar-2" />
-              </>
-            )}
-
-            {(animState === 'heavy_ai' ||
-              animState === 'magic_import' ||
-              animState === 'orbiting' ||
-              animState === 'malware_alert' ||
-              animState === 'legal_alert') && <div className="insi-quantum-ring-outer" />}
-
             <div className="insi-dove-body-wrap">
               {!doveImgFailed ? (
-                <img
-                  src={DOVE_IMAGE_URL}
-                  alt="INSI white and silver-gray dove assistant with vivid blue wing feathers"
-                  className="insi-dove-artwork"
-                  draggable={false}
-                  onError={() => setDoveImgFailed(true)}
-                />
+                <>
+                  <img
+                    src={DOVE_IMAGE_URL}
+                    alt="INSI white and silver-gray dove assistant with vivid blue wing feathers"
+                    className="insi-dove-artwork"
+                    draggable={false}
+                    onError={() => setDoveImgFailed(true)}
+                  />
+                  {/* Articulated Upper-Wing Layer that Flaps Up and Down During Flight */}
+                  <img
+                    src={DOVE_IMAGE_URL}
+                    alt=""
+                    aria-hidden="true"
+                    className="insi-dove-wing-flap-layer"
+                    draggable={false}
+                  />
+                </>
               ) : (
                 /* Vector Dove Fallback (Zero-Broken-Image Policy) */
                 <svg viewBox="0 0 120 120" className="insi-dove-fallback-svg" aria-hidden="true">
@@ -1335,7 +1435,7 @@ export default function InsiPetBot({
                 aria-hidden="true"
               />
 
-              {/* Avian Props (Magic Wand Sparkle, Security Shield, Speaking Waveform) */}
+              {/* Avian Props (Magic Wand Sparkle, Security Shield) */}
               {(animState === 'magic_import' || animState === 'celebrating') && (
                 <span className="insi-dove-prop-badge prop-magic" aria-hidden="true">
                   ✨
@@ -1348,7 +1448,7 @@ export default function InsiPetBot({
               )}
             </div>
 
-            {/* Perch Branch / Tab Grip Shadow under Dove Claws */}
+            {/* Subtle Claw Shadow When Perched on Project Dossier */}
             <div className="insi-dove-perch-bar" aria-hidden="true">
               <span className="perch-glow-dot" />
             </div>
@@ -1358,76 +1458,87 @@ export default function InsiPetBot({
           <div className={`insi-dove-status-pill ${isListeningActive ? 'is-listening' : ''} ${isSpeakingState ? 'is-speaking' : ''}`}>
             <span className="insi-status-dot" />
             <span className="insi-status-label">
-              {voiceStatus === 'listening_wake'
-                ? 'Listening: "Hey, INSI"'
-                : voiceStatus === 'push_to_talk'
-                ? 'Push-to-Talk Active'
+              {isOrbitingTask || animState === 'flying'
+                ? 'Flapping Wings · Executing Task…'
                 : isSpeakingState
                 ? 'INSI Speaking…'
-                : isOrbitingTask
-                ? 'Flying Task Round…'
-                : `INSI · ${activeTabLabel}`}
+                : statusBubbleText || 'Standing on Project Dossier'}
             </span>
           </div>
         </div>
       )}
 
-      {/* 2. Floating Bottom-Right INSI Control Dock Button (Always Accessible to Open/Close Panel & Toggle Voice) */}
+      {/* 2. Floating Bottom-Right Control Dock:
+          - By default when bird is invisible (`!visible && !panelOpen`), ONLY the "🎙 Enable Voice" button is visible.
+          - When the user says "Hey, INSI" and the dove appears (`visible` or `panelOpen`), the "INSI Dove" button appears with it! */}
       <div className="insi-floating-dock" role="region" aria-label="INSI Dove Assistant Controls">
-        <button
-          type="button"
-          className={`insi-dock-toggle-btn ${panelOpen ? 'active' : ''} ${isListeningActive ? 'listening' : ''}`}
-          onClick={() => setPanelOpen((prev) => !prev)}
-          aria-expanded={panelOpen}
-          aria-controls="insi-assistant-panel"
-          aria-label={panelOpen ? 'Close INSI Assistant Panel' : 'Open INSI Assistant Panel'}
-        >
-          <img
-            src={DOVE_IMAGE_URL}
-            alt=""
-            className="insi-dock-thumb"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-          <span className="insi-dock-text">
-            <strong>INSI Dove</strong>
-            <small>
-              {voiceStatus === 'listening_wake'
-                ? '● Listening ("Hey, INSI")'
-                : voiceStatus === 'push_to_talk'
-                ? '● Push-to-Talk'
-                : voiceStatus === 'permission_denied'
-                ? '⚠ Mic Blocked'
-                : 'Voice & Action Router'}
-            </small>
-          </span>
-          <span className="insi-dock-chevron" aria-hidden="true">
-            {panelOpen ? '✕' : '▲'}
-          </span>
-        </button>
-
-        {speechSupported && (
+        {(visible || panelOpen) && (
           <button
             type="button"
-            className={`insi-dock-mic-btn ${isListeningActive ? 'active' : ''}`}
-            onClick={() => {
-              if (isListeningActive) {
-                stopVoiceListening();
-              } else {
-                void startExplicitVoiceSession('continuous');
-              }
-            }}
-            aria-label={isListeningActive ? 'Stop INSI Voice Listening' : 'Enable INSI Voice ("Hey, INSI")'}
-            title={
-              isListeningActive
-                ? 'Stop listening and release microphone'
-                : 'Enable microphone wake-word listening ("Hey, INSI")'
-            }
+            className={`insi-dock-toggle-btn ${panelOpen ? 'active' : ''} ${isListeningActive ? 'listening' : ''}`}
+            onClick={() => setPanelOpen((prev) => !prev)}
+            aria-expanded={panelOpen}
+            aria-controls="insi-assistant-panel"
+            aria-label={panelOpen ? 'Close INSI Assistant Panel' : 'Open INSI Assistant Panel'}
           >
-            {isListeningActive ? '⏹ Stop Mic' : '🎙 Enable Voice'}
+            <img
+              src={DOVE_IMAGE_URL}
+              alt=""
+              className="insi-dock-thumb"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <span className="insi-dock-text">
+              <strong>INSI Dove</strong>
+              <small>
+                {voiceStatus === 'listening_wake'
+                  ? '● Listening ("Hey, INSI")'
+                  : voiceStatus === 'push_to_talk'
+                  ? '● Push-to-Talk'
+                  : 'Website Manager Active'}
+              </small>
+            </span>
+            <span className="insi-dock-chevron" aria-hidden="true">
+              {panelOpen ? '✕' : '▲'}
+            </span>
           </button>
         )}
+
+        <button
+          type="button"
+          className={`insi-dock-mic-btn ${isListeningActive ? 'active' : ''}`}
+          onClick={() => {
+            if (!speechSupported) {
+              setVisible(true);
+              setPanelOpen((prev) => !prev);
+              return;
+            }
+            if (isListeningActive) {
+              // If already listening and bird is hidden, clicking summons the bird & panel; if visible, stops mic
+              if (!visible && !panelOpen) {
+                triggerTaskFlightOrbit('INSI Dove summoned · Standing on Project Dossier!');
+                setPanelOpen(true);
+              } else {
+                stopVoiceListening();
+              }
+            } else {
+              void startExplicitVoiceSession('continuous');
+            }
+          }}
+          aria-label={
+            isListeningActive
+              ? 'Wake-word active ("Hey, INSI"). Click to summon INSI Dove or manage voice'
+              : 'Enable INSI Voice ("Hey, INSI")'
+          }
+          title={
+            isListeningActive
+              ? 'Say "Hey, INSI" anytime to summon the dove, or click here to open controls'
+              : 'Click once to enable hands-free "Hey, INSI" wake-word detection'
+          }
+        >
+          {isListeningActive ? '🟢 Say "Hey, INSI"' : '🎙 Enable Voice'}
+        </button>
       </div>
 
       {/* 3. Open / Close INSI Assistant Panel (Modal / Drawer) */}
@@ -1751,6 +1862,54 @@ export default function InsiPetBot({
                     }
                   >
                     🚨 Flag Bottom 2
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, stand on Project Dossier', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    📌 Stand on Project Dossier
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, download PDF report', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    📄 Download PDF
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, download Excel workbook', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    📊 Download Excel
+                  </button>
+                  <button
+                    type="button"
+                    className="insi-action-chip"
+                    onClick={() =>
+                      handleSpokenTranscript('Hey, INSI, download CSV data', {
+                        requireWakeWord: false,
+                        speakReply: true
+                      })
+                    }
+                  >
+                    📥 Download CSV
                   </button>
                   <button
                     type="button"

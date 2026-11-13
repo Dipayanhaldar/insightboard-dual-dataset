@@ -249,7 +249,6 @@ function App(){
     const raw = file.name.toLowerCase().endsWith('.csv') ? parseCSV(text) : JSON.parse(text);
     const sec = insi.scanSecurity({ text, rows: Array.isArray(raw) ? raw : [], filename: file.name });
     setDataset(raw, file.name, 'custom');
-    recordRealQuotaUsage('mongodb', 1);
     if (!sec.clean) {
      setNotice(`Loaded "${file.name}" with INSI Security/Privacy Shield active (${sec.threats.concat(sec.legalFlags).join(', ')}).`);
     }
@@ -265,6 +264,8 @@ function App(){
    window.removeEventListener('drop', handleWindowDrop);
   };
  }, [setDataset]);
+
+ const exportHandlersRef = useRef({ exportPDF: null, exportExcel: null, exportCSV: null });
 
  // Full-Website Task Automation Executor (shared by Hands-Free "Hey INSI" Voice & Command Bar)
  const executeWebsiteAutomation = useCallback(({ result, rawCommand = '', allowDownload = true } = {}) => {
@@ -313,15 +314,24 @@ function App(){
 
   if (allowDownload && plan.exportAppFormat) {
    if (plan.exportAppFormat === 'pdf') {
-    void exportPDF();
-    steps.push('Triggered 6-Chart PDF Visual Report export');
+    if (exportHandlersRef.current.exportPDF) {
+     void exportHandlersRef.current.exportPDF();
+    }
+    steps.push('Downloaded 6-Chart PDF Visual Executive Report');
    } else if (plan.exportAppFormat === 'excel') {
-    exportExcel();
-    steps.push('Exported formatted Excel (.xlsx) workbook');
+    if (exportHandlersRef.current.exportExcel) {
+     exportHandlersRef.current.exportExcel();
+    }
+    steps.push('Downloaded formatted Excel (.xlsx) workbook');
    } else if (plan.exportAppFormat === 'csv') {
-    const exportAct = (result.dashboard_actions || []).find((a) => a.action_type === 'export_file');
-    const filename = exportProcessedDataFile(result, 'csv', exportAct?.export_config?.suggested_filename || 'insi_export');
-    if (filename) steps.push(`Downloaded ${filename}`);
+    if (exportHandlersRef.current.exportCSV) {
+     exportHandlersRef.current.exportCSV();
+     steps.push('Downloaded filtered CSV dataset report');
+    } else {
+     const exportAct = (result.dashboard_actions || []).find((a) => a.action_type === 'export_file');
+     const filename = exportProcessedDataFile(result, 'csv', exportAct?.export_config?.suggested_filename || 'insi_export');
+     if (filename) steps.push(`Downloaded ${filename}`);
+    }
    } else if (plan.exportAppFormat === 'executive_summary_txt' || plan.exportAppFormat === 'json') {
     const exportAct = (result.dashboard_actions || []).find((a) => a.action_type === 'export_file');
     const filename = exportProcessedDataFile(
@@ -352,7 +362,7 @@ function App(){
   return steps;
  }, [activeTab, fields, switchPreset]);
 
- // Handle Hands-Free Voice Actions from INSI ("Hey INSI, switch to Hyderabad Metro", "Hey INSI, add to calendar", etc.)
+ // Handle Hands-Free Voice Actions from INSI ("Hey INSI, switch to Hyderabad Metro", "Hey INSI, download PDF", etc.)
  const handleVoiceCommandAction = useCallback((payload) => {
   if (!payload) return;
   if (payload.type === 'security_scan' && payload.spoken) {
@@ -368,10 +378,11 @@ function App(){
   }
  }, [executeWebsiteAutomation]);
 
- async function importFile(e){const file=e.target.files?.[0];if(!file)return;playButtonClick();if(audioRef.current){audioRef.current.pause();setAudioStatus('');}try{const text=await file.text();const raw=file.name.toLowerCase().endsWith('.csv')?parseCSV(text):JSON.parse(text);insi.scanSecurity({text,rows:Array.isArray(raw)?raw:[],filename:file.name});setDataset(raw,file.name,'custom');recordRealQuotaUsage('mongodb',1);}catch(err){setNotice(`Import failed: ${err.message}`);insi.react('error');}e.target.value='';}
+ async function importFile(e){const file=e.target.files?.[0];if(!file)return;playButtonClick();if(audioRef.current){audioRef.current.pause();setAudioStatus('');}try{const text=await file.text();const raw=file.name.toLowerCase().endsWith('.csv')?parseCSV(text):JSON.parse(text);insi.scanSecurity({text,rows:Array.isArray(raw)?raw:[],filename:file.name});setDataset(raw,file.name,'custom');}catch(err){setNotice(`Import failed: ${err.message}`);insi.react('error');}e.target.value='';}
  function exportCSV(){playButtonClick();const cols=fields;const text=[cols.map(csvCell).join(','),...filtered.map(r=>cols.map(k=>csvCell(r[k])).join(','))].join('\r\n');downloadBlob(new Blob(['\ufeff'+text],{type:'text/csv;charset=utf-8;'}),'insightboard-vdb-filtered-data.csv');setNotice(`Exported ${filtered.length} filtered records to CSV.`);insi.react('export');}
  function exportExcel(){playButtonClick();const clean=filtered.map(r=>Object.fromEntries(fields.map(k=>[nice(k),r[k]===undefined||r[k]===null?'':typeof r[k]==='object'?JSON.stringify(r[k]):r[k]])));const ws=XLSX.utils.json_to_sheet(clean);ws['!cols']=fields.map(k=>({wch:Math.min(32,Math.max(12,nice(k).length+3))}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Filtered Data');const meta=XLSX.utils.aoa_to_sheet([['InsightBoard VDB (Visual Dashboard) Export'],['Version',`v${APP_VERSION}`],['Dataset',datasetName],['Records',filtered.length],['Generated',new Date().toLocaleString()],['Note','Contains the currently filtered records.']]);XLSX.utils.book_append_sheet(wb,meta,'Report Info');XLSX.writeFile(wb,'insightboard-vdb-filtered-data.xlsx');setNotice(`Exported ${filtered.length} filtered records to Excel.`);insi.react('export');}
  async function exportPDF(){playButtonClick();try{setBusy(true);insi.react('export');if(activeTab!=='overview'&&activeTab!=='all'){setActiveTab('overview');}setNotice('Preparing report and rendering the six visible charts…');await document.fonts?.ready;await new Promise(resolve=>setTimeout(resolve,700));const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});const width=doc.internal.pageSize.getWidth();doc.setFontSize(18);doc.setTextColor(25,48,74);doc.text(`InsightBoard VDB v${APP_VERSION} — Visual Data Report`,14,14);try{const logoPath=preset==='metro'?'/assets/hyderabad-metro-logo.webp':null;if(logoPath){const response=await fetch(logoPath);if(response.ok){const blob=await response.blob();const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(blob);});doc.addImage(dataUrl,'WEBP',width-39,6,24,15);}}}catch(e){console.warn('Preset logo could not be embedded in PDF',e);}doc.setFontSize(9);doc.setTextColor(80,95,115);doc.text(`Dataset: ${datasetName} | Records: ${filtered.length} | Generated: ${new Date().toLocaleString()}`,14,21);doc.text(`Active filters: ${Object.entries(filters).filter(([,v])=>v).map(([k,v])=>`${nice(k)}=${v}`).join(' · ')||'None'}${search.trim()?` | Search: ${search.trim()}`:''}`,14,27,{maxWidth:width-28});const cards=[...document.querySelectorAll('.charts-grid .chart-card')];if(cards.length){let count=0;for(const card of cards){if(count%2===0){if(count>0)doc.addPage();doc.setFontSize(10);doc.setTextColor(25,48,74);doc.text(`Dashboard charts (${count+1}–${Math.min(count+2,cards.length)} of ${cards.length})`,14,35);}const canvas=await html2canvas(card,{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false,allowTaint:false,windowWidth:Math.max(card.scrollWidth,card.clientWidth),windowHeight:Math.max(card.scrollHeight,card.clientHeight)});const img=canvas.toDataURL('image/png');const margin=14,gap=6,cardW=(width-margin*2-gap)/2,cardH=78,x=margin+(count%2)*(cardW+gap),y=40;doc.addImage(img,'PNG',x,y,cardW,cardH,undefined,'FAST');count++;}if(cards.length!==6){setNotice(`Note: the current view rendered ${cards.length} chart panels. The PDF will include all panels currently shown.`);}}else{doc.setFontSize(11);doc.text('No charts are currently visible. Clear filters or import records to generate charts.',14,42);}doc.addPage();doc.setFontSize(16);doc.setTextColor(25,48,74);doc.text('Filtered Data Table',14,15);doc.setFontSize(9);doc.text(`Showing ${filtered.length} records; PDF table includes up to 1,000 rows and first 12 fields. Use Excel export for the complete filtered dataset.`,14,21);autoTable(doc,{startY:26,head:[fields.slice(0,12).map(nice)],body:filtered.slice(0,1000).map(r=>fields.slice(0,12).map(k=>typeof r[k]==='object'?JSON.stringify(r[k]):String(r[k]??''))),styles:{fontSize:6,cellPadding:1.5,overflow:'linebreak'},headStyles:{fillColor:[37,99,235]},margin:{left:10,right:10}});doc.save('insightboard-vdb-visual-report.pdf');setNotice(`PDF exported with ${cards.length} chart panels and up to ${Math.min(filtered.length,1000)} data rows.`);insi.celebrate();}catch(err){console.error(err);setNotice(`PDF export failed: ${err.message}. Please retry or use Excel export.`);insi.react('error');}finally{setBusy(false);}}
+ exportHandlersRef.current = { exportPDF, exportExcel, exportCSV };
 
  const v2Analytics=useMemo(()=>({
   datasetName:String(datasetName||'Current dataset').slice(0,120),

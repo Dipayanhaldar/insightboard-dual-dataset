@@ -1,4 +1,4 @@
-const CACHE_NAME = 'insightboard-shell-v4';
+const CACHE_NAME = 'insightboard-shell-v5';
 const OFFLINE_URL = '/offline.html';
 const APP_SHELL_URL = '/';
 const ASSET_MANIFEST_URL = '/asset-manifest.json';
@@ -13,21 +13,29 @@ const PRECACHE_URLS = [
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    const shellResponse = await fetch(APP_SHELL_URL, { cache: 'reload' });
-    if (!shellResponse.ok) throw new Error('Unable to fetch the InsightBoard app shell');
-    await cache.put(APP_SHELL_URL, shellResponse.clone());
-    await cache.addAll(PRECACHE_URLS);
+    try {
+      const shellResponse = await fetch(APP_SHELL_URL, { cache: 'reload' });
+      if (shellResponse.ok) {
+        await cache.put(APP_SHELL_URL, shellResponse.clone());
+      }
+    } catch {}
+    try {
+      await cache.addAll(PRECACHE_URLS);
+    } catch {}
 
-    // Pre-cache all production JS/CSS bundles, including lazy chunks.
-    const manifestResponse = await fetch(ASSET_MANIFEST_URL, { cache: 'no-store' });
-    if (!manifestResponse.ok) throw new Error('Unable to fetch the production asset manifest');
-    const assetManifest = await manifestResponse.json();
-    const assets = [...new Set(Object.values(assetManifest).flatMap(entry => [
-      entry.file,
-      ...(entry.css || [])
-    ]).filter(file => typeof file === 'string' && /\.(?:js|css)$/.test(file))
-      .map(file => file.startsWith('/') ? file : '/' + file))];
-    if (assets.length) await cache.addAll(assets);
+    // Pre-cache production JS/CSS bundles if manifest is available
+    try {
+      const manifestResponse = await fetch(ASSET_MANIFEST_URL, { cache: 'no-store' });
+      if (manifestResponse.ok) {
+        const assetManifest = await manifestResponse.json();
+        const assets = [...new Set(Object.values(assetManifest).flatMap(entry => [
+          entry.file,
+          ...(entry.css || [])
+        ]).filter(file => typeof file === 'string' && /\.(?:js|css)$/.test(file))
+          .map(file => file.startsWith('/') ? file : '/' + file))];
+        if (assets.length) await cache.addAll(assets);
+      }
+    } catch {}
     await self.skipWaiting();
   })());
 });
@@ -40,6 +48,8 @@ self.addEventListener('activate', event => {
   );
 });
 
+// Network-First strategy for HTML, JS, CSS, and navigation so updates pushed to GitHub/Vercel
+// propagate immediately to Website, Android APK (TWA/WebView), and Windows Store (MSIX) wrappers.
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
@@ -51,7 +61,7 @@ self.addEventListener('fetch', event => {
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       try {
-        const response = await fetch(request);
+        const response = await fetch(request, { cache: 'no-store' });
         if (response && response.ok) {
           const cache = await caches.open(CACHE_NAME);
           await cache.put(APP_SHELL_URL, response.clone());
@@ -66,10 +76,13 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/')) {
+  // Network-First for core JS, CSS, and static assets with instant offline fallback
+  if (
+    url.pathname.startsWith('/assets/') ||
+    url.pathname.startsWith('/icons/') ||
+    /\.(?:js|css|json|webmanifest|webp|png|svg|mp3)$/i.test(url.pathname)
+  ) {
     event.respondWith((async () => {
-      const cached = await caches.match(request);
-      if (cached) return cached;
       try {
         const response = await fetch(request);
         if (response && response.ok) {
@@ -78,6 +91,7 @@ self.addEventListener('fetch', event => {
         }
         return response;
       } catch {
+        const cached = await caches.match(request);
         return cached || Response.error();
       }
     })());

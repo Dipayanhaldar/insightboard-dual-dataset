@@ -804,9 +804,9 @@ app.post('/api/ai/optimize', aiLimiter, asyncRoute(async (req, res) => {
   return res.json({ plan: deterministicPlan, source: 'free-lifetime-engine', model: 'insightboard-free-ai-engine' });
 }));
 
-// Python Scientific Backend Bridge (connects to running Python microservice or executes CLI bridge)
+// Python Scientific Backend Bridge (connects to configured microservice, executes CLI bridge, or runs pure Node fallback on Vercel/Render)
 const pythonScriptPath = path.resolve(__dirname, '../python_backend/app.py');
-const PYTHON_BACKEND_URL = (process.env.PYTHON_BACKEND_URL || 'http://127.0.0.1:8001').replace(/\/$/, '');
+const PYTHON_BACKEND_URL = (process.env.PYTHON_BACKEND_URL || '').replace(/\/$/, '');
 
 function runPythonCliAnalysis(payload) {
   return new Promise((resolve, reject) => {
@@ -823,19 +823,92 @@ function runPythonCliAnalysis(payload) {
   });
 }
 
+function runNodeScientificFallback(payload = {}) {
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  const fields = Array.isArray(payload.fields) && payload.fields.length
+    ? payload.fields
+    : rows[0] ? Object.keys(rows[0]) : [];
+  const numFields = fields.filter(f => rows.some(r => r && r[f] !== null && r[f] !== '' && !Number.isNaN(Number(r[f]))));
+  const xField = payload.secondaryMetric && numFields.includes(payload.secondaryMetric)
+    ? payload.secondaryMetric
+    : numFields[1] || numFields[0] || 'index';
+  const yField = payload.primaryMetric && numFields.includes(payload.primaryMetric)
+    ? payload.primaryMetric
+    : numFields[0] || 'value';
+  const labelKey = payload.labelField || payload.primaryCategory || fields[0] || 'unit';
+
+  const pairs = rows.map((r, i) => ({
+    label: String(r?.[labelKey] ?? `Row ${i + 1}`),
+    x: xField === 'index' ? i + 1 : Number(r?.[xField]) || 0,
+    y: Number(r?.[yField]) || 0
+  }));
+
+  const n = Math.max(1, pairs.length);
+  const meanX = pairs.reduce((s, p) => s + p.x, 0) / n;
+  const meanY = pairs.reduce((s, p) => s + p.y, 0) / n;
+  let num = 0;
+  let denX = 0;
+  let denY = 0;
+  for (const p of pairs) {
+    const dx = p.x - meanX;
+    const dy = p.y - meanY;
+    num += dx * dy;
+    denX += dx * dx;
+    denY += dy * dy;
+  }
+  const slope = denX > 0 ? num / denX : 0;
+  const intercept = meanY - slope * meanX;
+  const r = denX > 0 && denY > 0 ? num / Math.sqrt(denX * denY) : 0;
+  const r2 = Number((r * r).toFixed(4));
+  const stdY = Math.sqrt(denY / n);
+
+  const outliers = pairs
+    .map(p => ({
+      label: p.label,
+      value: p.y,
+      zScore: stdY > 0 ? Number(((p.y - meanY) / stdY).toFixed(2)) : 0
+    }))
+    .filter(o => Math.abs(o.zScore) >= 1.5)
+    .slice(0, 10);
+
+  return {
+    status: 'ok',
+    engine: 'InsightBoard Cloud Scientific Engine',
+    datasetName: payload.datasetName || 'Active Dataset',
+    recordCount: rows.length,
+    regression: {
+      xField,
+      yField,
+      slope: Number(slope.toFixed(4)),
+      intercept: Number(intercept.toFixed(2)),
+      r2,
+      correlation: Number(r.toFixed(4)),
+      trendDirection: slope >= 0 ? 'positive' : 'negative'
+    },
+    summaryStats: {
+      mean: Number(meanY.toFixed(2)),
+      stdDev: Number(stdY.toFixed(2)),
+      sampleSize: rows.length
+    },
+    outliers
+  };
+}
+
 app.get('/api/python/health', asyncRoute(async (_req, res) => {
   res.set('Cache-Control', 'no-store');
-  try {
-    const r = await fetch(`${PYTHON_BACKEND_URL}/health`, { signal: AbortSignal.timeout(2000) });
-    if (r.ok) {
-      const data = await r.json();
-      return res.json({ ...data, mode: 'http-microservice', endpoint: PYTHON_BACKEND_URL });
-    }
-  } catch {}
+  if (PYTHON_BACKEND_URL) {
+    try {
+      const r = await fetch(`${PYTHON_BACKEND_URL}/health`, { signal: AbortSignal.timeout(2000) });
+      if (r.ok) {
+        const data = await r.json();
+        return res.json({ ...data, mode: 'http-microservice', endpoint: PYTHON_BACKEND_URL });
+      }
+    } catch {}
+  }
   return res.json({
     status: 'ok',
-    service: 'InsightBoard VDB Python Scientific Backend',
-    mode: 'auto-subprocess-bridge',
+    service: 'InsightBoard VDB Scientific Backend',
+    mode: 'cloud-hybrid-bridge',
     capabilities: [
       'ols_linear_regression',
       'tukey_iqr_zscore_outliers',
@@ -856,23 +929,25 @@ app.post('/api/python/analyze', asyncRoute(async (req, res) => {
     primaryCategory: safeText(req.body?.primaryCategory || '', 80),
     labelField: safeText(req.body?.labelField || '', 80)
   };
-  try {
-    const r = await fetch(`${PYTHON_BACKEND_URL}/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(5000)
-    });
-    if (r.ok) {
-      const data = await r.json();
-      return res.json(data);
-    }
-  } catch {}
+  if (PYTHON_BACKEND_URL) {
+    try {
+      const r = await fetch(`${PYTHON_BACKEND_URL}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(5000)
+      });
+      if (r.ok) {
+        const data = await r.json();
+        return res.json(data);
+      }
+    } catch {}
+  }
   try {
     const result = await runPythonCliAnalysis(payload);
     return res.json(result);
-  } catch (err) {
-    return res.status(500).json({ error: 'Python scientific engine error: ' + (err?.message || 'execution failed') });
+  } catch {
+    return res.json(runNodeScientificFallback(payload));
   }
 }));
 

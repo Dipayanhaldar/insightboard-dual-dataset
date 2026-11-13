@@ -49,6 +49,7 @@ export const INSI_STATES = Object.freeze([
 ]);
 
 export const INSI_CORNERS = Object.freeze([
+  'project-dossier-perch',
   'active-tab-perch',
   'bottom-right',
   'bottom-left',
@@ -248,32 +249,32 @@ export const DEFAULT_INSI_COMMAND_ROUTER = Object.freeze([
   {
     id: 'export_csv',
     label: 'Export Filtered CSV Report',
-    triggers: ['export csv', 'download csv', 'save csv'],
+    triggers: ['export csv', 'download csv', 'save csv', 'csv report', 'csv download', 'get csv', 'download data'],
     actionType: 'export',
     commandText: 'Export a CSV report of the active dataset',
     birdMotion: 'orbiting',
     requiresConfirmation: false,
-    confirmationNote: 'Task committed. Your CSV dataset export has started.'
+    confirmationNote: 'Task committed. Your CSV dataset download has started.'
   },
   {
     id: 'export_excel',
     label: 'Export Formatted Excel Workbook',
-    triggers: ['export excel', 'download excel', 'export xlsx', 'save spreadsheet'],
+    triggers: ['export excel', 'download excel', 'export xlsx', 'save spreadsheet', 'excel download', 'excel report', 'get excel'],
     actionType: 'export',
     commandText: 'Export Excel workbook',
     birdMotion: 'orbiting',
     requiresConfirmation: false,
-    confirmationNote: 'Task committed. Your Excel workbook export is ready.'
+    confirmationNote: 'Task committed. Your Excel workbook download has started.'
   },
   {
     id: 'export_pdf',
     label: 'Export Visual PDF Executive Report',
-    triggers: ['export pdf', 'download pdf', 'save pdf report'],
+    triggers: ['export pdf', 'download pdf', 'save pdf', 'pdf report', 'pdf download', 'get pdf', 'download report', 'export report'],
     actionType: 'export',
     commandText: 'Export PDF report',
     birdMotion: 'orbiting',
     requiresConfirmation: false,
-    confirmationNote: 'Task committed. Prepared your PDF executive report.'
+    confirmationNote: 'Task committed. Your PDF executive report download has started.'
   },
   {
     id: 'reset_filters',
@@ -287,14 +288,24 @@ export const DEFAULT_INSI_COMMAND_ROUTER = Object.freeze([
     confirmationNote: 'Confirmed and committed. All filters and highlights have been reset.'
   },
   {
+    id: 'perch_project_dossier',
+    label: 'Stand on Project Dossier Button',
+    triggers: ['project dossier', 'project desire', 'stand on project', 'sit on project', 'perch on dossier', 'stand on dossier'],
+    actionType: 'bird_motion',
+    commandText: 'Fly and stand on Project Dossier button',
+    birdMotion: 'perch_dossier',
+    requiresConfirmation: false,
+    confirmationNote: 'INSI flew over and is now standing right on your Project Dossier button.'
+  },
+  {
     id: 'bird_fly',
-    label: 'Fly Around Active Workspace & Perch on Active Tab',
-    triggers: ['fly around', 'take a round', 'take rounds', 'fly across', 'perch on tab', 'sit on tab', 'roam'],
+    label: 'Fly Around Active Workspace with Flapping Wings',
+    triggers: ['fly around', 'fly across', 'fly', 'flap wings', 'move wings', 'take a round', 'take rounds', 'perch on tab', 'sit on tab', 'roam'],
     actionType: 'bird_motion',
     commandText: 'Fly around workspace and perch on the active tab',
     birdMotion: 'orbiting',
     requiresConfirmation: false,
-    confirmationNote: 'Took a flight round across your active workspace and perched on the active tab.'
+    confirmationNote: 'Flapped wings across your active workspace and perched cleanly.'
   },
   {
     id: 'bird_dance',
@@ -335,7 +346,7 @@ const UNSUPPORTED_EXTERNAL_ACTION_REGEX =
   /\b(order\s+pizza|book\s+flight|book\s+cab|book\s+uber|send\s+whatsapp|send\s+sms|call\s+police|make\s+phone\s+call|play\s+spotify|play\s+netflix|buy\s+stock|transfer\s+money|bank\s+transfer|hack|crack\s+password|send\s+email\s+to|post\s+to\s+twitter|post\s+to\s+instagram|publish\s+to\s+production)\b/i;
 
 const SUPPORTED_ANALYTICS_QUERY_REGEX =
-  /\b(revenue|sales|footfall|ridership|visitor|conversion|rent|area|sqft|basket|store|tenant|station|zone|category|corridor|line|top|bottom|chart|bar|pie|line|area|scatter|average|sum|count|min|max|compare|overview|summary|wake\s+up|hello|hi|hey|are\s+you\s+listening|can\s+you\s+hear)\b/i;
+  /\b(revenue|sales|footfall|ridership|visitor|conversion|rent|area|sqft|basket|store|tenant|station|zone|category|corridor|line|top|bottom|chart|bar|pie|line|area|scatter|average|sum|count|min|max|compare|overview|summary|download|export|pdf|excel|csv|xlsx|json|table|sort|filter|search|dark|light|theme|metro|mall|tab|quota|studio|connector|calendar|schedule|fly|wings|dossier|desire|wake\s+up|hello|hi|hey|are\s+you\s+listening|can\s+you\s+hear)\b/i;
 
 /**
  * Evaluates a user's spoken or typed command against the Local Editable Command Router.

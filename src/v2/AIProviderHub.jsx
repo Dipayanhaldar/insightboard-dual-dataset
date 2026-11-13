@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Sparkles,
   KeyRound,
@@ -13,6 +13,37 @@ import {
 } from 'lucide-react';
 import './AIProviderHub.css';
 import { insi } from './insiController.js';
+
+export const ZERO_COST_ENGINES = [
+  {
+    id: 'pollinations_free',
+    tier: 'Keyless Cloud (Default)',
+    name: 'Pollinations.ai (Zero-Key Cloud)',
+    defaultModel: 'openai',
+    summary: 'Instant zero-cost, no-API-key cloud LLM via Pollinations OpenAI-compatible endpoint. Works immediately on Web, Android APK & Windows Store.'
+  },
+  {
+    id: 'puter_free',
+    tier: 'Keyless Cloud (Default)',
+    name: 'Puter.js Cloud AI (Zero-Key)',
+    defaultModel: 'gpt-4o-mini',
+    summary: 'Browser-native keyless cloud AI powered by Puter.js (`puter.ai.chat`). Students and public users can summarize datasets without any API key.'
+  },
+  {
+    id: 'transformers_wasm',
+    tier: 'Browser Edge (WASM/ONNX)',
+    name: 'Transformers.js (WASM / Android & Web)',
+    defaultModel: 'Xenova/distilbart-cnn-6-6',
+    summary: 'Lightweight ONNX/WASM in-browser inference (`@huggingface/transformers`) that runs on both Android APK WebViews and desktop browsers.'
+  },
+  {
+    id: 'webllm_edge',
+    tier: 'Browser Edge (WebGPU)',
+    name: 'WebLLM (WebGPU Desktop / Windows MSIX)',
+    defaultModel: 'SmolLM2-360M-Instruct-q4f16_1-MLC',
+    summary: 'Hardware-accelerated WebGPU local LLM inference (`@mlc-ai/web-llm`) for capable desktop & Windows Store (Edge WebView2) devices.'
+  }
+];
 
 const PROVIDERS = [
   {
@@ -92,7 +123,7 @@ const PROVIDERS = [
     number: '09',
     name: 'OpenRouter',
     defaultModel: 'meta-llama/llama-3.3-70b-instruct',
-    summary: 'Unified router across ratusan open and commercial models with a single BYOK key.',
+    summary: 'Unified router across open and commercial models with a single BYOK key.',
     docsUrl: 'https://openrouter.ai/docs/quick-start',
     modelsUrl: 'https://openrouter.ai/models'
   },
@@ -173,8 +204,131 @@ function computeLocalPythonFallback(rows, fields, datasetName) {
   };
 }
 
+let puterScriptPromise = null;
+function loadPuterSdk() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('Browser environment required'));
+  if (window.puter?.ai?.chat) return Promise.resolve(window.puter);
+  if (puterScriptPromise) return puterScriptPromise;
+  puterScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://js.puter.com/v2/';
+    script.async = true;
+    script.onload = () => {
+      if (window.puter?.ai?.chat) resolve(window.puter);
+      else reject(new Error('Puter.js loaded without ai.chat interface'));
+    };
+    script.onerror = () => {
+      puterScriptPromise = null;
+      reject(new Error('Could not reach js.puter.com'));
+    };
+    document.head.appendChild(script);
+  });
+  return puterScriptPromise;
+}
+
+export async function generateZeroCostCloudSummary({
+  engineId = 'pollinations_free',
+  datasetName = 'Active Dataset',
+  analytics = {},
+  analysisMode = 'overview',
+  languageName = 'English'
+} = {}) {
+  const prompt = [
+    `You are an executive data analyst for InsightBoard VDB.`,
+    `Write a concise, decision-ready ${analysisMode} summary in ${languageName} strictly grounded in this dataset ("${datasetName}"):`,
+    JSON.stringify(analytics).slice(0, 3400)
+  ].join('\n');
+
+  if (engineId === 'puter_free') {
+    try {
+      const puter = await loadPuterSdk();
+      const resp = await puter.ai.chat(prompt);
+      const text =
+        typeof resp === 'string'
+          ? resp
+          : resp?.message?.content?.[0]?.text || resp?.message?.content || resp?.text || '';
+      if (String(text).trim()) {
+        return {
+          text: String(text).trim(),
+          source: 'Puter.js Zero-Key Cloud AI'
+        };
+      }
+    } catch {
+      // Fall through to Pollinations zero-key endpoint
+    }
+  }
+
+  // Pollinations.ai OpenAI-compatible & GET text endpoints (Zero API key required)
+  try {
+    const openAiRes = await fetch('https://text.pollinations.ai/openai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'openai',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an accurate executive data analyst. Keep summaries concise, structured, and grounded in the provided dataset metrics.'
+          },
+          { role: 'user', content: prompt }
+        ]
+      }),
+      signal: AbortSignal.timeout(12000)
+    });
+    if (openAiRes.ok) {
+      const json = await openAiRes.json().catch(() => null);
+      const content = json?.choices?.[0]?.message?.content || '';
+      if (String(content).trim()) {
+        return {
+          text: String(content).trim(),
+          source: 'Pollinations.ai Zero-Key Cloud AI'
+        };
+      }
+    }
+  } catch {}
+
+  try {
+    const encoded = encodeURIComponent(prompt.slice(0, 1200));
+    const textRes = await fetch(`https://text.pollinations.ai/${encoded}`, {
+      signal: AbortSignal.timeout(10000)
+    });
+    if (textRes.ok) {
+      const rawText = await textRes.text();
+      if (String(rawText).trim()) {
+        return {
+          text: String(rawText).trim(),
+          source: 'Pollinations.ai Zero-Key Cloud AI'
+        };
+      }
+    }
+  } catch {}
+
+  // Built-in backend / local deterministic synthesis fallback so users are never blocked offline
+  const response = await fetch('/api/ai/analyze-dataset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      analysisMode,
+      datasetName,
+      snapshot: analytics
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (response.ok && data.answer) {
+    return {
+      text: data.answer,
+      source: 'InsightBoard Built-In Zero-Cost Engine'
+    };
+  }
+  throw new Error('Could not complete zero-cost summary.');
+}
+
 export default function AIProviderHub({ rows = [], fields = [], datasetName = '', analytics = {} }) {
-  const [selectedId, setSelectedId] = useState('openai');
+  const [zeroCostEngineId, setZeroCostEngineId] = useState('pollinations_free');
+  const [edgeProgress, setEdgeProgress] = useState('');
+  const webllmEngineRef = useRef(null);
+
+  const [selectedId, setSelectedId] = useState('groq');
   const selectedProvider = PROVIDERS.find((p) => p.id === selectedId) || PROVIDERS[0];
 
   const [apiKeyInput, setApiKeyInput] = useState('');
@@ -193,9 +347,14 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
   const [pythonBusy, setPythonBusy] = useState(false);
   const [pythonReport, setPythonReport] = useState(null);
 
+  const webGpuSupported = typeof navigator !== 'undefined' && 'gpu' in navigator;
+
   useEffect(() => {
     try {
-      const existing = sessionStorage.getItem(`insightboard-byok-${selectedId}`) || '';
+      const existing =
+        localStorage.getItem(`insightboard-byok-${selectedId}`) ||
+        sessionStorage.getItem(`insightboard-byok-${selectedId}`) ||
+        '';
       setSavedKey(existing);
       setApiKeyInput('');
     } catch {
@@ -245,22 +404,133 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
       return;
     }
     try {
+      localStorage.setItem(`insightboard-byok-${selectedId}`, trimmed);
       sessionStorage.setItem(`insightboard-byok-${selectedId}`, trimmed);
     } catch {}
     setSavedKey(trimmed);
     setApiKeyInput('');
     setError('');
-    setNotice(`${selectedProvider.name} key stored in this browser tab only.`);
+    setNotice(`${selectedProvider.name} key saved in browser localStorage.`);
     insi.smile(`insi.ai · ${selectedProvider.name} key ready`);
   }
 
   function handleForgetKey() {
     try {
+      localStorage.removeItem(`insightboard-byok-${selectedId}`);
       sessionStorage.removeItem(`insightboard-byok-${selectedId}`);
     } catch {}
     setSavedKey('');
     setApiKeyInput('');
-    setNotice(`Removed ${selectedProvider.name} key from this browser session.`);
+    setNotice(`Removed ${selectedProvider.name} key from this browser.`);
+  }
+
+  async function handleRunZeroCostTier(engineOverride) {
+    const activeEngine = engineOverride || zeroCostEngineId;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    setEdgeProgress('');
+    insi.heavyAi();
+
+    try {
+      if (activeEngine === 'webllm_edge') {
+        if (!webGpuSupported) {
+          setEdgeProgress('WebGPU not detected on this device — seamlessly routing to Keyless Cloud Tier…');
+          const fallback = await generateZeroCostCloudSummary({
+            engineId: 'pollinations_free',
+            datasetName,
+            analytics,
+            analysisMode
+          });
+          setAnswer(fallback.text);
+          setAnswerMeta(`${fallback.source} (WebGPU Fallback) · ${formatLabel(analysisMode)}`);
+          setNotice('Completed with zero API keys.');
+          insi.celebrate();
+          return;
+        }
+
+        setEdgeProgress('Loading @mlc-ai/web-llm WebGPU runtime…');
+        const webllm = await import(/* @vite-ignore */ 'https://esm.run/@mlc-ai/web-llm');
+        const targetModel = 'SmolLM2-360M-Instruct-q4f16_1-MLC';
+        if (!webllmEngineRef.current) {
+          webllmEngineRef.current = await webllm.CreateMLCEngine(targetModel, {
+            initProgressCallback: (report) => {
+              const pct = Math.round((report?.progress || 0) * 100);
+              setEdgeProgress(report?.text || `Downloading WebGPU weights (${pct}%)…`);
+            }
+          });
+        }
+        setEdgeProgress('Running hardware-accelerated WebGPU inference…');
+        const reply = await webllmEngineRef.current.chat.completions.create({
+          messages: [
+            { role: 'system', content: 'You are an executive data analyst. Summarize the dataset concisely.' },
+            {
+              role: 'user',
+              content: `Summarize ${datasetName} (${analysisMode}): ${JSON.stringify(analytics).slice(0, 1800)}`
+            }
+          ],
+          max_tokens: 350
+        });
+        const text = reply?.choices?.[0]?.message?.content || '';
+        setEdgeProgress('');
+        setAnswer(text);
+        setAnswerMeta(`WebLLM (WebGPU Local · ${targetModel}) · ${formatLabel(analysisMode)}`);
+        setNotice('Generated 100% locally on your GPU via WebLLM.');
+        insi.celebrate();
+        return;
+      }
+
+      if (activeEngine === 'transformers_wasm') {
+        setEdgeProgress('Initializing @huggingface/transformers WASM/ONNX pipeline…');
+        try {
+          const transformers = await import(
+            /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2'
+          );
+          if (transformers.env) {
+            transformers.env.allowLocalModels = false;
+          }
+          const pipe = await transformers.pipeline('summarization', 'Xenova/distilbart-cnn-6-6', {
+            progress_callback: (p) => {
+              if (p?.progress) {
+                setEdgeProgress(`WASM ONNX Model: ${Math.round(p.progress)}% loaded…`);
+              }
+            }
+          });
+          const rawInput = `Dataset ${datasetName} has ${analytics?.recordCount || rows.length} records. Top categories: ${JSON.stringify(
+            analytics?.topCategories?.slice(0, 4) || []
+          )}. Numeric metrics: ${JSON.stringify(analytics?.numericMetrics?.slice(0, 4) || [])}.`;
+          const out = await pipe(rawInput, { max_new_tokens: 130 });
+          const summaryText = Array.isArray(out) ? out[0]?.summary_text : out?.summary_text;
+          if (summaryText) {
+            setEdgeProgress('');
+            setAnswer(summaryText);
+            setAnswerMeta(`Transformers.js (WASM/ONNX In-Browser) · ${formatLabel(analysisMode)}`);
+            setNotice('Generated in-browser via Transformers.js WASM/ONNX.');
+            insi.celebrate();
+            return;
+          }
+        } catch {
+          setEdgeProgress('');
+        }
+      }
+
+      const cloudResult = await generateZeroCostCloudSummary({
+        engineId: activeEngine,
+        datasetName,
+        analytics,
+        analysisMode
+      });
+      setAnswer(cloudResult.text);
+      setAnswerMeta(`${cloudResult.source} · ${formatLabel(analysisMode)}`);
+      setNotice(`Generated using ${cloudResult.source} (No API key required).`);
+      insi.celebrate();
+    } catch (err) {
+      setError(err?.message || 'Could not run analysis.');
+      insi.react('error');
+    } finally {
+      setBusy(false);
+      setEdgeProgress('');
+    }
   }
 
   async function handleRunProviderAnalysis(e) {
@@ -271,8 +541,7 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
 
     const activeKey = apiKeyInput.trim() || savedKey.trim();
     if (!activeKey) {
-      // Run built-in zero-billing dataset analysis if no personal BYOK key is provided
-      await handleRunFreeAnalysis();
+      await handleRunZeroCostTier(zeroCostEngineId);
       return;
     }
 
@@ -299,7 +568,7 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
       if (!response.ok) {
         if (response.status === 429 || response.status === 402) {
           throw new Error(
-            `${selectedProvider.name} free quota or rate limit reached. Zero developer billing is enforced — click "Instant Free Analysis" below to analyze at $0 cost.`
+            `${selectedProvider.name} quota reached. Click "Instant Zero-Key Summary (Puter / Pollinations)" below to analyze at $0 cost.`
           );
         }
         throw new Error(data.error || `Could not complete ${selectedProvider.name} request.`);
@@ -315,39 +584,9 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
     }
   }
 
-  async function handleRunFreeAnalysis() {
-    setBusy(true);
-    setError('');
-    setNotice('');
-    insi.heavyAi();
-    try {
-      const response = await fetch('/api/ai/analyze-dataset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          analysisMode,
-          datasetName,
-          snapshot: analytics
-        })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (response.ok && data.answer) {
-        setAnswer(data.answer);
-        setAnswerMeta(`Built-In Dataset Engine · ${formatLabel(analysisMode)}`);
-        setNotice('Generated using built-in zero-billing dataset intelligence.');
-        insi.celebrate();
-      }
-    } catch {
-      setError('Could not run dataset analysis.');
-      insi.react('error');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   const metricLabel = formatLabel(pythonReport?.primaryMetric || 'Primary Metric');
   const driverLabel = formatLabel(pythonReport?.regressionDriver || 'Secondary Metric');
-  const rSquared = Number(pythonReport?.regression?.rSquared ?? 0);
+  const rSquared = Number(pythonReport?.regression?.rSquared ?? pythonReport?.regression?.r2 ?? 0);
   const safeRSquared = Number.isFinite(rSquared) ? Math.max(0, Math.min(1, rSquared)).toFixed(3) : '0.000';
 
   return (
@@ -355,15 +594,59 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
       <div className="v2-card-title">
         <span className="ai-provider-icon"><Sparkles size={18} /></span>
         <div className="ai-provider-title-copy">
-          <span className="v2-overline">MULTI-PROVIDER AI HUB &amp; PYTHON STATISTICAL ENGINE</span>
-          <h3 id="ai-provider-title">10-Provider BYOK AI Hub &amp; Validated Python Analytics</h3>
+          <span className="v2-overline">MULTI-TIER ZERO-COST AI ENGINE + 10-PROVIDER BYOK HUB</span>
+          <h3 id="ai-provider-title">Keyless Cloud (Puter &amp; Pollinations), Edge WebLLM/WASM &amp; 10 BYOK Providers</h3>
         </div>
-        <span className="ai-provider-count">10 PROVIDERS · BYOK</span>
+        <span className="ai-provider-count">ZERO-KEY + 10 BYOK</span>
       </div>
 
       <p className="v2-muted" style={{ marginTop: 8, marginBottom: 14 }}>
-        Analyze <strong>{datasetName || 'your active dataset'}</strong> using your own API key from 10 leading AI providers, or use the built-in Python statistical engine with zero developer billing.
+        Analyze <strong>{datasetName || 'your active dataset'}</strong> immediately with <strong>Zero API Keys</strong> using Puter.js, Pollinations.ai, Transformers.js (WASM), or WebLLM (WebGPU), or bring your own key from 10 cloud providers stored locally in your browser.
       </p>
+
+      {/* Tier 1 & Tier 2: Zero-Cost Keyless Cloud + Browser-Native Offline/Edge Selector */}
+      <section className="python-clean-box" style={{ marginBottom: 14 }} aria-label="Zero-Cost Keyless & Browser Edge AI Tier">
+        <div className="python-clean-header">
+          <div>
+            <span className="python-clean-kicker">
+              <Sparkles size={14} /> ZERO-COST DEFAULT TIER · NO API KEY REQUIRED
+            </span>
+            <h4>Instant Public &amp; Student AI Engine (Cloud + Offline Edge)</h4>
+          </div>
+          <button
+            type="button"
+            className="v2-button primary btn-3d"
+            onClick={() => void handleRunZeroCostTier(zeroCostEngineId)}
+            disabled={busy}
+          >
+            <Sparkles size={14} />
+            <span>{busy ? 'Generating…' : 'Run Zero-Key AI Summary'}</span>
+          </button>
+        </div>
+
+        <div className="ai-provider-grid" style={{ marginTop: 10 }} role="tablist" aria-label="Select Zero-Cost AI Engine">
+          {ZERO_COST_ENGINES.map((eng) => (
+            <button
+              key={eng.id}
+              type="button"
+              role="tab"
+              aria-selected={zeroCostEngineId === eng.id}
+              className={`ai-provider-choice btn-3d-subtle ${zeroCostEngineId === eng.id ? 'active' : ''}`}
+              onClick={() => setZeroCostEngineId(eng.id)}
+            >
+              <span className="ai-provider-number">{eng.tier.includes('Cloud') ? 'FREE' : 'EDGE'}</span>
+              <span>{eng.name}</span>
+            </button>
+          ))}
+        </div>
+
+        {edgeProgress && (
+          <div className="ai-provider-notice" style={{ marginTop: 10 }} role="status">
+            <RefreshCw size={14} className="v2-spin" />
+            <span>{edgeProgress}</span>
+          </div>
+        )}
+      </section>
 
       {/* Validated, Clean, Easy-to-Read Python Statistical Summary */}
       {pythonReport && (
@@ -389,7 +672,7 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
           <div className="python-clean-grid">
             <div className="python-stat-tile">
               <span className="python-stat-label">Primary Metric ({metricLabel})</span>
-              <strong className="python-stat-value">Mean: {formatNumber(pythonReport.statistics?.mean)}</strong>
+              <strong className="python-stat-value">Mean: {formatNumber(pythonReport.statistics?.mean ?? pythonReport.summaryStats?.mean)}</strong>
               <span className="python-stat-sub">Total Sum: {formatNumber(pythonReport.statistics?.sum)}</span>
             </div>
 
@@ -421,7 +704,7 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
       )}
 
       {/* 10-Provider BYOK Selector Grid */}
-      <div className="ai-provider-grid" role="tablist" aria-label="Select AI Provider">
+      <div className="ai-provider-grid" role="tablist" aria-label="Select BYOK AI Provider">
         {PROVIDERS.map((prov) => (
           <button
             key={prov.id}
@@ -440,7 +723,7 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
       {/* Selected Provider Info Banner */}
       <div className="ai-provider-current">
         <div>
-          <span className="v2-overline">SELECTED PROVIDER · {selectedProvider.number}</span>
+          <span className="v2-overline">OPTIONAL BYOK PROVIDER · {selectedProvider.number}</span>
           <h4>{selectedProvider.name}</h4>
           <p>{selectedProvider.summary}</p>
         </div>
@@ -459,21 +742,21 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
         <label className="v2-field">
           <span>
             <KeyRound size={13} />
-            <span>{selectedProvider.name} API Key (Optional — Session Only)</span>
-            <small>{savedKey ? 'Key active in this tab' : 'Leave blank for built-in free analysis'}</small>
+            <span>{selectedProvider.name} API Key (Optional — Saved in Browser localStorage)</span>
+            <small>{savedKey ? 'Key active in localStorage' : 'Leave blank to use Zero-Cost Cloud/Edge Tier'}</small>
           </span>
           <input
             type="password"
             value={apiKeyInput}
             onChange={(e) => setApiKeyInput(e.target.value)}
-            placeholder={savedKey ? '•••••••••••••••••••••••• (Session key saved)' : `Paste your ${selectedProvider.name} API key or leave blank for free built-in analysis`}
+            placeholder={savedKey ? '•••••••••••••••••••••••• (Key saved in browser)' : `Paste your ${selectedProvider.name} API key or leave blank for free zero-key analysis`}
             autoComplete="off"
           />
         </label>
 
         <div className="ai-provider-key-actions">
           <button type="button" className="v2-button secondary btn-3d" onClick={handleSaveKey}>
-            <KeyRound size={13} /> Use key in this session
+            <KeyRound size={13} /> Save key in browser
           </button>
           {savedKey && (
             <button type="button" className="v2-text-button" onClick={handleForgetKey}>
@@ -521,16 +804,16 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
             {busy ? (
               <><span className="ai-provider-spinner" /> Analyzing Dataset…</>
             ) : (
-              <><Sparkles size={15} /> {savedKey || apiKeyInput.trim() ? `Analyze with ${selectedProvider.name}` : 'Run Dataset Analysis'}</>
+              <><Sparkles size={15} /> {savedKey || apiKeyInput.trim() ? `Analyze with ${selectedProvider.name}` : `Analyze Free with ${ZERO_COST_ENGINES.find((e) => e.id === zeroCostEngineId)?.name || 'Zero-Key AI'}`}</>
             )}
           </button>
           <button
             type="button"
             className="v2-button secondary ai-provider-run btn-3d"
-            onClick={() => void handleRunFreeAnalysis()}
+            onClick={() => void handleRunZeroCostTier('pollinations_free')}
             disabled={busy}
           >
-            <ShieldCheck size={15} /> Instant Free Analysis
+            <ShieldCheck size={15} /> Instant Zero-Key Summary
           </button>
         </div>
       </form>
@@ -562,9 +845,9 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
       <div className="ai-provider-privacy">
         <ShieldCheck size={16} />
         <div>
-          <strong>Zero-Billing &amp; Session-Only Key Protection</strong>
+          <strong>Guest-First Zero-Billing &amp; Browser-Local Key Protection</strong>
           <p>
-            Personal BYOK keys stay in your browser session and are never stored in any database or repository. If any external free quota is exhausted, InsightBoard VDB fails closed with zero developer charges.
+            Public users can generate summaries without logging in or entering keys via Puter.js and Pollinations.ai. Optional BYOK keys stay strictly in your browser&apos;s localStorage.
           </p>
         </div>
       </div>

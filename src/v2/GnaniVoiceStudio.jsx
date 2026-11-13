@@ -11,8 +11,7 @@ import {
   ShieldCheck,
   Languages,
   RefreshCw,
-  Database,
-  Lock
+  Database
 } from 'lucide-react';
 import './GnaniVoiceStudio.css';
 import { buildLocalDemoSummary } from './localDemoInsights.js';
@@ -30,6 +29,8 @@ const GNANI_VOICES_BY_LANG = {
   'gu-IN': ['Falak', 'Veera'],
   'pa-IN': ['Mehuli', 'Zayan']
 };
+
+const SARVAM_SPEAKERS = ['meera', 'pavithra', 'maitreyi', 'arvind', 'amol', 'amartya'];
 
 const LANGUAGES = [
   ['en-IN', 'English (India)'],
@@ -50,28 +51,42 @@ export default function GnaniVoiceStudio({
   datasetName = '',
   analytics = {}
 }) {
+  const [ttsEngine, setTtsEngine] = useState('kokoro_free'); // 'kokoro_free' | 'gnani_byok' | 'sarvam_byok'
   const [gnaniKeyInput, setGnaniKeyInput] = useState('');
   const [savedGnaniKey, setSavedGnaniKey] = useState(() => {
     try {
-      return sessionStorage.getItem('insightboard-gnani-key') || '';
+      return (
+        localStorage.getItem('insightboard-gnani-key') ||
+        sessionStorage.getItem('insightboard-gnani-key') ||
+        ''
+      );
+    } catch {
+      return '';
+    }
+  });
+  const [sarvamKeyInput, setSarvamKeyInput] = useState('');
+  const [savedSarvamKey, setSavedSarvamKey] = useState(() => {
+    try {
+      return localStorage.getItem('insightboard-sarvam-key') || '';
     } catch {
       return '';
     }
   });
   const [keyNotice, setKeyNotice] = useState('');
 
-  // Data-dependent TTS state (Gnani Timbre v2.5)
+  // Data-dependent TTS state
   const [language, setLanguage] = useState('en-IN');
   const [voice, setVoice] = useState('Kaveri');
   const [speed, setSpeed] = useState(1.0);
   const [ttsBusy, setTtsBusy] = useState(false);
   const [ttsError, setTtsError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
+  const [spokenStatus, setSpokenStatus] = useState('');
 
-  const availableVoices = useMemo(
-    () => GNANI_VOICES_BY_LANG[language] || GNANI_VOICES_BY_LANG['en-IN'],
-    [language]
-  );
+  const availableVoices = useMemo(() => {
+    if (ttsEngine === 'sarvam_byok') return SARVAM_SPEAKERS;
+    return GNANI_VOICES_BY_LANG[language] || GNANI_VOICES_BY_LANG['en-IN'];
+  }, [language, ttsEngine]);
 
   useEffect(() => {
     if (!availableVoices.includes(voice)) {
@@ -91,10 +106,27 @@ export default function GnaniVoiceStudio({
     };
   }, [audioUrl]);
 
-  const activeKey = gnaniKeyInput.trim() || savedGnaniKey.trim();
+  const activeGnaniKey = gnaniKeyInput.trim() || savedGnaniKey.trim();
+  const activeSarvamKey = sarvamKeyInput.trim() || savedSarvamKey.trim();
 
   function handleSaveKey() {
     playButtonClick();
+    if (ttsEngine === 'sarvam_byok') {
+      const clean = sarvamKeyInput.trim();
+      if (!clean) {
+        setKeyNotice('Enter your Sarvam AI (Bulbul) API key first.');
+        return;
+      }
+      try {
+        localStorage.setItem('insightboard-sarvam-key', clean);
+      } catch {}
+      setSavedSarvamKey(clean);
+      setSarvamKeyInput('');
+      setKeyNotice('Sarvam AI (Bulbul) key saved in localStorage.');
+      summonInsi('voice', 'insi.ai · Sarvam Bulbul TTS key ready');
+      return;
+    }
+
     const clean = gnaniKeyInput.trim();
     if (!clean) {
       setKeyNotice('Enter your Gnani API key to unlock Timbre v2.5 speech generation.');
@@ -102,37 +134,168 @@ export default function GnaniVoiceStudio({
       return;
     }
     try {
+      localStorage.setItem('insightboard-gnani-key', clean);
       sessionStorage.setItem('insightboard-gnani-key', clean);
     } catch {}
     setSavedGnaniKey(clean);
     setGnaniKeyInput('');
-    setKeyNotice('Gnani API key verified in this session. You can now generate speech for the dataset summary.');
+    setKeyNotice('Gnani API key saved in browser. You can now generate speech for the dataset summary.');
     summonInsi('voice', 'insi.ai · Gnani Timbre v2.5 key unlocked');
   }
 
   function handleForgetKey() {
     playButtonClick();
+    if (ttsEngine === 'sarvam_byok') {
+      try {
+        localStorage.removeItem('insightboard-sarvam-key');
+      } catch {}
+      setSavedSarvamKey('');
+      setSarvamKeyInput('');
+      setKeyNotice('Sarvam AI key cleared from browser.');
+      return;
+    }
     try {
+      localStorage.removeItem('insightboard-gnani-key');
       sessionStorage.removeItem('insightboard-gnani-key');
     } catch {}
     setSavedGnaniKey('');
     setGnaniKeyInput('');
-    setKeyNotice('Gnani key cleared from this session.');
+    setKeyNotice('Gnani key cleared from this browser.');
+  }
+
+  async function playFreeKokoroOrIndianBrowserVoice() {
+    setTtsBusy(true);
+    setTtsError('');
+    setSpokenStatus('Initializing expressive neural voice…');
+    summonInsi('voice', 'insi.ai · Speaking dataset summary with Zero-Key Neural TTS…');
+
+    try {
+      // Attempt Kokoro-JS ONNX WebAudio synthesis when running in English on capable browser
+      if (language.startsWith('en')) {
+        try {
+          const kokoroMod = await import(/* @vite-ignore */ 'https://esm.run/kokoro-js');
+          if (kokoroMod?.KokoroTTS) {
+            setSpokenStatus('Loading Kokoro-82M ONNX Neural TTS…');
+            const tts = await kokoroMod.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
+              dtype: 'q8'
+            });
+            const audio = await tts.generate(dataSummaryScript.slice(0, 480), {
+              voice: 'af_bella'
+            });
+            if (audio?.toBlob) {
+              const wavBlob = await audio.toBlob();
+              if (audioUrl) URL.revokeObjectURL(audioUrl);
+              const nextUrl = URL.createObjectURL(wavBlob);
+              setAudioUrl(nextUrl);
+              setSpokenStatus('Kokoro-82M ONNX Neural Audio Ready (Zero Key)!');
+              summonInsi('success', 'insi.ai · Kokoro neural speech ready!');
+              setTtsBusy(false);
+              return;
+            }
+          }
+        } catch {
+          // Graceful fallback to Indian Browser SpeechSynthesis (distinct formal executive voice)
+        }
+      }
+
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(dataSummaryScript);
+        utter.lang = language;
+        // Formal executive summary cadence (pitch 0.96, rate = speed) — distinct from INSI Dove's 1.18x avian voice!
+        utter.pitch = 0.96;
+        utter.rate = Number(speed) || 1.0;
+
+        const voices = window.speechSynthesis.getVoices?.() || [];
+        const matchedVoice =
+          voices.find((v) => v.lang?.toLowerCase() === language.toLowerCase()) ||
+          voices.find((v) => /en[-_]IN|hi[-_]IN/i.test(v.lang)) ||
+          voices[0];
+        if (matchedVoice) utter.voice = matchedVoice;
+
+        utter.onend = () => {
+          setSpokenStatus(`Completed speaking summary in ${language}.`);
+        };
+        window.speechSynthesis.speak(utter);
+        setSpokenStatus(`Speaking dataset summary aloud (${matchedVoice?.name || language} · Zero API Key)…`);
+        summonInsi('success', 'insi.ai · Speaking executive summary aloud');
+      } else {
+        throw new Error('Browser SpeechSynthesis is unavailable on this device.');
+      }
+    } catch (err) {
+      setTtsError(err?.message || 'Could not play speech.');
+    } finally {
+      setTtsBusy(false);
+    }
   }
 
   async function handleGenerateSpeech(e) {
     e?.preventDefault?.();
     playButtonClick();
     setTtsError('');
+    setSpokenStatus('');
 
-    if (!activeKey) {
-      setTtsError('Enter your Gnani API key above to generate and listen to the dataset summary speech.');
+    if (!dataSummaryScript.trim()) {
+      setTtsError('Load a dataset with records first so the summary script can be generated.');
       summonInsi('error', "Oops! Let's try again.");
       return;
     }
 
-    if (!dataSummaryScript.trim()) {
-      setTtsError('Load a dataset with records first so the summary script can be generated.');
+    if (ttsEngine === 'kokoro_free') {
+      await playFreeKokoroOrIndianBrowserVoice();
+      return;
+    }
+
+    if (ttsEngine === 'sarvam_byok') {
+      if (!activeSarvamKey) {
+        setTtsError('Enter your Sarvam AI (Bulbul) API key above or switch to the Free Kokoro / Indian Neural Voice tier.');
+        return;
+      }
+      setTtsBusy(true);
+      summonInsi('voice', `insi.ai · Synthesizing Sarvam Bulbul (${voice} · ${language})…`);
+      try {
+        const res = await fetch('https://api.sarvam.ai/text-to-speech', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-subscription-key': activeSarvamKey
+          },
+          body: JSON.stringify({
+            inputs: [dataSummaryScript.slice(0, 500)],
+            target_language_code: language,
+            speaker: voice || 'meera',
+            pitch: 0,
+            pace: Number(speed) || 1.0,
+            loudness: 1.5,
+            speech_sample_rate: 22050,
+            enable_preprocessing: true,
+            model: 'bulbul:v1'
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        const b64 = data?.audios?.[0];
+        if (!res.ok || !b64) {
+          throw new Error(data?.message || data?.error || 'Sarvam Bulbul TTS synthesis failed.');
+        }
+        const byteChars = atob(b64);
+        const byteNumbers = new Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i += 1) {
+          byteNumbers[i] = byteChars.charCodeAt(i);
+        }
+        const wavBlob = new Blob([new Uint8Array(byteNumbers)], { type: 'audio/wav' });
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        setAudioUrl(URL.createObjectURL(wavBlob));
+        summonInsi('success', 'insi.ai · Sarvam Bulbul Indian voice ready!');
+      } catch (err) {
+        setTtsError(err?.message || 'Could not generate Sarvam AI speech.');
+      } finally {
+        setTtsBusy(false);
+      }
+      return;
+    }
+
+    if (!activeGnaniKey) {
+      setTtsError('Enter your Gnani API key above or switch to the Free Kokoro / Indian Neural Voice option.');
       summonInsi('error', "Oops! Let's try again.");
       return;
     }
@@ -144,7 +307,7 @@ export default function GnaniVoiceStudio({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-gnani-api-key': activeKey
+          'x-gnani-api-key': activeGnaniKey
         },
         body: JSON.stringify({
           text: dataSummaryScript,
@@ -177,47 +340,85 @@ export default function GnaniVoiceStudio({
       <div className="v2-card-title gnani-title-row">
         <div className="gnani-mark"><Headphones size={19} /></div>
         <div className="gnani-heading-copy">
-          <span className="v2-overline">GNANI AI VOICE STUDIO · TIMBRE V2.5 TEXT-TO-SPEECH</span>
+          <span className="v2-overline">EXPRESSIVE INDIAN VOICE STUDIO · KOKORO ONNX, SARVAM BULBUL &amp; GNANI TIMBRE V2.5</span>
           <h3 id="gnani-title">Data-Dependent Multilingual Voice Summary</h3>
         </div>
-        <span className="gnani-status ready">10 INDIAN LANGUAGES · 40+ VOICES</span>
+        <span className="gnani-status ready">ZERO-KEY + INDIAN BYOK</span>
       </div>
 
       <p className="v2-muted gnani-intro">
-        The briefing below is generated automatically from your active dataset (<strong>{datasetName || 'Active Dataset'}</strong> · {rows.length.toLocaleString()} records). Select your preferred Indian language and voice model, enter your Gnani API key, and generate speech to listen to your dataset summary.
+        Listen to an executive briefing generated from <strong>{datasetName || 'Active Dataset'}</strong> ({rows.length.toLocaleString()} records) using <strong>Free Kokoro / Indian Neural TTS</strong> (no API key required), <strong>Sarvam AI (Bulbul)</strong>, or <strong>Gnani Timbre v2.5</strong>.
       </p>
 
-      {/* Gnani API Key Input (Required to unlock Speech Synthesis) */}
-      <div className="gnani-key-panel">
-        <div className="gnani-key-heading">
-          <KeyRound size={15} />
-          <strong>Gnani Timbre v2.5 API Key (Required to Generate Speech)</strong>
-          <span>{activeKey ? 'KEY UNLOCKED' : 'KEY REQUIRED'}</span>
-        </div>
-        <p>
-          Enter your personal Gnani API key to synthesize and listen to the auto-generated dataset summary. Keys stay strictly in your browser session.
-        </p>
-        <label className="v2-field gnani-key-field">
-          <input
-            type="password"
-            value={gnaniKeyInput}
-            onChange={(e) => setGnaniKeyInput(e.target.value)}
-            placeholder={savedGnaniKey ? '•••••••••••••••••••••••• (Gnani session key active)' : 'Enter your Gnani Timbre v2.5 API key…'}
-            autoComplete="off"
-          />
-        </label>
-        <div className="gnani-key-actions">
-          <button type="button" className="v2-button secondary btn-3d" onClick={handleSaveKey}>
-            <KeyRound size={13} /> Save Key for Session
-          </button>
-          {savedGnaniKey && (
-            <button type="button" className="v2-button secondary btn-3d" onClick={handleForgetKey}>
-              <Trash2 size={13} /> Clear Key
-            </button>
-          )}
-        </div>
-        {keyNotice && <p className="gnani-key-notice" role="status">{keyNotice}</p>}
+      {/* Voice Engine Tier Selector */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }} role="tablist" aria-label="Voice TTS Engine">
+        <button
+          type="button"
+          className={`v2-button ${ttsEngine === 'kokoro_free' ? 'primary' : 'secondary'} btn-3d`}
+          onClick={() => setTtsEngine('kokoro_free')}
+        >
+          <Volume2 size={14} /> Free Kokoro / Indian Neural (No Key)
+        </button>
+        <button
+          type="button"
+          className={`v2-button ${ttsEngine === 'gnani_byok' ? 'primary' : 'secondary'} btn-3d`}
+          onClick={() => setTtsEngine('gnani_byok')}
+        >
+          <Headphones size={14} /> Gnani.ai Timbre v2.5 (BYOK)
+        </button>
+        <button
+          type="button"
+          className={`v2-button ${ttsEngine === 'sarvam_byok' ? 'primary' : 'secondary'} btn-3d`}
+          onClick={() => setTtsEngine('sarvam_byok')}
+        >
+          <Languages size={14} /> Sarvam AI Bulbul (Indian BYOK)
+        </button>
       </div>
+
+      {/* Optional BYOK Key Panel for Gnani or Sarvam */}
+      {ttsEngine !== 'kokoro_free' && (
+        <div className="gnani-key-panel">
+          <div className="gnani-key-heading">
+            <KeyRound size={15} />
+            <strong>
+              {ttsEngine === 'sarvam_byok'
+                ? 'Sarvam AI (Bulbul v1) API Key (Saved in localStorage)'
+                : 'Gnani Timbre v2.5 API Key (Saved in localStorage)'}
+            </strong>
+            <span>{(ttsEngine === 'sarvam_byok' ? activeSarvamKey : activeGnaniKey) ? 'KEY UNLOCKED' : 'KEY REQUIRED'}</span>
+          </div>
+          <label className="v2-field gnani-key-field">
+            <input
+              type="password"
+              value={ttsEngine === 'sarvam_byok' ? sarvamKeyInput : gnaniKeyInput}
+              onChange={(e) =>
+                ttsEngine === 'sarvam_byok' ? setSarvamKeyInput(e.target.value) : setGnaniKeyInput(e.target.value)
+              }
+              placeholder={
+                ttsEngine === 'sarvam_byok'
+                  ? savedSarvamKey
+                    ? '•••••••••••••••••••••••• (Sarvam key active)'
+                    : 'Enter your Sarvam AI API subscription key…'
+                  : savedGnaniKey
+                  ? '•••••••••••••••••••••••• (Gnani key active)'
+                  : 'Enter your Gnani Timbre v2.5 API key…'
+              }
+              autoComplete="off"
+            />
+          </label>
+          <div className="gnani-key-actions">
+            <button type="button" className="v2-button secondary btn-3d" onClick={handleSaveKey}>
+              <KeyRound size={13} /> Save Key in Browser
+            </button>
+            {(ttsEngine === 'sarvam_byok' ? savedSarvamKey : savedGnaniKey) && (
+              <button type="button" className="v2-button secondary btn-3d" onClick={handleForgetKey}>
+                <Trash2 size={13} /> Clear Key
+              </button>
+            )}
+          </div>
+          {keyNotice && <p className="gnani-key-notice" role="status">{keyNotice}</p>}
+        </div>
+      )}
 
       <form className="gnani-form" onSubmit={handleGenerateSpeech}>
         <label className="v2-field">
@@ -282,17 +483,23 @@ export default function GnaniVoiceStudio({
         <button
           type="submit"
           className="v2-button primary gnani-action btn-3d"
-          disabled={ttsBusy || !activeKey}
-          title={!activeKey ? 'Enter your Gnani API key above to generate speech' : `Generate speech with ${voice}`}
+          disabled={ttsBusy}
         >
           {ttsBusy ? (
-            <><RefreshCw size={15} className="v2-spin" /> Synthesizing Dataset Summary with Gnani Timbre v2.5…</>
-          ) : !activeKey ? (
-            <><Lock size={15} /> Enter Gnani API Key Above to Generate Speech</>
+            <><RefreshCw size={15} className="v2-spin" /> Synthesizing Dataset Voice Summary…</>
           ) : (
-            <><Play size={15} /> Generate &amp; Listen to Dataset Speech ({voice} · {language})</>
+            <><Play size={15} /> {ttsEngine === 'kokoro_free' ? `Listen Now with Free Neural Voice (${language})` : `Generate & Listen (${voice} · ${language})`}</>
           )}
         </button>
+
+        {spokenStatus && (
+          <div className="gnani-audio-result" role="status">
+            <div>
+              <CheckCircle2 size={15} />
+              <strong>{spokenStatus}</strong>
+            </div>
+          </div>
+        )}
 
         {ttsError && (
           <div className="gnani-error" role="alert">
@@ -305,16 +512,16 @@ export default function GnaniVoiceStudio({
           <div className="gnani-audio-result" aria-live="polite">
             <div>
               <CheckCircle2 size={15} />
-              <strong>Gnani Timbre v2.5 Audio Ready ({voice} · {language})</strong>
-              <span>24 kHz MP3</span>
+              <strong>Audio Ready ({voice} · {language})</strong>
+              <span>24 kHz Audio</span>
             </div>
             <audio controls src={audioUrl} />
             <a
               href={audioUrl}
-              download={`insightboard-gnani-${voice.toLowerCase()}.mp3`}
+              download={`insightboard-voice-${voice.toLowerCase()}.mp3`}
               className="v2-button secondary gnani-download btn-3d"
             >
-              <Download size={14} /> Download MP3
+              <Download size={14} /> Download Audio
             </a>
           </div>
         )}
@@ -323,9 +530,9 @@ export default function GnaniVoiceStudio({
       <div className="gnani-privacy">
         <ShieldCheck size={16} />
         <span>
-          <strong>Data-Dependent Speech &amp; Zero-Billing Guardrail</strong>
+          <strong>Distinct Executive Voice &amp; Zero-Billing Guardrail</strong>
           <small>
-            Speech is synthesized strictly from your active dataset summary using your session Gnani key—no arbitrary uploads or developer billing.
+            Uses a formal executive pitch (0.96x) or Kokoro/Sarvam/Gnani neural models—distinct from the INSI Dove assistant&apos;s task confirmation voice.
           </small>
         </span>
       </div>

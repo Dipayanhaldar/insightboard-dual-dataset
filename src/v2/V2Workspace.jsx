@@ -21,11 +21,9 @@ import {
 } from 'lucide-react';
 import './V2Workspace.css';
 import GnaniVoiceStudio from './GnaniVoiceStudio.jsx';
-import AIProviderHub from './AIProviderHub.jsx';
+import AIProviderHub, { generateZeroCostCloudSummary } from './AIProviderHub.jsx';
 import UsageQuotasPanel from './UsageQuotasPanel.jsx';
 import { playButtonClick, summonInsi } from './uiSound.js';
-import {
-} from '../firebase.js';
 
 const GEMINI_BROWSER_MODEL = 'gemini-2.5-flash';
 const LANGUAGES = [
@@ -415,22 +413,39 @@ export default function V2Workspace({
     setMessage('Removed personal Gemini API key from this browser.');
   }
 
-  async function generateSummary() {
+  async function generateSummary(preferZeroCost = false) {
     playButtonClick();
-    if (!activeGeminiKey) {
-      setMessage('Enter your Gemini API key above to generate the Gemini AI Summary.');
-      summonInsi('error', "Oops! Let's try again.");
-      return;
-    }
-
     setBusy(true);
     setMessage('');
     setSummary('');
     setSummarySource('');
     summonInsi('heavy_ai');
 
+    const langName = LANGUAGES.find(([code]) => code === summaryLanguage)?.[1] || 'English';
+
+    if (!activeGeminiKey || preferZeroCost) {
+      try {
+        const freeRes = await generateZeroCostCloudSummary({
+          engineId: 'pollinations_free',
+          datasetName: datasetName || 'Active Dataset',
+          analytics,
+          analysisMode: 'overview',
+          languageName: langName
+        });
+        setSummary(freeRes.text);
+        setSummarySource(freeRes.source);
+        setMessage(`Generated with ${freeRes.source} (No API key required).`);
+        summonInsi('success');
+      } catch (err) {
+        setMessage(err?.message || 'Could not generate summary.');
+        summonInsi('error');
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     try {
-      const langName = LANGUAGES.find(([code]) => code === summaryLanguage)?.[1] || 'English';
       const prompt = `Write a concise executive summary in ${langName} strictly grounded in this aggregate dataset snapshot:\n${JSON.stringify(analytics)}`;
       const directRes = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_BROWSER_MODEL}:generateContent`,
@@ -732,10 +747,17 @@ export default function V2Workspace({
                 </select>
               </label>
 
-              <button className="v2-button primary v2-generate-button btn-3d" onClick={() => void generateSummary()} disabled={busy || !activeGeminiKey}>
-                {busy ? <RefreshCw size={15} className="v2-spin" /> : !activeGeminiKey ? <Lock size={15} /> : <Sparkles size={15} />}{' '}
-                {busy ? 'Generating summary…' : !activeGeminiKey ? 'Enter Gemini API Key Above to Generate' : copy.summarize}
-              </button>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="v2-button primary v2-generate-button btn-3d" onClick={() => void generateSummary(false)} disabled={busy} style={{ flex: 1 }}>
+                  {busy ? <RefreshCw size={15} className="v2-spin" /> : <Sparkles size={15} />}{' '}
+                  {busy ? 'Generating summary…' : activeGeminiKey ? copy.summarize : 'Generate Free AI Summary (Zero Key · Puter / Pollinations)'}
+                </button>
+                {activeGeminiKey && (
+                  <button type="button" className="v2-button secondary btn-3d" onClick={() => void generateSummary(true)} disabled={busy}>
+                    <Sparkles size={14} /> Free Keyless Tier
+                  </button>
+                )}
+              </div>
 
               {summary ? (
                 <div className="v2-summary" aria-live="polite">
@@ -743,7 +765,7 @@ export default function V2Workspace({
                     InsightBoard VDB ·{' '}
                     {summarySource === 'gemini-byok'
                       ? 'Personal Gemini Key Summary'
-                      : 'Gemini Executive Summary'}
+                      : summarySource || 'Executive Summary'}
                   </h4>
                   <div style={{ whiteSpace: 'pre-wrap' }}>{summary}</div>
                 </div>
