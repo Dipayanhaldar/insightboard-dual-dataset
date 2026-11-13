@@ -36,6 +36,7 @@ test('detectWakeWordAndCommand recognizes "Hey Inci" and common speech-to-text v
     'Wake up NCI, show revenue by store',
     'Hey NC show revenue by store',
     'Hey in C, show revenue by store',
+    'Hey NC show revenue by store',
     'Hey, show revenue by store'
   ];
 

@@ -56,15 +56,22 @@ const HEY_PREFIX_COMMAND_REGEX = /^\s*(?:hey|hi|hello|ok|okay|wake\s+up|listen)(
  * like "Hey Inci", "Hey In C I", "Hey N C I", and common phonetic variants normalize cleanly.
  */
 export function normalizeSpeechTranscript(rawInput = '') {
-  return String(rawInput || '')
-    .replace(/\b(?:hey[\s,:.-]*)?I[\s.\-_]*N[\s.\-_]*S[\s.\-_]*I\b/gi, 'Hey Inci')
-    .replace(/\b(?:hey[\s,.-]*)?in[\s.\-_]*c[\s.\-_]*i\b/gi, (match) => /^hey\b/i.test(match) ? 'Hey Inci' : 'Inci')
-    .replace(/\b(?:in[\s\-_]*see|in[\s\-_]*sea|insee|incy|insy)\b/gi, 'Inci')
-    .replace(/\bN[\s.\-_]*C[\s.\-_]*I\b/gi, 'Inci')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+  const input = String(rawInput || '').replace(/\\s+/g, ' ').trim();
+  if (!input) return '';
 
+  // Preserve the spoken prefix while normalizing only recognized Inci phonetic variants.
+  const wakePattern = /^(?:(hey|hi|hello|ok|okay|wake\\s+up|wake|listen)[\\s,:.\\-!?]+)?(i\\s*n\\s*s\\s*i|i[.\\s-]*n[.\\s-]*s[.\\s-]*i|in[\\s.-]*c[\\s.-]*i|in[\\s-]*see|in[\\s-]*sea|insee|incy|insy|n\\s*c\\s*i|nci|nc|inc)(?=$|[\\s,:.\\-!?])/i;
+  const match = input.match(wakePattern);
+  if (!match) return input;
+
+  const prefix = match[1] ? match[1].toLowerCase() : 'hey';
+  const remaining = input.slice(match[0].length).replace(/^[\\s,:.\\-!?]+/, '').trim();
+  const normalizedPrefix = /^(?:wake\\s+up|wake)$/i.test(prefix)
+    ? 'Wake up Inci'
+    : 'Hey Inci';
+
+  return remaining ? `${normalizedPrefix}, ${remaining}` : normalizedPrefix;
+}
 const FUZZY_SYNONYM_GROUPS = Object.freeze({
   revenue: [
     'monthly_revenue_inr',
