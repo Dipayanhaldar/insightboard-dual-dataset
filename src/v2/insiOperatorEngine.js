@@ -57,6 +57,7 @@ const HEY_PREFIX_COMMAND_REGEX = /^\s*(?:hey|hi|hello|ok|okay|wake\s+up|listen)(
  */
 export function normalizeSpeechTranscript(rawInput = '') {
   return String(rawInput || '')
+    .replace(/\bI[\s.\-_]*N[\s.\-_]*S[\s.\-_]*I\b/gi, 'Inci')
     .replace(/\b(?:hey[\s,.-]*)?in[\s.\-_]*c[\s.\-_]*i\b/gi, 'Inci')
     .replace(/\b(?:in[\s\-_]*see|in[\s\-_]*sea|insee|incy|insy)\b/gi, 'Inci')
     .replace(/\bN[\s.\-_]*C[\s.\-_]*I\b/gi, 'Inci')
@@ -165,7 +166,7 @@ const FUZZY_SYNONYM_GROUPS = Object.freeze({
 });
 
 /**
- * Detects whether a voice/text input starts with or contains "Hey Inci" / "Hey Inci" / "Hey Inci" / "Wake up Inci" / "Hey NCI"
+ * Detects whether a voice/text input starts with or contains "Hey Inci" / "Hey In C I" / "Wake up Inci" / "Hey NCI"
  * (or phonetic STT transcriptions like "Hey NC", "Hey INC", "Hey INS", "Hey NSE", "Hey easy", "Hey insight")
  */
 export function detectWakeWordAndCommand(rawInput = '') {
@@ -194,7 +195,7 @@ export function detectWakeWordAndCommand(rawInput = '') {
     };
   }
 
-  // Also check inline wake word e.g. "please hey, INSI show revenue" or "wake up Insee"
+  // Also check inline wake word e.g. "please Hey Inci show revenue" or "Wake up Inci"
   const inlineMatch = original.match(INLINE_WAKE_REGEX);
   if (inlineMatch) {
     const stripped = original
@@ -210,7 +211,7 @@ export function detectWakeWordAndCommand(rawInput = '') {
     };
   }
 
-  // If user said "Hey <command>" or "Wake up <command>" and STT dropped or mangled "INSI"
+  // If user said "Hey <command>" or "Wake up <command>" and STT dropped or mangled "Inci"
   const heyPrefixMatch = original.match(HEY_PREFIX_COMMAND_REGEX);
   if (heyPrefixMatch && DIRECT_VOICE_INTENT_REGEX.test(heyPrefixMatch[1])) {
     const stripped = heyPrefixMatch[1].trim();
@@ -222,7 +223,7 @@ export function detectWakeWordAndCommand(rawInput = '') {
     };
   }
 
-  // If browser STT clipped "INSI" and heard bare "Hey" / "Wake up" / "Wake up [word]" / "Are you listening"
+  // If browser STT clipped "Inci" and heard bare "Hey" / "Wake up" / "Are you listening"
   if (BARE_GREETING_REGEX.test(original)) {
     return {
       wakeWordDetected: true,
