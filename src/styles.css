@@ -359,3 +359,45 @@ html[data-theme="dark"] .workspace-tab-btn:hover{background:#233b5e;color:#fff;b
 html[data-theme="dark"] .workspace-tab-btn.active{background:linear-gradient(120deg,#2563eb,#4f46e5);color:#fff}
 @media(max-width:720px){.workspace-tabs-bar{flex-direction:column;align-items:stretch}.workspace-tabs-group{width:100%}.workspace-tab-btn{flex:1 1 calc(50% - 6px);justify-content:center}}
 
+/* Responsive studio tabs: scroll horizontally on narrow screens, never pin over content. */
+.workspace-tabs-bar {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  scroll-margin-top: 90px;
+}
+.workspace-tabs-group,
+.workspace-tabs-meta {
+  min-width: 0;
+  max-width: 100%;
+}
+@media (max-width: 720px) {
+  .workspace-tabs-bar {
+    display: block;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .workspace-tabs-group,
+  .workspace-tabs-meta {
+    display: flex;
+    flex-wrap: nowrap;
+    width: max-content;
+    max-width: none;
+  }
+  .workspace-tab-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+@media (min-width: 721px) {
+  .workspace-tabs-group {
+    flex: 1 1 auto;
+  }
+}
