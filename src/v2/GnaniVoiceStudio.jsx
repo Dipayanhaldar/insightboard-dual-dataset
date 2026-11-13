@@ -56,9 +56,7 @@ export default function GnaniVoiceStudio({
   const [savedGnaniKey, setSavedGnaniKey] = useState(() => {
     try {
       return (
-        localStorage.getItem('insightboard-gnani-key') ||
-        sessionStorage.getItem('insightboard-gnani-key') ||
-        ''
+        localStorage.getItem('insightboard-gnani-key') || ''
       );
     } catch {
       return '';
@@ -135,7 +133,6 @@ export default function GnaniVoiceStudio({
     }
     try {
       localStorage.setItem('insightboard-gnani-key', clean);
-      sessionStorage.setItem('insightboard-gnani-key', clean);
     } catch {}
     setSavedGnaniKey(clean);
     setGnaniKeyInput('');
@@ -156,7 +153,6 @@ export default function GnaniVoiceStudio({
     }
     try {
       localStorage.removeItem('insightboard-gnani-key');
-      sessionStorage.removeItem('insightboard-gnani-key');
     } catch {}
     setSavedGnaniKey('');
     setGnaniKeyInput('');
