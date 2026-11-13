@@ -56,23 +56,24 @@ const HEY_PREFIX_COMMAND_REGEX = /^\s*(?:hey|hi|hello|ok|okay|wake\s+up|listen)(
  * like "Hey Inci", "Hey In C I", "Hey N C I", and common phonetic variants normalize cleanly.
  */
 export function normalizeSpeechTranscript(rawInput = '') {
-  const input = String(rawInput || '').replace(/\\s+/g, ' ').trim();
+  const input = String(rawInput || '').replace(/\s+/g, ' ').trim();
   if (!input) return '';
 
-  // Preserve the spoken prefix while normalizing only recognized Inci phonetic variants.
-  const wakePattern = /^(?:(hey|hi|hello|ok|okay|wake\\s+up|wake|listen)[\\s,:.\\-!?]+)?(i\\s*n\\s*s\\s*i|i[.\\s-]*n[.\\s-]*s[.\\s-]*i|in[\\s.-]*c[\\s.-]*i|in[\\s-]*see|in[\\s-]*sea|insee|incy|insy|n\\s*c\\s*i|nci|nc|inc)(?=$|[\\s,:.\\-!?])/i;
-  const match = input.match(wakePattern);
-  if (!match) return input;
-
-  const prefix = match[1] ? match[1].toLowerCase() : 'hey';
-  const remaining = input.slice(match[0].length).replace(/^[\\s,:.\\-!?]+/, '').trim();
-  const normalizedPrefix = /^(?:wake\\s+up|wake)$/i.test(prefix)
-    ? 'Wake up Inci'
-    : 'Hey Inci';
-
-  return remaining ? `${normalizedPrefix}, ${remaining}` : normalizedPrefix;
-}
-const FUZZY_SYNONYM_GROUPS = Object.freeze({
+  // Normalize only the leading wake phrase; preserve spoken command text.
+  const patterns = [
+    /^(hey|hi|hello|ok|okay)\s*[,.:!?-]?\s*(?:i\s*n\s*s\s*i|insi|in\s*c\s*i|in-see|in\s*see|in\s*sea|insee|incy|insy|n\s*c\s*i|nci|nc|inc)\b/i,
+    /^(wake\s+up|wake)\s+(?:i\s*n\s*s\s*i|insi|in\s*c\s*i|in-see|in\s*see|in\s*sea|insee|incy|insy|n\s*c\s*i|nci|nc|inc)\b/i,
+    /^(i\s*n\s*s\s*i|insi|in\s*c\s*i|in-see|in\s*see|in\s*sea|insee|incy|insy|n\s*c\s*i|nci|nc|inc)\b/i
+  ];
+  for (let index = 0; index < patterns.length; index += 1) {
+    const match = input.match(patterns[index]);
+    if (!match) continue;
+    const rest = input.slice(match[0].length).replace(/^[\s,:.!?-]+/, '').trim();
+    const phrase = index === 1 ? 'Wake up Inci' : 'Hey Inci';
+    return rest ? phrase + ', ' + rest : phrase;
+  }
+  return input;
+}const FUZZY_SYNONYM_GROUPS = Object.freeze({
   revenue: [
     'monthly_revenue_inr',
     'revenue',
