@@ -112,7 +112,7 @@ export default function GnaniVoiceStudio({
     if (ttsEngine === 'sarvam_byok') {
       const clean = sarvamKeyInput.trim();
       if (!clean) {
-        setKeyNotice('Enter your Sarvam AI (Bulbul) API key first.');
+        setKeyNotice('Enter your Indian language voice API key first.');
         return;
       }
       try {
@@ -120,8 +120,8 @@ export default function GnaniVoiceStudio({
       } catch {}
       setSavedSarvamKey(clean);
       setSarvamKeyInput('');
-      setKeyNotice('Sarvam AI (Bulbul) key saved in localStorage.');
-      summonInsi('voice', 'insi.ai · Sarvam Bulbul TTS key ready');
+      setKeyNotice('Indian language voice key saved in localStorage.');
+      summonInsi('voice', 'insi.ai · Indian language voice key ready');
       return;
     }
 
@@ -166,12 +166,12 @@ export default function GnaniVoiceStudio({
     summonInsi('voice', 'insi.ai · Speaking dataset summary with Zero-Key Neural TTS…');
 
     try {
-      // Attempt Kokoro-JS ONNX WebAudio synthesis when running in English on capable browser
+      // Attempt local ONNX WebAudio synthesis when running in English on capable browser
       if (language.startsWith('en')) {
         try {
           const kokoroMod = await import(/* @vite-ignore */ 'https://esm.run/kokoro-js');
           if (kokoroMod?.KokoroTTS) {
-            setSpokenStatus('Loading Kokoro-82M ONNX Neural TTS…');
+            setSpokenStatus('Loading local neural voice model…');
             const tts = await kokoroMod.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
               dtype: 'q8'
             });
@@ -183,8 +183,8 @@ export default function GnaniVoiceStudio({
               if (audioUrl) URL.revokeObjectURL(audioUrl);
               const nextUrl = URL.createObjectURL(wavBlob);
               setAudioUrl(nextUrl);
-              setSpokenStatus('Kokoro-82M ONNX Neural Audio Ready (Zero Key)!');
-              summonInsi('success', 'insi.ai · Kokoro neural speech ready!');
+              setSpokenStatus('Local neural audio ready (zero key)!');
+              summonInsi('success', 'insi.ai · Local neural speech ready!');
               setTtsBusy(false);
               return;
             }
@@ -244,11 +244,11 @@ export default function GnaniVoiceStudio({
 
     if (ttsEngine === 'sarvam_byok') {
       if (!activeSarvamKey) {
-        setTtsError('Enter your Sarvam AI (Bulbul) API key above or switch to the Free Kokoro / Indian Neural Voice tier.');
+        setTtsError('Enter your Indian language voice API key above or switch to the free local/browser voice tier.');
         return;
       }
       setTtsBusy(true);
-      summonInsi('voice', `insi.ai · Synthesizing Sarvam Bulbul (${voice} · ${language})…`);
+      summonInsi('voice', `insi.ai · Synthesizing Indian-language speech (${voice} · ${language})…`);
       try {
         const res = await fetch('https://api.sarvam.ai/text-to-speech', {
           method: 'POST',
@@ -271,7 +271,7 @@ export default function GnaniVoiceStudio({
         const data = await res.json().catch(() => ({}));
         const b64 = data?.audios?.[0];
         if (!res.ok || !b64) {
-          throw new Error(data?.message || data?.error || 'Sarvam Bulbul TTS synthesis failed.');
+          throw new Error(data?.message || data?.error || 'Indian-language speech synthesis failed.');
         }
         const byteChars = atob(b64);
         const byteNumbers = new Array(byteChars.length);
@@ -281,9 +281,9 @@ export default function GnaniVoiceStudio({
         const wavBlob = new Blob([new Uint8Array(byteNumbers)], { type: 'audio/wav' });
         if (audioUrl) URL.revokeObjectURL(audioUrl);
         setAudioUrl(URL.createObjectURL(wavBlob));
-        summonInsi('success', 'insi.ai · Sarvam Bulbul Indian voice ready!');
+        summonInsi('success', 'insi.ai · Indian-language voice ready!');
       } catch (err) {
-        setTtsError(err?.message || 'Could not generate Sarvam AI speech.');
+        setTtsError(err?.message || 'Could not generate Indian-language speech.');
       } finally {
         setTtsBusy(false);
       }
@@ -291,7 +291,7 @@ export default function GnaniVoiceStudio({
     }
 
     if (!activeGnaniKey) {
-      setTtsError('Enter your Gnani API key above or switch to the Free Kokoro / Indian Neural Voice option.');
+      setTtsError('Enter your Gnani API key above or switch to the free local/browser voice option.');
       summonInsi('error', "Oops! Let's try again.");
       return;
     }
@@ -336,14 +336,14 @@ export default function GnaniVoiceStudio({
       <div className="v2-card-title gnani-title-row">
         <div className="gnani-mark"><Headphones size={19} /></div>
         <div className="gnani-heading-copy">
-          <span className="v2-overline">EXPRESSIVE INDIAN VOICE STUDIO · KOKORO ONNX, SARVAM BULBUL &amp; GNANI TIMBRE V2.5</span>
+          <span className="v2-overline">EXPRESSIVE INDIAN VOICE STUDIO · FREE LOCAL VOICE &amp; INDIAN BYOK</span>
           <h3 id="gnani-title">Data-Dependent Multilingual Voice Summary</h3>
         </div>
         <span className="gnani-status ready">ZERO-KEY + INDIAN BYOK</span>
       </div>
 
       <p className="v2-muted gnani-intro">
-        Listen to an executive briefing generated from <strong>{datasetName || 'Active Dataset'}</strong> ({rows.length.toLocaleString()} records) using <strong>Free Kokoro / Indian Neural TTS</strong> (no API key required), <strong>Sarvam AI (Bulbul)</strong>, or <strong>Gnani Timbre v2.5</strong>.
+        Listen to an executive briefing generated from <strong>{datasetName || 'Active Dataset'}</strong> ({rows.length.toLocaleString()} records) using <strong>Free local neural/browser speech</strong> (no API key required), or an Indian-language BYOK voice provider.
       </p>
 
       {/* Voice Engine Tier Selector */}
@@ -353,7 +353,7 @@ export default function GnaniVoiceStudio({
           className={`v2-button ${ttsEngine === 'kokoro_free' ? 'primary' : 'secondary'} btn-3d`}
           onClick={() => setTtsEngine('kokoro_free')}
         >
-          <Volume2 size={14} /> Free Kokoro / Indian Neural (No Key)
+          <Volume2 size={14} /> Free Local Neural / Browser Voice (No Key)
         </button>
         <button
           type="button"
@@ -367,7 +367,7 @@ export default function GnaniVoiceStudio({
           className={`v2-button ${ttsEngine === 'sarvam_byok' ? 'primary' : 'secondary'} btn-3d`}
           onClick={() => setTtsEngine('sarvam_byok')}
         >
-          <Languages size={14} /> Sarvam AI Bulbul (Indian BYOK)
+          <Languages size={14} /> Indian Language Voice (BYOK)
         </button>
       </div>
 
@@ -378,7 +378,7 @@ export default function GnaniVoiceStudio({
             <KeyRound size={15} />
             <strong>
               {ttsEngine === 'sarvam_byok'
-                ? 'Sarvam AI (Bulbul v1) API Key (Saved in localStorage)'
+                ? 'Indian Language Voice API Key (Saved in localStorage)'
                 : 'Gnani Timbre v2.5 API Key (Saved in localStorage)'}
             </strong>
             <span>{(ttsEngine === 'sarvam_byok' ? activeSarvamKey : activeGnaniKey) ? 'KEY UNLOCKED' : 'KEY REQUIRED'}</span>
@@ -393,8 +393,8 @@ export default function GnaniVoiceStudio({
               placeholder={
                 ttsEngine === 'sarvam_byok'
                   ? savedSarvamKey
-                    ? '•••••••••••••••••••••••• (Sarvam key active)'
-                    : 'Enter your Sarvam AI API subscription key…'
+                    ? '•••••••••••••••••••••••• (Indian voice key active)'
+                    : 'Enter your Indian language voice API key…'
                   : savedGnaniKey
                   ? '•••••••••••••••••••••••• (Gnani key active)'
                   : 'Enter your Gnani Timbre v2.5 API key…'
@@ -528,7 +528,7 @@ export default function GnaniVoiceStudio({
         <span>
           <strong>Distinct Executive Voice &amp; Zero-Billing Guardrail</strong>
           <small>
-            Uses a formal executive pitch (0.96x) or Kokoro/Sarvam/Gnani neural models—distinct from the INSI Dove assistant&apos;s task confirmation voice.
+            Uses a formal executive pitch (0.96x) or local neural and Indian-language BYOK speech engines—distinct from the INSI Dove assistant&apos;s task confirmation voice.
           </small>
         </span>
       </div>
