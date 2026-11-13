@@ -58,7 +58,7 @@ const HEY_PREFIX_COMMAND_REGEX = /^\s*(?:hey|hi|hello|ok|okay|wake\s+up|listen)(
 export function normalizeSpeechTranscript(rawInput = '') {
   return String(rawInput || '')
     .replace(/\b(?:hey[\s,:.-]*)?I[\s.\-_]*N[\s.\-_]*S[\s.\-_]*I\b/gi, 'Hey Inci')
-    .replace(/\b(?:hey[\s,.-]*)?in[\s.\-_]*c[\s.\-_]*i\b/gi, 'Inci')
+    .replace(/\b(?:hey[\s,.-]*)?in[\s.\-_]*c[\s.\-_]*i\b/gi, 'Hey Inci')
     .replace(/\b(?:in[\s\-_]*see|in[\s\-_]*sea|insee|incy|insy)\b/gi, 'Inci')
     .replace(/\bN[\s.\-_]*C[\s.\-_]*I\b/gi, 'Inci')
     .replace(/\s+/g, ' ')
