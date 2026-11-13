@@ -1,21 +1,21 @@
 {
   "product": "InsightBoard VDB",
   "displayName": "InsightBoard VDB (Visual Dashboard)",
-  "websiteVersion": "3.0.0",
-  "apiVersion": "3.0.0",
-  "windowsPackageVersion": "3.0.0.0",
-  "androidApkVersion": "3.0.0",
+  "websiteVersion": "3.0.1",
+  "apiVersion": "3.0.1",
+  "windowsPackageVersion": "3.0.1.0",
+  "androidApkVersion": "3.0.1",
   "releaseChannel": "production",
-  "releasedAt": "2026-11-10",
-  "minimumSupportedApiVersion": "3.0.0",
+  "releasedAt": "2026-11-14",
+  "minimumSupportedApiVersion": "3.0.1",
   "notes": [
-    "INSI (insi.ai) v3.0 Autonomous Executive Data Operator with hands-free 'Hey INSI' wake-word recognition and phonetic STT support.",
-    "Separated 3-Mode Universal Data Connector (Mode A Offline Sandbox, Mode B Drag-and-Drop POS/ERP CSV & JSON, Mode C Live Webhook & OpenAPI 3.1 External AI Bridge).",
-    "Usage & Quotas zero-billing governance for Google Gemini, Supabase, MongoDB Atlas, and Microsoft Azure.",
-    "Synchronized Web, API, Microsoft Store PWA (3.0.0.0), and Android APK (v3.0.0) builds."
+    "Fixed the Hey Inci wake-phrase normalization regression and aligned its automated test coverage.",
+    "Removed the sticky top header behavior that obscured dashboard content and made studio tabs responsive on narrow screens.",
+    "Preserved existing dashboard data flows, charting, exports, authentication, database integrations, and AI provider configuration.",
+    "Synchronized production web, API, Windows Store submission metadata, and Android APK build version to 3.0.1."
   ],
   "updatePolicy": {
-    "websiteAndApi": "Synchronized production runtime at v3.0.0.",
-    "windowsPackage": "Synchronized Microsoft Store MSIX/PWA (3.0.0.0) and Android APK (v3.0.0) packages."
+    "websiteAndApi": "Synchronized production runtime at v3.0.1.",
+    "windowsPackage": "Windows Store PWA submission metadata synchronized to 3.0.1.0; the Store rollout remains subject to Partner Center submission and approval. Android APK package version v3.0.1."
   }
 }
