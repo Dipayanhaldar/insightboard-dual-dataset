@@ -54,7 +54,7 @@ export default function InsiPetBot({
   emptyDashboard = false,
   onVoiceCommandAction
 }) {
-  // Visual Dove States — Invisible by default until summoned by "Hey, INSI" or command
+  // Visual Dove States — Invisible by default until summoned by "Hey, Inci" or command
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [animState, setAnimState] = useState('perched');
@@ -83,7 +83,7 @@ export default function InsiPetBot({
     eyeY: 0
   });
   const [isOrbitingTask, setIsOrbitingTask] = useState(false);
-  const [statusBubbleText, setStatusBubbleText] = useState('Standing on Project Dossier · Say "Hey, INSI"');
+  const [statusBubbleText, setStatusBubbleText] = useState('Standing on Project Dossier · Say "Hey, Inci"');
 
   // Assistant Panel & Local Command Router States
   const [panelOpen, setPanelOpen] = useState(false);
@@ -95,9 +95,9 @@ export default function InsiPetBot({
     {
       id: 'welcome',
       kind: 'info',
-      title: 'INSI Dove Assistant · Always Listening ("Hey, INSI")',
+      title: 'INSI Dove Assistant · Always Listening ("Hey, Inci")',
       detail:
-        'Automatic browser microphone wake-word detection is active. Say "Hey, INSI" anytime to summon the dove, fly across the workspace, download reports, or switch datasets.'
+        'Automatic browser microphone wake-word detection is active. Say "Hey, Inci" anytime to summon the dove, fly across the workspace, download reports, or switch datasets.'
     }
   ]);
 
@@ -109,7 +109,7 @@ export default function InsiPetBot({
   const [newRouteCommand, setNewRouteCommand] = useState('');
   const [newRouteConfirm, setNewRouteConfirm] = useState(false);
 
-  // Voice & Speech Synthesis States (Auto-enabled: requests browser mic permission automatically & always listens for "Hey, INSI")
+  // Voice & Speech Synthesis States (Auto-enabled: requests browser mic permission automatically & always listens for "Hey, Inci")
   const speechSupported = useMemo(() => {
     if (typeof window === 'undefined') return false;
     return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
@@ -616,7 +616,7 @@ export default function InsiPetBot({
         rows: ctx.rows,
         fields: ctx.fields,
         datasetName: ctx.datasetName,
-        command: `Hey, INSI, ${cleanCmd}`,
+        command: `Hey, Inci, ${cleanCmd}`,
         activeMode: 'demo_sandbox'
       });
 
@@ -650,8 +650,8 @@ export default function InsiPetBot({
   );
 
   /**
-   * Primary Command Handler for both Voice ("Hey, INSI") and Text Input:
-   * 1. Normalizes speech transcript ("Hey, INSI", "Hey I N S I", "Hey Insee", "Wake up Insee")
+   * Primary Command Handler for both Voice ("Hey, Inci") and Text Input:
+   * 1. Normalizes speech transcript ("Hey, Inci", "Hey Inci", "Hey Inci", "Wake up Inci")
    * 2. Evaluates against the Local Editable Command Router (`matchLocalCommandRouter`)
    * 3. Handles unrecognized commands honestly (never fakes or invents a completed action)
    * 4. Prompts for confirmation before consequential actions
@@ -689,7 +689,7 @@ export default function InsiPetBot({
       const strippedCmd = (wake.wakeWordDetected ? wake.cleanCommand : normalized).trim();
       const ctx = latestContextRef.current;
 
-      // Check bare wake greeting ("Hey, INSI", "Hey I N S I", "Hey Insee", "Wake up Insee", "Are you listening")
+      // Check bare wake greeting ("Hey, Inci", "Hey Inci", "Hey Inci", "Wake up Inci", "Are you listening")
       if (
         /^(?:give me an executive overview of the active dataset|wake\s+up.*|hey.*|insi|are\s+you\s+listening.*|can\s+you\s+hear\s+me.*|hello|hi)$/i.test(
           strippedCmd
@@ -699,17 +699,17 @@ export default function InsiPetBot({
         )
       ) {
         triggerTaskFlightOrbit('Awake & flying across your active workspace!');
-        const wakeReply = `INSI is awake and perched on your ${activeTabLabel} tab with ${ctx.rows.length} records in ${ctx.datasetName}. Say "Hey, INSI, switch to Hyderabad Metro", "Highlight top 3 leaders", or "Open data table".`;
+        const wakeReply = `Inci is awake and perched on your ${activeTabLabel} tab with ${ctx.rows.length} records in ${ctx.datasetName}. Say "Hey, Inci, switch to Hyderabad Metro", "Highlight top 3 leaders", or "Open data table".`;
         if (speakReply) speakWithoutEcho(wakeReply);
         appendLog({
           kind: 'info',
-          title: `Wake Phrase Recognized ("${wake.matchedWakePhrase || 'Hey, INSI'}")`,
+          title: `Wake Phrase Recognized ("${wake.matchedWakePhrase || 'Hey, Inci'}")`,
           detail: wakeReply
         });
         if (ctx.onVoiceCommandAction) {
           ctx.onVoiceCommandAction({
             type: 'security_scan',
-            spoken: `🕊️ INSI Awake ("${normalized}"): ${wakeReply}`
+            spoken: `🕊️ Inci Awake ("${normalized}"): ${wakeReply}`
           });
         }
         return null;
@@ -784,7 +784,7 @@ export default function InsiPetBot({
 
   /**
    * Starts and maintains persistent browser SpeechRecognition so the website and integrated AI
-   * ALWAYS listen for "Hey, INSI" automatically with auto browser mic permission.
+   * ALWAYS listen for "Hey, Inci" automatically with auto browser mic permission.
    */
   const startExplicitVoiceSession = useCallback(
     async (mode = 'continuous', { silent = false } = {}) => {
@@ -815,7 +815,7 @@ export default function InsiPetBot({
             setVoiceStatus('permission_denied');
             if (!silent) {
               setVoiceErrorMsg(
-                'Browser microphone permission is blocked. Please allow microphone access in the browser address bar so INSI can hear "Hey, INSI".'
+                'Browser microphone permission is blocked. Please allow microphone access in the browser address bar so INSI can hear "Hey, Inci".'
               );
             }
             return;
@@ -851,7 +851,7 @@ export default function InsiPetBot({
             setStatusBubbleText(
               voiceModeRef.current === 'ptt'
                 ? 'Speak your command now…'
-                : 'Listening for "Hey, INSI"…'
+                : 'Listening for "Hey, Inci"…'
             );
           };
 
@@ -963,21 +963,21 @@ export default function InsiPetBot({
       if (!silent) {
         appendLog({
           kind: 'info',
-          title: mode === 'ptt' ? 'Instant Command Listening Active' : 'Always-On "Hey, INSI" Listener Active',
+          title: mode === 'ptt' ? 'Instant Command Listening Active' : 'Always-On "Hey, Inci" Listener Active',
           detail:
             mode === 'ptt'
               ? 'Speak your command now—no wake phrase required.'
-              : 'Automatically listening while the website is open. Say "Hey, INSI" followed by your command.'
+              : 'Automatically listening while the website is open. Say "Hey, Inci" followed by your command.'
         });
       }
     },
     [appendLog, handleSpokenTranscript]
   );
 
-  // Automatic Browser Microphone Permission & Persistent Always-On "Hey, INSI" Wake-Word Engine:
+  // Automatic Browser Microphone Permission & Persistent Always-On "Hey, Inci" Wake-Word Engine:
   // 1. Immediately requests microphone permission and starts continuous listening on mount.
   // 2. Automatically unlocks/resumes on any user interaction, tab focus, or visibility change.
-  // 3. Keeps a lightweight watchdog interval so "Hey, INSI" never stops listening.
+  // 3. Keeps a lightweight watchdog interval so "Hey, Inci" never stops listening.
   useEffect(() => {
     if (typeof window === 'undefined' || !speechSupported) return undefined;
     let cancelled = false;
@@ -1010,7 +1010,7 @@ export default function InsiPetBot({
     window.addEventListener('focus', onVisibilityOrFocus, { passive: true });
     document.addEventListener('visibilitychange', onVisibilityOrFocus, { passive: true });
 
-    // 3. Watchdog timer to keep "Hey, INSI" always active while the page is open
+    // 3. Watchdog timer to keep "Hey, Inci" always active while the page is open
     const watchdog = setInterval(() => {
       if (!cancelled && document.visibilityState === 'visible' && !isListeningRef.current) {
         ensureListeningActive();
@@ -1272,7 +1272,7 @@ export default function InsiPetBot({
 
   return (
     <>
-      {/* 1. Animated INSI Dove Avatar (Invisible until called by "Hey, INSI"; stands on Project Dossier button) */}
+      {/* 1. Animated INSI Dove Avatar (Invisible until called by "Hey, Inci"; stands on Project Dossier button) */}
       {visible && (
         <div
           className={`insi-pet-stage ${leaving ? 'insi-leaving' : 'insi-entering'} state-${animState} prop-${activeProp} size-${sizeVariant} corner-${corner} ${
@@ -1294,7 +1294,7 @@ export default function InsiPetBot({
           role="button"
           tabIndex={0}
           aria-label={`INSI Dove Assistant (${animState}). Click to open or close INSI Assistant Panel.`}
-          title='INSI Dove Assistant — Standing on Project Dossier. Click to open controls or say "Hey, INSI"'
+          title='INSI Dove Assistant — Standing on Project Dossier. Click to open controls or say "Hey, Inci"'
           onClick={() => setPanelOpen((prev) => !prev)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -1412,7 +1412,7 @@ export default function InsiPetBot({
       )}
 
       {/* 2. Floating Bottom-Right Control Dock:
-          - Completely invisible until "Hey, INSI" summons the bird (NO "Enable Voice" button!)
+          - Completely invisible until "Hey, Inci" summons the bird (NO "Enable Voice" button!)
           - When the dove appears (`visible` or `panelOpen`), the "INSI Dove" button appears with it! */}
       {(visible || panelOpen) && (
         <div className="insi-floating-dock" role="region" aria-label="INSI Dove Assistant Controls">
@@ -1436,7 +1436,7 @@ export default function InsiPetBot({
               <strong>INSI Dove</strong>
               <small>
                 {isListeningActive
-                  ? '● Always Listening ("Hey, INSI")'
+                  ? '● Always Listening ("Hey, Inci")'
                   : 'Website Manager Active'}
               </small>
             </span>
@@ -1473,11 +1473,11 @@ export default function InsiPetBot({
               <div>
                 <h2 className="insi-panel-title">
                   INSI Dove Assistant
-                  <span className="insi-local-badge">Always-On Wake Word</span>
+                  <span className="insi-local-badge">Always-On Wake Phrase</span>
                 </h2>
                 <p className="insi-panel-subtitle">
-                  Default wake phrase: <strong>&ldquo;Hey, INSI&rdquo;</strong> (also recognizes{' '}
-                  <code>Hey I N S I</code>, <code>Hey Insee</code>, <code>Wake up Insee</code>)
+                  Default wake phrase: <strong>&ldquo;Hey, Inci&rdquo;</strong> (also recognizes{' '}
+                  <code>Hey Inci</code>, <code>Hey Inci</code>, <code>Wake up Inci</code>)
                 </p>
               </div>
             </div>
@@ -1495,7 +1495,7 @@ export default function InsiPetBot({
           <div className="insi-scope-banner">
             <span>🕊️</span>
             <p>
-              INSI automatically listens for <strong>&ldquo;Hey, INSI&rdquo;</strong> while this site is open. When
+              INSI automatically listens for <strong>&ldquo;Hey, Inci&rdquo;</strong> while this site is open. When
               called, the dove flies in, executes your command, and flies off when finished.
             </p>
           </div>
@@ -1506,7 +1506,7 @@ export default function InsiPetBot({
               <div className={`insi-voice-indicator status-${voiceStatus}`}>
                 <span className="pulse-dot" />
                 <span>
-                  {voiceStatus === 'listening_wake' && 'Always Listening Actively for "Hey, INSI"…'}
+                  {voiceStatus === 'listening_wake' && 'Always Listening Actively for "Hey, Inci"…'}
                   {voiceStatus === 'push_to_talk' && 'Instant Voice Command Active — Speak Now…'}
                   {voiceStatus === 'requesting_permission' && 'Requesting Browser Microphone Permission…'}
                   {voiceStatus === 'permission_denied' && 'Browser Mic Permission Blocked (Allow in Address Bar)'}
@@ -1534,7 +1534,7 @@ export default function InsiPetBot({
                 disabled={!speechSupported}
                 onClick={() => void startExplicitVoiceSession('continuous', { silent: false })}
               >
-                🟢 Auto-Listening (&ldquo;Hey, INSI&rdquo;)
+                🟢 Auto-Listening (&ldquo;Hey, Inci&rdquo;)
               </button>
 
               <button
@@ -1660,7 +1660,7 @@ export default function InsiPetBot({
                   type="text"
                   value={commandInput}
                   onChange={(e) => setCommandInput(e.target.value)}
-                  placeholder='Type a command (e.g., "Hey, INSI, switch to Hyderabad Metro" or "Top 3 leaders")…'
+                  placeholder='Type a command (e.g., "Hey, Inci, switch to Hyderabad Metro" or "Top 3 leaders")…'
                   className="insi-command-input"
                   aria-label="Type a command for INSI Dove Assistant"
                 />
@@ -1677,7 +1677,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, fly around workspace and perch on tab', {
+                      handleSpokenTranscript('Hey, Inci, fly around workspace and perch on tab', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1689,7 +1689,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, dance', {
+                      handleSpokenTranscript('Hey, Inci, dance', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1701,7 +1701,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, cast magic', {
+                      handleSpokenTranscript('Hey, Inci, cast magic', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1713,7 +1713,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, switch to Hyderabad Metro', {
+                      handleSpokenTranscript('Hey, Inci, switch to Hyderabad Metro', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1725,7 +1725,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, switch to Shopping Mall', {
+                      handleSpokenTranscript('Hey, Inci, switch to Shopping Mall', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1737,7 +1737,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, highlight top 3 leaders', {
+                      handleSpokenTranscript('Hey, Inci, highlight top 3 leaders', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1749,7 +1749,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, flag bottom 2 underperforming', {
+                      handleSpokenTranscript('Hey, Inci, flag bottom 2 underperforming', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1761,7 +1761,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, stand on Project Dossier', {
+                      handleSpokenTranscript('Hey, Inci, stand on Project Dossier', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1773,7 +1773,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, download PDF report', {
+                      handleSpokenTranscript('Hey, Inci, download PDF report', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1785,7 +1785,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, download Excel workbook', {
+                      handleSpokenTranscript('Hey, Inci, download Excel workbook', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1797,7 +1797,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, download CSV data', {
+                      handleSpokenTranscript('Hey, Inci, download CSV data', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1809,7 +1809,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, open data table', {
+                      handleSpokenTranscript('Hey, Inci, open data table', {
                         requireWakeWord: false,
                         speakReply: true
                       })
@@ -1821,7 +1821,7 @@ export default function InsiPetBot({
                     type="button"
                     className="insi-action-chip warning"
                     onClick={() =>
-                      handleSpokenTranscript('Hey, INSI, reset all filters', {
+                      handleSpokenTranscript('Hey, Inci, reset all filters', {
                         requireWakeWord: false,
                         speakReply: true
                       })
