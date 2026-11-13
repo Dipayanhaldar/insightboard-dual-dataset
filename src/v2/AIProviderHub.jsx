@@ -32,9 +32,9 @@ export const ZERO_COST_ENGINES = [
   {
     id: 'transformers_wasm',
     tier: 'Browser Edge (WASM/ONNX)',
-    name: 'Transformers.js (WASM / Android & Web)',
+    name: 'Mobile Local AI (ONNX / WASM)',
     defaultModel: 'Xenova/distilbart-cnn-6-6',
-    summary: 'Lightweight ONNX/WASM in-browser inference (`@huggingface/transformers`) that runs on both Android APK WebViews and desktop browsers.'
+    summary: 'Lightweight in-browser ONNX/WASM inference for mobile and desktop browsers.'
   },
   {
     id: 'webllm_edge',
@@ -352,9 +352,7 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
   useEffect(() => {
     try {
       const existing =
-        localStorage.getItem(`insightboard-byok-${selectedId}`) ||
-        sessionStorage.getItem(`insightboard-byok-${selectedId}`) ||
-        '';
+        localStorage.getItem(`insightboard-byok-${selectedId}`) || '';
       setSavedKey(existing);
       setApiKeyInput('');
     } catch {
@@ -405,7 +403,6 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
     }
     try {
       localStorage.setItem(`insightboard-byok-${selectedId}`, trimmed);
-      sessionStorage.setItem(`insightboard-byok-${selectedId}`, trimmed);
     } catch {}
     setSavedKey(trimmed);
     setApiKeyInput('');
@@ -417,7 +414,6 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
   function handleForgetKey() {
     try {
       localStorage.removeItem(`insightboard-byok-${selectedId}`);
-      sessionStorage.removeItem(`insightboard-byok-${selectedId}`);
     } catch {}
     setSavedKey('');
     setApiKeyInput('');
@@ -504,8 +500,8 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
           if (summaryText) {
             setEdgeProgress('');
             setAnswer(summaryText);
-            setAnswerMeta(`Transformers.js (WASM/ONNX In-Browser) · ${formatLabel(analysisMode)}`);
-            setNotice('Generated in-browser via Transformers.js WASM/ONNX.');
+            setAnswerMeta(`Mobile Local AI (ONNX/WASM) · ${formatLabel(analysisMode)}`);
+            setNotice('Generated locally in this browser using ONNX/WASM.');
             insi.celebrate();
             return;
           }
@@ -595,13 +591,13 @@ export default function AIProviderHub({ rows = [], fields = [], datasetName = ''
         <span className="ai-provider-icon"><Sparkles size={18} /></span>
         <div className="ai-provider-title-copy">
           <span className="v2-overline">MULTI-TIER ZERO-COST AI ENGINE + 10-PROVIDER BYOK HUB</span>
-          <h3 id="ai-provider-title">Keyless Cloud (Puter &amp; Pollinations), Edge WebLLM/WASM &amp; 10 BYOK Providers</h3>
+          <h3 id="ai-provider-title">Keyless Cloud AI, Edge AI &amp; 10 BYOK Providers</h3>
         </div>
         <span className="ai-provider-count">ZERO-KEY + 10 BYOK</span>
       </div>
 
       <p className="v2-muted" style={{ marginTop: 8, marginBottom: 14 }}>
-        Analyze <strong>{datasetName || 'your active dataset'}</strong> immediately with <strong>Zero API Keys</strong> using Puter.js, Pollinations.ai, Transformers.js (WASM), or WebLLM (WebGPU), or bring your own key from 10 cloud providers stored locally in your browser.
+        Analyze <strong>{datasetName || 'your active dataset'}</strong> immediately with <strong>Zero API Keys</strong> using keyless cloud AI or local browser AI, or bring your own key from 10 cloud providers stored locally in your browser.
       </p>
 
       {/* Tier 1 & Tier 2: Zero-Cost Keyless Cloud + Browser-Native Offline/Edge Selector */}
