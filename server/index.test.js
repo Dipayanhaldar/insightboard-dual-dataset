@@ -182,7 +182,7 @@ test('lifetime-free AI summary and retail optimization endpoints work without pe
   assert.ok(typeof optimizeBody.plan === 'string' && optimizeBody.plan.length > 40);
 });
 
-test('legacy Google sign-in endpoints are disabled; email/password remains the supported account flow', async () => {
+test('Google sign-in requires a verified Firebase ID token; email/password remains available', async () => {
   const portableRes = await fetch(`${baseUrl}/api/auth/google/portable`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -192,6 +192,20 @@ test('legacy Google sign-in endpoints are disabled; email/password remains the s
 
   const oauthUrlRes = await fetch(`${baseUrl}/api/auth/google/url`);
   assert.equal(oauthUrlRes.status, 404);
+
+  const forgedIdentityRes = await fetch(`${baseUrl}/api/auth/google/firebase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'mall.manager@corporate.com', name: 'Mall Manager' })
+  });
+  assert.equal(forgedIdentityRes.status, 401);
+
+  const invalidTokenRes = await fetch(`${baseUrl}/api/auth/google/firebase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken: 'not-a-firebase-id-token' })
+  });
+  assert.equal(invalidTokenRes.status, 401);
 
   const registerRes = await fetch(`${baseUrl}/api/auth/register`, {
     method: 'POST',
