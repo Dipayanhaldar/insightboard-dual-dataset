@@ -25,7 +25,11 @@ dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'insightboard-dev-fallback-secret-key-2026-min32chars';
+const isVercelRuntime = process.env.VERCEL === '1';
+const isProduction = process.env.NODE_ENV === 'production';
+// Never ship a predictable signing key. Local development gets an ephemeral key;
+// production must provide a strong JWT_SECRET or account routes fail closed.
+const JWT_SECRET = process.env.JWT_SECRET || (isProduction ? '' : `${randomUUID()}${randomUUID()}`);
 const TOKEN_LIFETIME = process.env.JWT_EXPIRES_IN || '8h';
 const boundedInt = (value, fallback, min, max) => {
   const parsed = Number.parseInt(value, 10);
@@ -34,15 +38,10 @@ const boundedInt = (value, fallback, min, max) => {
 const MAX_REPORTS = Math.min(100, Math.max(1, Number(process.env.MAX_REPORTS_PER_USER) || 20));
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || process.env.CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || process.env.CLIENT_SECRET || '';
 const APP_VERSION = process.env.API_VERSION || process.env.npm_package_version || '3.0.0';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDirectory = path.resolve(__dirname, '../dist');
 const publicDirectory = path.resolve(__dirname, '../public');
-const isVercelRuntime = process.env.VERCEL === '1';
-const isProduction = process.env.NODE_ENV === 'production';
-
 function getGeminiClient() {
   if (!GEMINI_API_KEY) return null;
   return new GoogleGenAI({
@@ -324,6 +323,13 @@ function sanitizeSnapshot(input) {
     })).filter(item => item.field)
   };
 }
+function requireAuthConfig(_req, res, next) {
+  if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    return res.status(503).json({ error: 'Account authentication is not configured on this server.' });
+  }
+  next();
+}
+
 function makeToken(user) {
   if (!JWT_SECRET || JWT_SECRET.length < 32) {
     throw new Error('JWT_SECRET is missing or too short. Configure a strong secret before using accounts.');
@@ -1479,7 +1485,7 @@ app.post('/api/voice/site-stt', voiceLimiter, asyncRoute(async (req, res) => {
   });
 }));
 
-app.post('/api/auth/register', authLimiter, requireDatabase, asyncRoute(async (req, res) => {
+app.post('/api/auth/register', authLimiter, requireAuthConfig, requireDatabase, asyncRoute(async (req, res) => {
   const email = safeText(req.body?.email, 254).toLowerCase();
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1514,7 +1520,7 @@ app.post('/api/auth/register', authLimiter, requireDatabase, asyncRoute(async (r
   });
 }));
 
-app.post('/api/auth/login', authLimiter, requireDatabase, asyncRoute(async (req, res) => {
+app.post('/api/auth/login', authLimiter, requireAuthConfig, requireDatabase, asyncRoute(async (req, res) => {
   const email = safeText(req.body?.email, 254).toLowerCase();
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   const user = req.useMemoryStore ? memoryUsers.get(email) : await User.findOne({ email }).select('+passwordHash');
@@ -1527,141 +1533,7 @@ app.post('/api/auth/login', authLimiter, requireDatabase, asyncRoute(async (req,
   });
 }));
 
-app.get('/api/auth/google/url', (req, res) => {
-  const origin = safeText(req.query?.origin || process.env.APP_URL || `${req.protocol}://${req.get('host')}`, 240).replace(/\/$/, '');
-  const redirectUri = `${origin}/auth/callback`;
-  if (!GOOGLE_CLIENT_ID) {
-    return res.json({
-      configured: false,
-      mode: 'portable-instant-google',
-      redirectUri
-    });
-  }
-  const params = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: 'openid email profile',
-    access_type: 'online',
-    prompt: 'select_account'
-  });
-  return res.json({
-    configured: true,
-    mode: 'google-oauth-popup',
-    url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
-    redirectUri
-  });
-});
-
-app.post('/api/auth/google/portable', authLimiter, requireDatabase, asyncRoute(async (req, res) => {
-  const email = safeText(req.body?.email || 'manager@insightboard.vdb', 254).toLowerCase();
-  const name = safeText(req.body?.name || 'Retail Operations Manager', 120);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ error: 'Enter a valid Google workspace email address.' });
-  }
-  let user;
-  if (req.useMemoryStore) {
-    user = memoryUsers.get(email);
-    if (!user) {
-      user = {
-        _id: new mongoose.Types.ObjectId(),
-        email,
-        name,
-        provider: 'google',
-        passwordHash: await bcrypt.hash(randomUUID(), 10),
-        createdAt: new Date()
-      };
-      memoryUsers.set(email, user);
-      memoryUsersById.set(user._id.toString(), user);
-    }
-  } else {
-    user = await User.findOne({ email });
-    if (!user) {
-      user = await User.create({
-        email,
-        passwordHash: await bcrypt.hash(randomUUID(), 10)
-      });
-    }
-  }
-  return res.json({
-    token: makeToken(user),
-    user: { id: user._id.toString(), email: user.email, name, provider: 'google' }
-  });
-}));
-
-const handleGoogleOAuthCallback = asyncRoute(async (req, res) => {
-  const code = safeText(req.query?.code, 512);
-  const origin = `${req.protocol}://${req.get('host')}`;
-  const redirectUri = `${origin}/auth/callback`;
-  if (!code || !GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-    return res.send(`<!doctype html><html><body><script>
-      if (window.opener) {
-        window.opener.postMessage({ type: 'OAUTH_AUTH_ERROR', error: 'Google OAuth credentials are not configured on this host.' }, '*');
-        window.close();
-      } else { window.location.href = '/'; }
-    </script><p>Returning to InsightBoard VDB...</p></body></html>`);
-  }
-  try {
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: GOOGLE_CLIENT_ID,
-        client_secret: GOOGLE_CLIENT_SECRET,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code'
-      })
-    });
-    const tokenData = await tokenRes.json().catch(() => ({}));
-    if (!tokenRes.ok || !tokenData.access_token) {
-      throw new Error('Could not exchange Google authorization code.');
-    }
-    const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` }
-    });
-    const profile = await profileRes.json().catch(() => ({}));
-    const email = safeText(profile?.email, 254).toLowerCase();
-    const name = safeText(profile?.name || email, 120);
-    if (!email) throw new Error('Google profile did not include an email address.');
-
-    let user = memoryUsers.get(email);
-    if (!user) {
-      user = {
-        _id: new mongoose.Types.ObjectId(),
-        email,
-        name,
-        provider: 'google',
-        passwordHash: await bcrypt.hash(randomUUID(), 10),
-        createdAt: new Date()
-      };
-      memoryUsers.set(email, user);
-      memoryUsersById.set(user._id.toString(), user);
-    }
-    const jwtToken = makeToken(user);
-    const payload = JSON.stringify({
-      type: 'OAUTH_AUTH_SUCCESS',
-      token: jwtToken,
-      user: { id: user._id.toString(), email: user.email, name, provider: 'google' }
-    });
-    return res.send(`<!doctype html><html><body><script>
-      if (window.opener) {
-        window.opener.postMessage(${payload}, '*');
-        window.close();
-      } else { window.location.href = '/'; }
-    </script><p>Google Sign-In complete. Closing window...</p></body></html>`);
-  } catch (err) {
-    const safeMsg = JSON.stringify({ type: 'OAUTH_AUTH_ERROR', error: err?.message || 'Google Sign-In failed' });
-    return res.send(`<!doctype html><html><body><script>
-      if (window.opener) {
-        window.opener.postMessage(${safeMsg}, '*');
-        window.close();
-      } else { window.location.href = '/'; }
-    </script><p>Authentication failed. Closing window...</p></body></html>`);
-  }
-});
-
-app.get(['/auth/callback', '/auth/callback/'], handleGoogleOAuthCallback);
+// Google sign-in was removed. Email/password is the only supported account flow.
 
 app.get('/api/auth/me', requireDatabase, requireAuth, asyncRoute(async (req, res) => {
   const user = req.useMemoryStore ? memoryUsersById.get(req.auth.sub) : await User.findById(req.auth.sub).select('_id email');
