@@ -22,6 +22,7 @@ import {
 
 const DOVE_IMAGE_URL = '/assets/aistudio/rock-dove-columbidae-bird-ai-generated-free-png_0065e921.webp';
 const ROUTER_STORAGE_KEY = 'insightboard_insi_command_router_v1';
+const FEMALE_INDIAN_VOICE_NAME = /female|woman|girl|aarti|aditi|anjali|asha|bhavna|chitra|devika|divya|heera|kavya|kaveri|lekha|meera|neerja|priya|reshma|sita|sneha|swara|trupti|vaidehi|vidya|sunita|mary|lalitha/i;
 
 const CORNER_POSITIONS = {
   'bottom-right': { bottom: '78px', right: '22px', top: 'auto', left: 'auto' },
@@ -497,8 +498,8 @@ export default function InsiPetBot({
           // Pick the 2nd Indian voice if multiple exist so it differs from the default 1st voice used by Summary,
           // or prefer Heera / Rishi / Lekha / Google Hindi
           chosenVoice =
-            indianVoices.find((v) => /rishi|heera|lekha|neerja|swara|हिन्दी/i.test(v.name)) ||
-            indianVoices[1] ||
+            indianVoices.find((v) => FEMALE_INDIAN_VOICE_NAME.test(`${v.name} ${v.voiceURI}`)) ||
+            indianVoices.find((v) => /heera|lekha|neerja|swara|हिन्दी/i.test(v.name)) ||
             indianVoices[0] ||
             voices.find((v) => /en[-_](GB|AU|US)/i.test(v.lang)) ||
             voices[0];
@@ -1566,7 +1567,7 @@ export default function InsiPetBot({
             {/* Distinct Indian Voice Selector + Motion Controls */}
             <div className="insi-voice-prefs-row">
               <label className="insi-pref-label">
-                <span>Task Voice (Distinct from Summary):</span>
+                <span>Task Voice (Female-first Indian voice):</span>
                 <select
                   value={selectedVoiceURI}
                   onChange={(e) => setSelectedVoiceURI(e.target.value)}
@@ -1574,7 +1575,7 @@ export default function InsiPetBot({
                   aria-label="Select Indian Voice for INSI Task Completion"
                 >
                   <option value="indian_distinct_auto">
-                    🇮🇳 Auto Distinct Indian Voice (Pitch 1.18x · Avian Chime)
+                    🇮🇳 Auto Female-First Indian Voice (device dependent)
                   </option>
                   {selectableVoices.map((v) => (
                     <option key={v.voiceURI || v.name} value={v.voiceURI || v.name}>
