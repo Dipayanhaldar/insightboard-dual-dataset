@@ -33,17 +33,20 @@ const GNANI_VOICES_BY_LANG = {
 const SARVAM_SPEAKERS = ['meera', 'pavithra', 'maitreyi', 'arvind', 'amol', 'amartya'];
 
 const LANGUAGES = [
-  ['en-IN', 'English (India)'],
-  ['hi-IN', 'Hindi — हिन्दी'],
-  ['te-IN', 'Telugu — తెలుగు'],
-  ['ta-IN', 'Tamil — தமிழ்'],
-  ['kn-IN', 'Kannada — ಕನ್ನಡ'],
-  ['ml-IN', 'Malayalam — മലയാളം'],
-  ['mr-IN', 'Marathi — मराठी'],
-  ['bn-IN', 'Bengali — বাংলা'],
-  ['gu-IN', 'Gujarati — ગુજરાતી'],
-  ['pa-IN', 'Punjabi — ਪੰਜਾਬੀ']
+  ['en-IN', 'Indian English'], ['hi-IN', 'Hindi — हिन्दी'], ['bn-IN', 'Bengali — বাংলা'],
+  ['te-IN', 'Telugu — తెలుగు'], ['ta-IN', 'Tamil — தமிழ்'], ['kn-IN', 'Kannada — ಕನ್ನಡ'],
+  ['ml-IN', 'Malayalam — മലയാളം'], ['mr-IN', 'Marathi — मराठी'], ['gu-IN', 'Gujarati — ગુજરાતી'],
+  ['pa-IN', 'Punjabi — ਪੰਜਾਬੀ'], ['or-IN', 'Odia — ଓଡ଼ିଆ'], ['as-IN', 'Assamese — অসমীয়া'],
+  ['ur-IN', 'Urdu — اردو'], ['sa-IN', 'Sanskrit — संस्कृतम्'], ['mni-IN', 'Manipuri'],
+  ['brx-IN', 'Bodo'], ['kok-IN', 'Konkani'], ['mai-IN', 'Maithili'], ['doi-IN', 'Dogri'],
+  ['ne-IN', 'Nepali — नेपाली'], ['sat-IN', 'Santali'], ['sd-IN', 'Sindhi — سنڌي']
 ];
+
+const FEMALE_VOICE_NAME = /female|woman|girl|aarti|aditi|anjali|asha|bhavna|charvi|chitra|devika|divya|heera|jahnavi|jaya|kavitha|kaveri|kavya|lekha|lalitha|malini|mary|meera|neerja|neha|nalini|priya|reshma|riya|sita|sneha|sunita|swara|trupti|vaidehi|vidya|suhana|lavanya|yukti|varuni|asmita|trisha|brinda|zahira|kirra|falak|mehuli/i;
+
+function isLikelyFemaleVoice(voice) {
+  return FEMALE_VOICE_NAME.test(`${voice?.name || ''} ${voice?.voiceURI || ''}`);
+}
 
 export default function GnaniVoiceStudio({
   rows = [],
@@ -80,6 +83,31 @@ export default function GnaniVoiceStudio({
   const [ttsError, setTtsError] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
   const [spokenStatus, setSpokenStatus] = useState('');
+  const [browserVoices, setBrowserVoices] = useState([]);
+  const [browserVoiceURI, setBrowserVoiceURI] = useState('');
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return undefined;
+    const refresh = () => setBrowserVoices(window.speechSynthesis.getVoices?.() || []);
+    refresh();
+    window.speechSynthesis.addEventListener?.('voiceschanged', refresh);
+    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', refresh);
+  }, []);
+
+  const languageBrowserVoices = useMemo(() => {
+    const prefix = language.split('-')[0].toLowerCase();
+    return browserVoices.filter((item) => String(item.lang || '').toLowerCase().startsWith(prefix));
+  }, [browserVoices, language]);
+  const femaleBrowserVoices = useMemo(
+    () => languageBrowserVoices.filter(isLikelyFemaleVoice),
+    [languageBrowserVoices]
+  );
+
+  useEffect(() => {
+    if (!femaleBrowserVoices.some((item) => item.voiceURI === browserVoiceURI)) {
+      setBrowserVoiceURI(femaleBrowserVoices[0]?.voiceURI || '');
+    }
+  }, [femaleBrowserVoices, browserVoiceURI]);
 
   const availableVoices = useMemo(() => {
     if (ttsEngine === 'sarvam_byok') return SARVAM_SPEAKERS;
@@ -162,64 +190,36 @@ export default function GnaniVoiceStudio({
   async function playFreeKokoroOrIndianBrowserVoice() {
     setTtsBusy(true);
     setTtsError('');
-    setSpokenStatus('Initializing expressive neural voice…');
-    summonInsi('voice', 'insi.ai · Speaking dataset summary with Zero-Key Neural TTS…');
-
+    setSpokenStatus('Preparing a free female voice from this device…');
     try {
-      // Attempt local ONNX WebAudio synthesis when running in English on capable browser
-      if (language.startsWith('en')) {
-        try {
-          const kokoroMod = await import(/* @vite-ignore */ 'https://esm.run/kokoro-js');
-          if (kokoroMod?.KokoroTTS) {
-            setSpokenStatus('Loading local neural voice model…');
-            const tts = await kokoroMod.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-ONNX', {
-              dtype: 'q8'
-            });
-            const audio = await tts.generate(dataSummaryScript.slice(0, 480), {
-              voice: 'af_bella'
-            });
-            if (audio?.toBlob) {
-              const wavBlob = await audio.toBlob();
-              if (audioUrl) URL.revokeObjectURL(audioUrl);
-              const nextUrl = URL.createObjectURL(wavBlob);
-              setAudioUrl(nextUrl);
-              setSpokenStatus('Local neural audio ready (zero key)!');
-              summonInsi('success', 'insi.ai · Local neural speech ready!');
-              setTtsBusy(false);
-              return;
-            }
-          }
-        } catch {
-          // Graceful fallback to Indian Browser SpeechSynthesis (distinct formal executive voice)
-        }
+      if (typeof window === 'undefined' || !window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
+        throw new Error('This browser does not provide text-to-speech. Try Chrome on Android or install a device voice engine.');
       }
-
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(dataSummaryScript);
-        utter.lang = language;
-        // Formal executive summary cadence (pitch 0.96, rate = speed) — distinct from INSI Dove's 1.18x avian voice!
-        utter.pitch = 0.96;
-        utter.rate = Number(speed) || 1.0;
-
-        const voices = window.speechSynthesis.getVoices?.() || [];
-        const matchedVoice =
-          voices.find((v) => v.lang?.toLowerCase() === language.toLowerCase()) ||
-          voices.find((v) => /en[-_]IN|hi[-_]IN/i.test(v.lang)) ||
-          voices[0];
-        if (matchedVoice) utter.voice = matchedVoice;
-
-        utter.onend = () => {
-          setSpokenStatus(`Completed speaking summary in ${language}.`);
-        };
-        window.speechSynthesis.speak(utter);
-        setSpokenStatus(`Speaking dataset summary aloud (${matchedVoice?.name || language} · Zero API Key)…`);
-        summonInsi('success', 'insi.ai · Speaking executive summary aloud');
-      } else {
-        throw new Error('Browser SpeechSynthesis is unavailable on this device.');
+      const voices = window.speechSynthesis.getVoices?.() || [];
+      const prefix = language.split('-')[0].toLowerCase();
+      const matching = voices.filter((item) => String(item.lang || '').toLowerCase().startsWith(prefix));
+      const female = matching.filter(isLikelyFemaleVoice);
+      const chosen = female.find((item) => item.voiceURI === browserVoiceURI) || female[0];
+      if (!chosen) {
+        const installed = matching.map((item) => item.name).filter(Boolean);
+        throw new Error(installed.length
+          ? `No clearly identifiable female ${language} voice is installed. Available device voices: ${installed.join(', ')}. Install a female voice for this language in your device Text-to-speech settings, then reload InsightBoard.`
+          : `No ${language} voice is installed on this device. Install its voice data in Android Settings → Text-to-speech output, then reload InsightBoard.`);
       }
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(dataSummaryScript);
+      utter.lang = language;
+      utter.voice = chosen;
+      utter.pitch = 1.04;
+      utter.rate = Number(speed) || 1;
+      utter.onend = () => setSpokenStatus(`Finished · ${chosen.name} · ${language} · free device voice`);
+      utter.onerror = (event) => setTtsError(event?.error || 'The selected device voice could not speak this text.');
+      window.speechSynthesis.speak(utter);
+      setSpokenStatus(`Speaking with ${chosen.name} · ${language} · female voice preferred · no API key`);
+      summonInsi('success', 'insi.ai · Free device voice started');
     } catch (err) {
       setTtsError(err?.message || 'Could not play speech.');
+      setSpokenStatus('');
     } finally {
       setTtsBusy(false);
     }
@@ -336,14 +336,14 @@ export default function GnaniVoiceStudio({
       <div className="v2-card-title gnani-title-row">
         <div className="gnani-mark"><Headphones size={19} /></div>
         <div className="gnani-heading-copy">
-          <span className="v2-overline">EXPRESSIVE INDIAN VOICE STUDIO · FREE LOCAL VOICE &amp; INDIAN BYOK</span>
+          <span className="v2-overline">MULTILINGUAL INDIAN VOICE STUDIO · FREE DEVICE VOICE</span>
           <h3 id="gnani-title">Data-Dependent Multilingual Voice Summary</h3>
         </div>
-        <span className="gnani-status ready">ZERO-KEY + INDIAN BYOK</span>
+        <span className="gnani-status ready">FREE DEVICE VOICE</span>
       </div>
 
       <p className="v2-muted gnani-intro">
-        Listen to an executive briefing generated from <strong>{datasetName || 'Active Dataset'}</strong> ({rows.length.toLocaleString()} records) using <strong>Free local neural/browser speech</strong> (no API key required), or an Indian-language BYOK voice provider.
+        Listen to an executive briefing generated from <strong>{datasetName || 'Active Dataset'}</strong> ({rows.length.toLocaleString()} records) using <strong>Free device text-to-speech</strong> (no API key required), or an Indian-language BYOK voice provider.
       </p>
 
       {/* Voice Engine Tier Selector */}
@@ -353,7 +353,7 @@ export default function GnaniVoiceStudio({
           className={`v2-button ${ttsEngine === 'kokoro_free' ? 'primary' : 'secondary'} btn-3d`}
           onClick={() => setTtsEngine('kokoro_free')}
         >
-          <Volume2 size={14} /> Free Local Neural / Browser Voice (No Key)
+          <Volume2 size={14} /> Free Female Device Voice (No API)
         </button>
         <button
           type="button"
@@ -434,19 +434,19 @@ export default function GnaniVoiceStudio({
 
         <label className="v2-field">
           <span>
-            <Volume2 size={13} /> 2. Select Voice Model <small>{availableVoices.length} voices for {language}</small>
+            <Volume2 size={13} /> 2. Select Voice Model <small>{ttsEngine === 'kokoro_free' ? `${femaleBrowserVoices.length} detected female voices for ${language}` : `${availableVoices.length} provider voices`}</small>
           </span>
-          <select
-            value={voice}
-            onChange={(e) => {
-              playButtonClick();
-              setVoice(e.target.value);
-            }}
-          >
-            {availableVoices.map((v) => (
-              <option key={v} value={v}>{v} ({language})</option>
-            ))}
-          </select>
+          {ttsEngine === 'kokoro_free' ? (
+            <select value={browserVoiceURI} onChange={(e) => { playButtonClick(); setBrowserVoiceURI(e.target.value); }}>
+              {femaleBrowserVoices.length ? femaleBrowserVoices.map((item) => (
+                <option key={item.voiceURI} value={item.voiceURI}>{item.name} ({item.lang}) · female match</option>
+              )) : <option value="">No female voice detected for this language</option>}
+            </select>
+          ) : (
+            <select value={voice} onChange={(e) => { playButtonClick(); setVoice(e.target.value); }}>
+              {availableVoices.map((v) => <option key={v} value={v}>{v} ({language})</option>)}
+            </select>
+          )}
         </label>
 
         <label className="v2-field">
@@ -484,7 +484,7 @@ export default function GnaniVoiceStudio({
           {ttsBusy ? (
             <><RefreshCw size={15} className="v2-spin" /> Synthesizing Dataset Voice Summary…</>
           ) : (
-            <><Play size={15} /> {ttsEngine === 'kokoro_free' ? `Listen Now with Free Neural Voice (${language})` : `Generate & Listen (${voice} · ${language})`}</>
+            <><Play size={15} /> {ttsEngine === 'kokoro_free' ? `Listen with Free Female Device Voice (${language})` : `Generate & Listen (${voice} · ${language})`}</>
           )}
         </button>
 
@@ -528,7 +528,7 @@ export default function GnaniVoiceStudio({
         <span>
           <strong>Distinct Executive Voice &amp; Zero-Billing Guardrail</strong>
           <small>
-            Uses a formal executive pitch (0.96x) or local neural and Indian-language BYOK speech engines—distinct from the INSI Dove assistant&apos;s task confirmation voice.
+            Uses free female-preferred device speech or optional Indian-language BYOK speech engines—distinct from the INSI Dove assistant&apos;s task confirmation voice.
           </small>
         </span>
       </div>
