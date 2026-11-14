@@ -121,3 +121,15 @@ The workflow `.github/workflows/release-windows-store-and-apk.yml` runs automati
 ## Future Monetization Readiness
 
 InsightBoard VDB `v2.1.0` is structured so future commercial tiers (such as multi-mall portfolio benchmarking, automated tenant billing exports, scheduled WhatsApp/Email executive digests, or enterprise SSO) can be toggled cleanly via user account roles in `/api/auth/*` without breaking the lifetime-free core analytics workflow.
+
+
+## Google sign-in (Firebase Authentication)
+
+InsightBoard's account panel supports both the existing email/password flow and Google sign-in through Firebase Authentication.
+
+1. In Firebase Console, open **Authentication → Sign-in method** and enable **Google**. Configure the OAuth client ID and client secret in the Firebase provider settings, not in frontend source code.
+2. Under **Authentication → Settings → Authorized domains**, add the production Vercel domain and any custom domain used by the website.
+3. The backend verifies Firebase ID tokens against Google's published signing certificates before issuing the existing InsightBoard API session. No OAuth client secret or Firebase service-account private key is required in Vercel environment variables for this verification flow.
+4. The project ID defaults to `banded-field-nbcxw`. Set `FIREBASE_PROJECT_ID` in the deployment environment only if the Firebase project changes. The existing `JWT_SECRET` requirement for InsightBoard API sessions remains unchanged.
+
+Google sign-in does not replace or remove email/password accounts. A Google account must return a verified email address.
