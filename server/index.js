@@ -1551,7 +1551,7 @@ app.post('/api/auth/google/firebase', authLimiter, requireAuthConfig, requireDat
   const email = safeText(claims.email, 254).toLowerCase();
   const isGoogleProvider = claims.firebase?.sign_in_provider === 'google.com';
   if (
-    !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
     claims.email_verified !== true ||
     !isGoogleProvider
   ) {
