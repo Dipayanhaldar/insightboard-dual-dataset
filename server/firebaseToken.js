@@ -20,7 +20,7 @@ async function getFirebaseSigningKeys(fetchImpl = fetch) {
     throw new Error('Firebase signing key response was invalid.');
   }
   const cacheControl = response.headers.get('cache-control') || '';
-  const maxAge = Number(cacheControl.match(/max-age=(\\d+)/i)?.[1] || 3600);
+  const maxAge = Number(cacheControl.match(/max-age=(\d+)/i)?.[1] || 3600);
   keyCache.set(FIREBASE_CERTS_URL, {
     keys,
     expiresAt: now + Math.max(60, Math.min(maxAge, 86400)) * 1000
