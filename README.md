@@ -40,8 +40,8 @@ All connected surfaces share the same semantic release version and are validated
   - **Zone & Tenant Space Productivity Matrix**: Visual bar chart comparing zone revenue vs. space efficiency (`₹/sq.ft`) and automated managerial action cards (*Underperforming Target Recovery*, *High-Footfall Conversion Gap*, *Rent Coverage Stress Alert*, *Anchor Expansion Signal*).
 - **Lifetime-Free Server AI Summary & Retail Optimization (`/api/ai/summary` & `/api/ai/optimize`)**:
   - Powered by server-side Google Gemini (`@google/genai`) when `GEMINI_API_KEY` is configured on the host, paired with an **always-on, lifetime-free server-side analytical engine fallback** so every user gets structured executive summaries and 5-point retail optimization plans with **zero personal API keys required**.
-- **Cross-Platform Portable Google Sign-In (`/api/auth/google/url`, `/auth/callback`, `/api/auth/google/portable`)**:
-  - Works seamlessly across Render, Vercel, custom domains, Windows Store PWA, Android APK, and cloud development environments without locking the codebase to a single hosting provider.
+- **Email & Password Account Access**:
+  - Saved report history uses the existing email/password registration and sign-in endpoints. Google sign-in endpoints are disabled; no email supplied by a client can be used to mint an account session.
 - **Automated Microsoft Store PWA + Android APK CI/CD (`.github/workflows/release-windows-store-and-apk.yml`)**:
   - Automatically validates the PWA build, compiles a downloadable `.apk` (`InsightBoard-VDB-v2.1.0.apk`), generates/submits the Microsoft Store Partner Center package update, and publishes both artifacts to **GitHub Releases**.
 
