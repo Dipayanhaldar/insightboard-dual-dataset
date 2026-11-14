@@ -1,5 +1,6 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import app from './index.js';
 
 let server;
@@ -20,6 +21,34 @@ after(async () => {
     server.close(error => error ? reject(error) : resolve());
     server.closeAllConnections?.();
   });
+});
+
+test('production account routes fail closed when JWT_SECRET is not configured', () => {
+  const script = `
+    import app from './server/index.js';
+    const server = app.listen(0, '127.0.0.1', async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:' + server.address().port + '/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'blocked@example.com', password: 'password12345' })
+        });
+        const body = await response.json();
+        if (response.status !== 503 || !String(body.error || '').includes('not configured')) process.exitCode = 1;
+      } catch {
+        process.exitCode = 1;
+      } finally {
+        server.close(() => process.exit(process.exitCode || 0));
+      }
+    });
+  `;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    timeout: 15000,
+    env: { ...process.env, NODE_ENV: 'production', JWT_SECRET: '' }
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });
 
 test('liveness probe is available without a database connection', async () => {
@@ -153,23 +182,37 @@ test('lifetime-free AI summary and retail optimization endpoints work without pe
   assert.ok(typeof optimizeBody.plan === 'string' && optimizeBody.plan.length > 40);
 });
 
-test('cross-platform Google OAuth URL and portable Google SSO endpoints function across hosts', async () => {
-  const urlRes = await fetch(`${baseUrl}/api/auth/google/url?origin=${encodeURIComponent(baseUrl)}`);
-  const urlBody = await urlRes.json();
-  assert.equal(urlRes.status, 200);
-  assert.equal(typeof urlBody.redirectUri, 'string');
-  assert.ok(urlBody.redirectUri.endsWith('/auth/callback'));
-
-  const ssoRes = await fetch(`${baseUrl}/api/auth/google/portable`, {
+test('Google sign-in requires a verified Firebase ID token; email/password remains available', async () => {
+  const portableRes = await fetch(`${baseUrl}/api/auth/google/portable`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'mall.manager@corporate.com', name: 'Mall Manager' })
   });
-  const ssoBody = await ssoRes.json();
-  assert.equal(ssoRes.status, 200);
-  assert.ok(ssoBody.token);
-  assert.equal(ssoBody.user.email, 'mall.manager@corporate.com');
-  assert.equal(ssoBody.user.provider, 'google');
+  assert.equal(portableRes.status, 404);
+
+  const oauthUrlRes = await fetch(`${baseUrl}/api/auth/google/url`);
+  assert.equal(oauthUrlRes.status, 404);
+
+  const forgedIdentityRes = await fetch(`${baseUrl}/api/auth/google/firebase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'mall.manager@corporate.com', name: 'Mall Manager' })
+  });
+  assert.equal(forgedIdentityRes.status, 401);
+
+  const invalidTokenRes = await fetch(`${baseUrl}/api/auth/google/firebase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken: 'not-a-firebase-id-token' })
+  });
+  assert.equal(invalidTokenRes.status, 401);
+
+  const registerRes = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'email-login@example.com', password: 'password12345' })
+  });
+  assert.equal(registerRes.status, 201);
 });
 
 test('Python scientific backend health and OLS/IQR/Monte Carlo analysis endpoints work automatically', async () => {

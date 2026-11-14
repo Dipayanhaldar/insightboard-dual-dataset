@@ -14,7 +14,8 @@
     "lint": "node --check server/index.js",
     "test": "node --test server/*.test.js src/v2/*.test.js",
     "check:pwa": "node scripts/validate-pwa.mjs",
-    "check:pwa:build": "node scripts/validate-pwa-build.mjs"
+    "check:pwa:build": "node scripts/validate-pwa-build.mjs",
+    "build:vercel": "vite build --outDir vercel-dist"
   },
   "dependencies": {
     "@google/genai": ">=1.0.0",

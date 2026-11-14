@@ -40,8 +40,8 @@ All connected surfaces share the same semantic release version and are validated
   - **Zone & Tenant Space Productivity Matrix**: Visual bar chart comparing zone revenue vs. space efficiency (`₹/sq.ft`) and automated managerial action cards (*Underperforming Target Recovery*, *High-Footfall Conversion Gap*, *Rent Coverage Stress Alert*, *Anchor Expansion Signal*).
 - **Lifetime-Free Server AI Summary & Retail Optimization (`/api/ai/summary` & `/api/ai/optimize`)**:
   - Powered by server-side Google Gemini (`@google/genai`) when `GEMINI_API_KEY` is configured on the host, paired with an **always-on, lifetime-free server-side analytical engine fallback** so every user gets structured executive summaries and 5-point retail optimization plans with **zero personal API keys required**.
-- **Cross-Platform Portable Google Sign-In (`/api/auth/google/url`, `/auth/callback`, `/api/auth/google/portable`)**:
-  - Works seamlessly across Render, Vercel, custom domains, Windows Store PWA, Android APK, and cloud development environments without locking the codebase to a single hosting provider.
+- **Email & Password Account Access**:
+  - Saved report history uses the existing email/password registration and sign-in endpoints. Google sign-in endpoints are disabled; no email supplied by a client can be used to mint an account session.
 - **Automated Microsoft Store PWA + Android APK CI/CD (`.github/workflows/release-windows-store-and-apk.yml`)**:
   - Automatically validates the PWA build, compiles a downloadable `.apk` (`InsightBoard-VDB-v2.1.0.apk`), generates/submits the Microsoft Store Partner Center package update, and publishes both artifacts to **GitHub Releases**.
 
@@ -121,3 +121,15 @@ The workflow `.github/workflows/release-windows-store-and-apk.yml` runs automati
 ## Future Monetization Readiness
 
 InsightBoard VDB `v2.1.0` is structured so future commercial tiers (such as multi-mall portfolio benchmarking, automated tenant billing exports, scheduled WhatsApp/Email executive digests, or enterprise SSO) can be toggled cleanly via user account roles in `/api/auth/*` without breaking the lifetime-free core analytics workflow.
+
+
+## Google sign-in (Firebase Authentication)
+
+InsightBoard's account panel supports both the existing email/password flow and Google sign-in through Firebase Authentication.
+
+1. In Firebase Console, open **Authentication → Sign-in method** and enable **Google**. Configure the OAuth client ID and client secret in the Firebase provider settings, not in frontend source code.
+2. Under **Authentication → Settings → Authorized domains**, add the production Vercel domain and any custom domain used by the website.
+3. The backend verifies Firebase ID tokens against Google's published signing certificates before issuing the existing InsightBoard API session. No OAuth client secret or Firebase service-account private key is required in Vercel environment variables for this verification flow.
+4. The project ID defaults to `banded-field-nbcxw`. Set `FIREBASE_PROJECT_ID` in the deployment environment only if the Firebase project changes. The existing `JWT_SECRET` requirement for InsightBoard API sessions remains unchanged.
+
+Google sign-in does not replace or remove email/password accounts. A Google account must return a verified email address.

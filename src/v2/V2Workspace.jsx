@@ -17,8 +17,11 @@ import {
   Headphones,
   ExternalLink,
   Lock,
-  Gauge
+  Gauge,
+  Chrome
 } from 'lucide-react';
+import { auth, googleProvider, signInWithPopup, signOut as firebaseSignOut } from '../firebase.js';
+import { getIdToken } from 'firebase/auth';
 import './V2Workspace.css';
 import GnaniVoiceStudio from './GnaniVoiceStudio.jsx';
 import AIProviderHub, { generateZeroCostCloudSummary } from './AIProviderHub.jsx';
@@ -315,19 +318,55 @@ export default function V2Workspace({
     }
   }
 
-  function signOut() {
+  async function signInWithGoogle() {
+    playButtonClick();
+    setAuthBusy(true);
+    setMessage('');
+    try {
+      const credential = await signInWithPopup(auth, googleProvider);
+      const idToken = await getIdToken(credential.user, true);
+      const response = await fetch('/api/auth/google/firebase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.token) {
+        throw new Error(data.error || 'Google sign-in could not be completed.');
+      }
+      try { sessionStorage.setItem('insightboard-api-token', data.token); } catch {}
+      setAccount(data.user || { email: credential.user.email || '' });
+      setAuthToken(data.token);
+      setAuthPassword('');
+      setMessage('Signed in with Google successfully.');
+      summonInsi('signin', 'INSI · Google account authenticated');
+    } catch (error) {
+      const code = error?.code || '';
+      const detail = code === 'auth/unauthorized-domain'
+        ? 'This website domain is not authorized in Firebase Authentication.'
+        : code === 'auth/operation-not-allowed'
+        ? 'Google sign-in is not enabled in Firebase Authentication.'
+        : error?.message || 'Could not sign in with Google. Try again.';
+      setMessage(detail);
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function signOut() {
     playButtonClick();
     try { sessionStorage.removeItem('insightboard-api-token'); } catch {}
     setAuthToken('');
     setAccount(null);
     setHistory([]);
     setAuthPassword('');
+    try { await firebaseSignOut(auth); } catch {}
     setMessage('You have signed out.');
   }
 
   async function saveSnapshot() {
     if (!authToken) {
-      setMessage('Sign in with your email and password before saving a report.');
+      setMessage('Sign in before saving a report.');
       return;
     }
     const snapshot = analytics || {};
@@ -653,7 +692,11 @@ export default function V2Workspace({
                     {authBusy ? <RefreshCw size={15} className="v2-spin" /> : authMode === 'register' ? <Mail size={15} /> : <LogIn size={15} />}
                     {authBusy ? 'Please wait…' : authMode === 'register' ? 'Create email account' : 'Sign in with email'}
                   </button>
-                  <small className="v2-muted">Email and password only. Google sign-in is not offered.</small>
+                  <button type="button" className="v2-button secondary btn-3d" onClick={signInWithGoogle} disabled={authBusy}>
+                    {authBusy ? <RefreshCw size={15} className="v2-spin" /> : <Chrome size={15} />}
+                    Continue with Google
+                  </button>
+                  <small className="v2-muted">Sign in with email and password or your Google account.</small>
                 </form>
               )}
             </div>

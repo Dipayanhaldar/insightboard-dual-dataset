@@ -16,3 +16,4 @@ server/.env.*
 !.env.example
 node_modules/
 dist/
+vercel-dist/

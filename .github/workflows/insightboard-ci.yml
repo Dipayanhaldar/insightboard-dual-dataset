@@ -59,5 +59,13 @@ jobs:
       - name: Build frontend for Render & Cloud Hosts
         run: npm run build
 
+      - name: Build frontend for Vercel static hosting
+        run: npm run build:vercel
+
+      - name: Verify Vercel output and API adapter
+        run: |
+          test -s vercel-dist/index.html
+          node --check 'api/[...path].js'
+
       - name: Verify offline production asset cache
         run: npm run check:pwa:build
