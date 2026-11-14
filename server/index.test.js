@@ -153,23 +153,23 @@ test('lifetime-free AI summary and retail optimization endpoints work without pe
   assert.ok(typeof optimizeBody.plan === 'string' && optimizeBody.plan.length > 40);
 });
 
-test('cross-platform Google OAuth URL and portable Google SSO endpoints function across hosts', async () => {
-  const urlRes = await fetch(`${baseUrl}/api/auth/google/url?origin=${encodeURIComponent(baseUrl)}`);
-  const urlBody = await urlRes.json();
-  assert.equal(urlRes.status, 200);
-  assert.equal(typeof urlBody.redirectUri, 'string');
-  assert.ok(urlBody.redirectUri.endsWith('/auth/callback'));
-
-  const ssoRes = await fetch(`${baseUrl}/api/auth/google/portable`, {
+test('legacy Google sign-in endpoints are disabled; email/password remains the supported account flow', async () => {
+  const portableRes = await fetch(`${baseUrl}/api/auth/google/portable`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'mall.manager@corporate.com', name: 'Mall Manager' })
   });
-  const ssoBody = await ssoRes.json();
-  assert.equal(ssoRes.status, 200);
-  assert.ok(ssoBody.token);
-  assert.equal(ssoBody.user.email, 'mall.manager@corporate.com');
-  assert.equal(ssoBody.user.provider, 'google');
+  assert.equal(portableRes.status, 404);
+
+  const oauthUrlRes = await fetch(`${baseUrl}/api/auth/google/url`);
+  assert.equal(oauthUrlRes.status, 404);
+
+  const registerRes = await fetch(`${baseUrl}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'email-login@example.com', password: 'password12345' })
+  });
+  assert.equal(registerRes.status, 201);
 });
 
 test('Python scientific backend health and OLS/IQR/Monte Carlo analysis endpoints work automatically', async () => {
