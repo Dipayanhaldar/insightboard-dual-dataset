@@ -38,7 +38,7 @@ test('production account routes fail closed when JWT_SECRET is not configured', 
       } catch {
         process.exitCode = 1;
       } finally {
-        server.close();
+        server.close(() => process.exit(process.exitCode || 0));
       }
     });
   `;
