@@ -3,6 +3,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { verifyFirebaseGoogleIdToken } from './firebaseToken.js';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'node:path';
@@ -201,7 +202,10 @@ const providerByokLimiter = rateLimit({
 
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
-  passwordHash: { type: String, required: true, select: false }
+  passwordHash: { type: String, required: false, select: false },
+  name: { type: String, default: '', maxlength: 120 },
+  firebaseUid: { type: String, default: '', maxlength: 128 },
+  authProvider: { type: String, default: 'password', enum: ['password', 'google'] }
 }, { timestamps: true });
 const reportSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
@@ -1524,7 +1528,7 @@ app.post('/api/auth/login', authLimiter, requireAuthConfig, requireDatabase, asy
   const email = safeText(req.body?.email, 254).toLowerCase();
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   const user = req.useMemoryStore ? memoryUsers.get(email) : await User.findOne({ email }).select('+passwordHash');
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+  if (!user?.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
     return res.status(401).json({ error: 'Email or password is incorrect.' });
   }
   return res.json({
@@ -1533,10 +1537,63 @@ app.post('/api/auth/login', authLimiter, requireAuthConfig, requireDatabase, asy
   });
 }));
 
-// Google sign-in was removed. Email/password is the only supported account flow.
+// Exchange a Firebase-issued Google ID token for the existing InsightBoard API session.
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || 'banded-field-nbcxw';
+app.post('/api/auth/google/firebase', authLimiter, requireAuthConfig, requireDatabase, asyncRoute(async (req, res) => {
+  const idToken = req.body?.idToken;
+  let claims;
+  try {
+    claims = await verifyFirebaseGoogleIdToken(idToken, FIREBASE_PROJECT_ID);
+  } catch {
+    return res.status(401).json({ error: 'Google sign-in could not be verified. Try again.' });
+  }
+
+  const email = safeText(claims.email, 254).toLowerCase();
+  const isGoogleProvider = claims.firebase?.sign_in_provider === 'google.com';
+  if (
+    !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) ||
+    claims.email_verified !== true ||
+    !isGoogleProvider
+  ) {
+    return res.status(401).json({ error: 'Use a verified Google account to sign in.' });
+  }
+
+  let user = req.useMemoryStore
+    ? memoryUsers.get(email)
+    : await User.findOne({ email });
+
+  if (!user) {
+    const newUser = {
+      email,
+      name: safeText(claims.name || '', 120),
+      firebaseUid: safeText(claims.sub, 128),
+      authProvider: 'google',
+      createdAt: new Date()
+    };
+    if (req.useMemoryStore) {
+      newUser._id = new mongoose.Types.ObjectId();
+      memoryUsers.set(email, newUser);
+      memoryUsersById.set(newUser._id.toString(), newUser);
+      user = newUser;
+    } else {
+      try {
+        user = await User.create(newUser);
+      } catch (error) {
+        if (error?.code !== 11000) throw error;
+        user = await User.findOne({ email });
+        if (!user) throw error;
+      }
+    }
+  }
+
+  return res.json({
+    token: makeToken(user),
+    user: { id: user._id.toString(), email: user.email, name: user.name || '' }
+  });
+}));
 
 app.get('/api/auth/me', requireDatabase, requireAuth, asyncRoute(async (req, res) => {
-  const user = req.useMemoryStore ? memoryUsersById.get(req.auth.sub) : await User.findById(req.auth.sub).select('_id email');
+  const user = req.useMemoryStore ? memoryUsersById.get(req.auth.sub) : await User.findById(req.auth.sub).select('_id email name');
   if (!user) return res.status(401).json({ error: 'Account was not found. Sign in again.' });
   return res.json({ user: { id: user._id.toString(), email: user.email, name: user.name || '' } });
 }));
