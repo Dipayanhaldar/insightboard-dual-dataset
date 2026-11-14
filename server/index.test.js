@@ -1,5 +1,6 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import app from './index.js';
 
 let server;
@@ -20,6 +21,34 @@ after(async () => {
     server.close(error => error ? reject(error) : resolve());
     server.closeAllConnections?.();
   });
+});
+
+test('production account routes fail closed when JWT_SECRET is not configured', () => {
+  const script = `
+    import app from './server/index.js';
+    const server = app.listen(0, '127.0.0.1', async () => {
+      try {
+        const response = await fetch('http://127.0.0.1:' + server.address().port + '/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'blocked@example.com', password: 'password12345' })
+        });
+        const body = await response.json();
+        if (response.status !== 503 || !String(body.error || '').includes('not configured')) process.exitCode = 1;
+      } catch {
+        process.exitCode = 1;
+      } finally {
+        server.close();
+      }
+    });
+  `;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    timeout: 15000,
+    env: { ...process.env, NODE_ENV: 'production', JWT_SECRET: '' }
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });
 
 test('liveness probe is available without a database connection', async () => {
